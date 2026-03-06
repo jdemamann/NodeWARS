@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt" style="background:#04070f;height:100%">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>NODE WARS</title>
+<link rel="icon" href="data:,">
+<!-- Fonts loaded async to avoid blocking in local-file contexts -->
+<script>
+(function(){
+  try{
+    var l=document.createElement('link');
+    l.rel='stylesheet';
+    l.href='https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&family=Exo+2:wght@400;600;700&display=swap';
+    document.head.appendChild(l);
+  }catch(e){}
+})();
+</script>
+<link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+<noscript style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#ff3d5a;font-size:14px;z-index:9999">
+  ⚠ JavaScript é necessário para jogar NODE WARS.
+</noscript>
+
+<!-- Boot splash -->
+<div id="bootmsg" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#00e5ff;font-size:13px;z-index:9999;letter-spacing:3px;font-family:monospace">
+  NODE WARS<br><span style="font-size:9px;color:#4a5e72;margin-top:8px;display:block">LOADING...</span>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hl">NODE WARS</div>
+  <div class="hs"></div>
+  <div class="hst hp"><div class="lb">YOU</div><div class="vl" id="sp">0</div></div>
+  <div class="hs"></div>
+  <div class="hst hn"><div class="lb">NEUTRAL</div><div class="vl" id="sn">0</div></div>
+  <div class="hs"></div>
+  <div class="hst he"><div class="lb">ENEMY</div><div class="vl" id="se">0</div></div>
+  <div class="hsp"></div>
+  <span id="hlvl">LVL 1</span>
+  <span id="hln" style="font-size:8px;letter-spacing:2px;color:#4a5e72;margin-left:6px"></span>
+  <span id="hpar" style="font-size:8px;letter-spacing:1px;color:#4a5e72;margin-left:8px"></span>
+  <span id="hscore" style="display:none"></span>
+  <div class="hh" id="hhints"></div>
+  <button id="hlang" title="Language / Idioma" style="padding:4px 8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.45);font:bold 8px 'Orbitron';cursor:pointer;border-radius:3px;letter-spacing:1px">PT|EN</button>
+  <button id="hpause" title="Pause (ESC)" style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:1.5px solid rgba(0,229,255,0.35);background:rgba(0,229,255,0.07);color:#00e5ff;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;cursor:pointer;border-radius:4px;transition:all .2s">
+    <span style="font-size:14px;line-height:1">☰</span>
+    <span data-t="pause">PAUSE</span>
+  </button>
+</div>
+
+<canvas id="canvas"></canvas>
+<div id="dc"></div>
+
+<!-- Tutorial overlay -->
+<div id="tutbox" class="off">
+  <div class="tut-world-badge" id="tutWorldBadge" style="display:none"></div>
+  <div class="tsteps" id="tutsteps"></div>
+  <div id="tutTitle"></div>
+  <div id="tutText"></div>
+  <button id="tutNext">NEXT &rarr;</button>
+</div>
+
+<!-- ── SCREENS ── -->
+
+<!-- Main Menu -->
+<div class="scr" id="sm">
+  <div class="mt">NODE WARS</div>
+  <div class="ms" id="msub">The network is alive. Energy flows. Nodes evolve.<br>Dominate the grid — or be consumed by it.</div>
+  <div class="mbtns">
+    <button class="btn" id="btnplay"><span data-t="startCampaign">▶ START CAMPAIGN</span></button>
+    <button class="btn sec" id="btnstory"><span data-t="theStory">◈ THE STORY</span></button>
+    <button class="btn sec" id="btnsettings" style="margin-top:4px;font-size:10px;letter-spacing:2px"><span data-t="settings">⚙ SETTINGS</span></button>
+    <button class="btn sec" id="btncredits" style="font-size:10px;letter-spacing:2px"><span data-t="credits">◈ CREDITS</span></button>
+  </div>
+</div>
+
+<!-- Settings Screen -->
+<div class="scr off" id="sq">
+  <div class="st" data-t="settings">⚙ SETTINGS</div>
+  <div class="settings-body" id="settingsBody">
+    <div class="sgroup">
+      <div class="sgroup-title" data-t="setWorlds">🌍 WORLDS</div>
+      <div class="srow">
+        <div class="slabel">
+          <span class="sw2col" data-t="setW2">⊗ WORLD 2: THE VOID</span>
+          <span class="sdesc" data-t="setW2desc">Hazardous vortexes drain energy in transit</span>
+        </div>
+        <button class="stoggle" id="togW2">OFF</button>
+      </div>
+      <div class="srow">
+        <div class="slabel">
+          <span class="sw3col" data-t="setW3">⚡ WORLD 3: NEXUS PRIME</span>
+          <span class="sdesc" data-t="setW3desc">Relays boost flow · Pulsars broadcast energy</span>
+        </div>
+        <button class="stoggle" id="togW3">OFF</button>
+      </div>
+    </div>
+    <div class="sgroup">
+      <div class="sgroup-title" data-t="setGameplay">🎮 GAMEPLAY</div>
+      <div class="srow">
+        <div class="slabel">
+          <span data-t="setSfx">SOUND EFFECTS</span>
+          <span class="sdesc" data-t="setSfxDesc">Procedural audio feedback</span>
+        </div>
+        <button class="stoggle" id="togSound">ON</button>
+      </div>
+      <div class="srow">
+        <div class="slabel">
+          <span data-t="setMusic">MUSIC</span>
+          <span class="sdesc" data-t="setMusicDesc">Procedural adaptive soundtrack</span>
+        </div>
+        <button class="stoggle" id="togMusic">ON</button>
+      </div>
+    </div>
+    <div class="sgroup">
+      <div class="sgroup-title" data-t="setDisplay">🖥 DISPLAY</div>
+      <div class="srow">
+        <div class="slabel">
+          <span data-t="setFont">UI FONT</span>
+          <span class="sdesc" data-t="setFontDesc">Change the display font</span>
+        </div>
+        <button class="stoggle font-cycle-btn" id="btnFontCycle">ORBITRON</button>
+      </div>
+      <div class="srow">
+        <div class="slabel">
+          <span data-t="setZoom">TEXT SIZE</span>
+          <span class="sdesc" data-t="setZoomDesc">Scale the UI text (50–200%)</span>
+        </div>
+        <div class="srow-zoom">
+          <button class="zoom-ctrl" id="btnZoomDec">−</button>
+          <span class="zoom-val" id="zoomDisplay">100%</span>
+          <button class="zoom-ctrl" id="btnZoomInc">+</button>
+        </div>
+      </div>
+      <div class="srow" id="langRowSettings">
+        <div class="slabel">
+          <span data-t="setLang">LANGUAGE</span>
+          <span class="sdesc" data-t="setLangDesc">Português / English</span>
+        </div>
+        <div class="lang-sel" style="margin:0;gap:6px">
+          <button class="btn-lang active" id="btnlangpt" style="padding:5px 12px;font-size:10px">🇧🇷 PT</button>
+          <button class="btn-lang" id="btnlangen" style="padding:5px 12px;font-size:10px">🇺🇸 EN</button>
+        </div>
+      </div>
+    </div>
+    <div class="sgroup">
+      <div class="sgroup-title" data-t="setDeveloper">🛠 DEVELOPER</div>
+      <div class="srow">
+        <div class="slabel">
+          <span style="color:#f5c518" data-t="setDebug">⚡ DEBUG MODE</span>
+          <span class="sdesc" data-t="setDebugDesc">All levels unlocked · Shows hidden info</span>
+        </div>
+        <button class="stoggle" id="togDebug">OFF</button>
+      </div>
+      <div class="srow" id="debugResetRow" style="display:none">
+        <div class="slabel">
+          <span style="color:#ff4060" data-t="setReset">⚠ RESET PROGRESS</span>
+          <span class="sdesc" data-t="setResetDesc">Clears all stars and completed levels</span>
+        </div>
+        <button class="stoggle sdanger" id="btnResetProg">RESET</button>
+      </div>
+    </div>
+    <div class="debug-info" id="debugInfoPanel" style="display:none">
+      <div style="color:#f5c518;font:bold 9px 'Orbitron';letter-spacing:2px;margin-bottom:6px">DEBUG INFO</div>
+      <div id="debugInfoText" style="color:rgba(255,255,255,0.5);font:8px monospace;line-height:1.6"></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:9px;margin-top:12px">
+    <button class="btn sec sm" id="btnSettingsBack" data-t="back">← MENU</button>
+  </div>
+</div>
+
+<!-- Level Select -->
+<div class="scr off" id="sl">
+  <div class="st" id="slTitle">SELECT PHASE</div>
+  <div class="world-tabs" id="worldTabs"></div>
+  <div class="lg" id="lgrid"></div>
+  <div style="display:flex;gap:9px;margin-top:8px;align-items:center">
+    <button class="btn sec sm" id="btnback">← MENU</button>
+    <div id="worldDesc" style="font:8px 'Share Tech Mono',monospace;color:rgba(255,255,255,0.3);flex:1;text-align:right;padding-right:4px"></div>
+  </div>
+</div>
+
+<!-- Story Screen -->
+<div class="scr off" id="ss">
+  <div class="story-wrap" id="storywrap"></div>
+  <div style="margin-top:12px;display:flex;gap:9px">
+    <button class="btn sec sm" id="btnstoryback2">← MENU</button>
+    <button class="btn ok" id="btnstoryback">▶ ENTER THE GRID</button>
+  </div>
+</div>
+
+<!-- Result Screen -->
+<div class="scr off" id="sr">
+  <div class="rt" id="rtitle">VICTORY</div>
+  <div class="rs" id="rsub"></div>
+  <div class="rscore" id="rscore" style="display:none"></div>
+  <div class="li" id="rinfo"></div>
+  <div class="rbs">
+    <button class="btn sec sm" id="btnrl">PHASES</button>
+    <button class="btn warn sm" id="btnrr">RETRY</button>
+    <button class="btn sm" id="btnrn">NEXT ▶</button>
+  </div>
+</div>
+
+<!-- Pause Menu -->
+<div class="scr off" id="pm">
+  <div class="ptitle">⏸ <span data-t="pause">PAUSED</span></div>
+  <div class="pinfo" id="pinfo">PHASE 1</div>
+  <div class="pbtns">
+    <button class="btn" id="btnresume"><span data-t="resume">▶ RESUME</span></button>
+    <button class="btn warn" id="btnprr"><span data-t="restart">RESTART PHASE</span></button>
+    <button class="btn sec" id="btnprl"><span data-t="phaseSelect">PHASE SELECT</span></button>
+    <button class="btn sec" id="btnpskip"><span data-t="skip">SKIP PHASE ↷</span></button>
+    <button class="btn sec" style="border-color:rgba(255,61,90,0.4);color:#ff3d5a" id="btnpmenu"><span data-t="mainMenu">☰ MAIN MENU</span></button>
+  </div>
+  <div class="pinfo" id="ppsave" style="margin-top:6px;font-size:7px"><span data-t="progSaved">Progress auto-saved</span></div>
+</div>
+
+<!-- Credits Screen (content built dynamically by buildCredits() in Screens.js) -->
+<div class="scr off" id="scredit">
+  <div class="cred-wrap" id="credWrap"></div>
+  <div style="display:flex;gap:9px;margin-top:16px">
+    <button class="btn sec sm" id="btncreditsback" data-t="creditsBack">← MENU</button>
+  </div>
+</div>
+
+<!-- World Banner (injected by JS) -->
+<div id="worldBanner"></div>
+
+<!-- Overlays -->
+<div id="toast"></div>
+<div id="fade" class="in"></div>
+
+<!-- Entry point (ES Module) -->
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

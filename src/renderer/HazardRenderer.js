@@ -1,0 +1,227 @@
+/* ================================================================
+   NODE WARS v3 — Hazard Renderer
+
+   Draws W2 vortex hazards and W3 pulsar beacons.
+   ================================================================ */
+
+export class HazardRenderer {
+  /* ── W2: Vortex hazards ── */
+  static drawVortex(ctx, hz, time) {
+    const x = hz.x, y = hz.y, r = hz.r, ph = hz.phase;
+    const warn = hz._warn || 0;
+
+    /* ── Pulsing OFF state: dormant visual + countdown ring ── */
+    if (hz.pulsing && !hz.pulseActive) {
+      ctx.save();
+      /* Faint outline */
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(120,0,180,0.14)';
+      ctx.lineWidth   = 1;
+      ctx.setLineDash([5, 12]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      /* Countdown fill arc (0 → full as reactivation nears) */
+      const prog = Math.min(1, hz.pulseTimer / (hz.pulsePeriod / 2));
+      if (prog > 0.02) {
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.55, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
+        ctx.strokeStyle = `rgba(200,60,255,${0.25 + prog * 0.45})`;
+        ctx.lineWidth   = 3;
+        ctx.shadowColor = '#c040ff';
+        ctx.shadowBlur  = 10 * prog;
+        ctx.stroke();
+        ctx.shadowBlur  = 0;
+      }
+      ctx.restore();
+      return;
+    }
+
+    ctx.save();
+
+    /* Outer warning ring */
+    const wAlpha = 0.07 + warn * 0.18 + Math.sin(time * 4) * 0.04;
+    ctx.beginPath();
+    ctx.arc(x, y, hz.warningR || r * 1.5, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(180,0,255,${wAlpha})`;
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([5,8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    /* Dark core gradient */
+    const grad = ctx.createRadialGradient(x, y, r * 0.1, x, y, r);
+    grad.addColorStop(0,    'rgba(80,0,140,0.82)');
+    grad.addColorStop(0.55, 'rgba(50,0,100,0.55)');
+    grad.addColorStop(1,    'rgba(20,0,40,0)');
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    /* Spiral arms */
+    for (let i = 0; i < 3; i++) {
+      const a = ph + (i / 3) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.6, a, a + 1.2);
+      ctx.strokeStyle = `rgba(160,0,255,${0.35 + warn * 0.25})`;
+      ctx.lineWidth   = 2.5;
+      ctx.shadowColor = '#a000ff';
+      ctx.shadowBlur  = 12 + warn * 8;
+      ctx.stroke();
+    }
+
+    /* Inner eye */
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.22, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(220,80,255,${0.4 + Math.sin(time * 8) * 0.15})`;
+    ctx.shadowColor = '#e060ff';
+    ctx.shadowBlur  = 18;
+    ctx.fill();
+    ctx.shadowBlur  = 0;
+
+    /* Particle sparks */
+    for (let i = 0; i < 5; i++) {
+      const spa = ph * 2.1 + i * 1.26;
+      const spr = r * (0.3 + 0.6 * ((i * 0.37 + ph * 0.5) % 1));
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(spa) * spr, y + Math.sin(spa) * spr, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(220,100,255,${0.5 + i * 0.08})`;
+      ctx.fill();
+    }
+
+    /* Super-vortex: extra outer menace ring */
+    if (hz.isSuper) {
+      ctx.beginPath();
+      ctx.arc(x, y, r * 1.72, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,0,255,${0.12 + Math.sin(time * 2.2) * 0.07})`;
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([10, 8]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font          = 'bold 9px "Orbitron",sans-serif';
+      ctx.fillStyle     = `rgba(255,80,255,${0.7 + Math.sin(time * 4) * 0.2})`;
+      ctx.textAlign     = 'center';
+      ctx.textBaseline  = 'middle';
+      ctx.shadowColor   = '#ff00ff';
+      ctx.shadowBlur    = 14;
+      ctx.fillText('Ⓢ VOID CORE', x, y + r * 1.72 + 14);
+      ctx.shadowBlur    = 0;
+    } else if (warn > 0.1) {
+      /* Danger label when active */
+      ctx.font          = 'bold 9px "Orbitron",sans-serif';
+      ctx.fillStyle     = `rgba(255,100,255,${warn * 0.9})`;
+      ctx.textAlign     = 'center';
+      ctx.textBaseline  = 'middle';
+      ctx.shadowColor   = '#ff00ff';
+      ctx.shadowBlur    = 10;
+      ctx.fillText('VORTEX', x, y + r + 14);
+      ctx.shadowBlur    = 0;
+    }
+
+    ctx.restore();
+  }
+
+  /* ── W3: Pulsar beacons ── */
+  static drawPulsar(ctx, ps) {
+    const x      = ps.x, y = ps.y, r = ps.r;
+    const pulse  = ps.pulse || 0;
+    const ph     = ps.phase || 0;
+    const charge = ps.charging ? Math.max(0, 1.2 - (ps.timer || 0)) : 0;
+    ctx.save();
+
+    /* Range ring */
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,160,0,${0.06 + pulse * 0.12})`;
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([4,10]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    /* Expanding pulse wave */
+    if (pulse > 0.05) {
+      const waveR = r * (1 - pulse) * 0.8 + r * 0.2;
+      ctx.beginPath();
+      ctx.arc(x, y, waveR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,200,50,${pulse * 0.7})`;
+      ctx.lineWidth   = 2 + pulse * 3;
+      ctx.shadowColor = '#ffc800';
+      ctx.shadowBlur  = 20 * pulse;
+      ctx.stroke();
+      ctx.shadowBlur  = 0;
+    }
+
+    /* Charge ring */
+    if (charge > 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, 28, 0, Math.PI * 2 * charge);
+      ctx.strokeStyle = `rgba(255,200,50,${0.7 * charge})`;
+      ctx.lineWidth   = 3;
+      ctx.shadowColor = '#ffaa00';
+      ctx.shadowBlur  = 14 * charge;
+      ctx.stroke();
+      ctx.shadowBlur  = 0;
+    }
+
+    /* Body radial gradient */
+    const grd = ctx.createRadialGradient(x, y, 4, x, y, 22);
+    grd.addColorStop(0,   'rgba(255,220,100,0.9)');
+    grd.addColorStop(0.5, 'rgba(255,140,0,0.65)');
+    grd.addColorStop(1,   'rgba(255,80,0,0)');
+    ctx.beginPath();
+    ctx.arc(x, y, 22, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    /* Rotating arms */
+    for (let i = 0; i < 4; i++) {
+      const a  = ph + (i / 4) * Math.PI * 2;
+      const ax = x + Math.cos(a) * 14;
+      const ay = y + Math.sin(a) * 14;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(ax, ay);
+      ctx.strokeStyle = `rgba(255,180,0,${0.45 + charge * 0.3})`;
+      ctx.lineWidth   = 2;
+      ctx.shadowColor = '#ffcc00';
+      ctx.shadowBlur  = 8;
+      ctx.stroke();
+      ctx.shadowBlur  = 0;
+    }
+
+    ctx.font          = 'bold 8px "Orbitron",sans-serif';
+    ctx.fillStyle     = ps.isSuper ? 'rgba(255,240,100,0.9)' : 'rgba(255,200,80,0.7)';
+    ctx.textAlign     = 'center';
+    ctx.textBaseline  = 'middle';
+    ctx.shadowColor   = ps.isSuper ? '#ffdd00' : 'transparent';
+    ctx.shadowBlur    = ps.isSuper ? 10 : 0;
+    ctx.fillText(ps.isSuper ? 'NEXUS CORE' : 'PULSAR', x, y + 28);
+    ctx.shadowBlur    = 0;
+
+    /* Super-pulsar: extra broadcast range ring */
+    if (ps.isSuper) {
+      ctx.beginPath();
+      ctx.arc(x, y, ps.r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,200,0,${0.05 + (ps.pulse || 0) * 0.12})`;
+      ctx.lineWidth   = 1.5;
+      ctx.setLineDash([8, 16]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      /* Expanding super-pulse wave */
+      if ((ps.pulse || 0) > 0.05) {
+        const wR = ps.r * (1 - ps.pulse * 0.85);
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(30, wR), 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,220,60,${ps.pulse * 0.5})`;
+        ctx.lineWidth   = 3 + ps.pulse * 5;
+        ctx.shadowColor = '#ffcc00';
+        ctx.shadowBlur  = 30 * ps.pulse;
+        ctx.stroke();
+        ctx.shadowBlur  = 0;
+      }
+    }
+
+    ctx.restore();
+  }
+}
