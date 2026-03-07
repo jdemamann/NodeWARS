@@ -6,6 +6,7 @@ import { MAX_E, LVL_STEP, BUILD_B, BUILD_PX } from './constants.js';
 
 /* ── MATH ── */
 export const vd    = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
+export const vdSq  = (ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay; return dx * dx + dy * dy; };
 export const clamp = (v, lo, hi)      => Math.max(lo, Math.min(hi, v));
 export const rnd   = (a, b)           => a + Math.random() * (b - a);
 

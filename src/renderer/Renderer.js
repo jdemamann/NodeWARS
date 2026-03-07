@@ -57,7 +57,7 @@ export class Renderer {
     const camX = game.camX || 0;
     const camY = game.camY || 0;
     ctx.save();
-    ctx.translate(camX, camY);
+    ctx.translate(camX | 0, camY | 0);
 
     /* Hazards */
     if (game.hazards) {
@@ -76,10 +76,8 @@ export class Renderer {
     /* Tentacle flow orbs */
     game.orbPool.draw(ctx);
 
-    /* Free orbs (post-cut particles) */
-    if (game.freeOrbs) {
-      game.freeOrbs.forEach(o => o.draw(ctx));
-    }
+    /* Free orbs (post-cut particles, pooled) */
+    game.freeOrbPool.draw(ctx);
 
     /* Nodes */
     game.nodes.forEach(n =>

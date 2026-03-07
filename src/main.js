@@ -112,6 +112,8 @@ function wireButtons() {
     const id  = 'tog' + key.charAt(0).toUpperCase() + key.slice(1);
     $id(id)?.addEventListener('click', () => toggleSetting(key));
   });
+  /* Explicit listener — bypasses the forEach so caching can't break it */
+  $id('togHighGraphics')?.addEventListener('click', () => toggleSetting('highGraphics'));
   $id(IDS.BTN_RESET_PROG)?.addEventListener('click', () => {
     if (!confirm('Reset all progress?')) return;
     STATE.resetProgress();
@@ -145,7 +147,7 @@ function wireButtons() {
     else if (w === 3) Music.playNexus();
     else Music.playGenesis();
   });
-  $id(IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { game.paused = false; buildWorldTabs(); showScr('levels'); }));
+  $id(IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
   $id(IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); }));
   $id(IDS.BTN_PSKIP)?.addEventListener('click', () => {
     if (STATE.curLvl < LEVELS.length - 1) {
@@ -156,7 +158,7 @@ function wireButtons() {
     } else showToast(T('alreadyFinal'));
   });
   $id(IDS.BTN_PMENU)?.addEventListener('click', () => {
-    Music.menuClick(); Music.playMenu(); fadeGo(() => { game.paused = false; showScr('menu'); });
+    Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu'));
   });
 
   /* Language buttons (now in settings) */

@@ -6,13 +6,13 @@
    ================================================================ */
 
 import { LEVELS, TentState, NodeType, MAX_SLOTS, EMBRYO } from './constants.js';
-import { vd, bldC, bezPt, findCutT, maxRange, baseRegen, domR, clamp } from './utils.js';
+import { vd, vdSq, bldC, bezPt, findCutT, maxRange, baseRegen, domR, clamp } from './utils.js';
 import { bus }          from './EventBus.js';
 import { STATE }        from './GameState.js';
 import { T }            from './i18n.js';
 import { GNode }        from './entities/GNode.js';
 import { Tent }         from './entities/Tent.js';
-import { OrbPool, FreeOrb, shouldSpawnOrb } from './entities/Orb.js';
+import { OrbPool, FreeOrbPool, shouldSpawnOrb } from './entities/Orb.js';
 import { AI }           from './systems/AI.js';
 import { Tutorial }     from './systems/Tutorial.js';
 import { Physics }      from './systems/Physics.js';
@@ -51,10 +51,10 @@ export class Game {
 
     this.nodes      = [];
     this.tents      = [];
-    this.freeOrbs   = [];
-    this.hazards    = [];
-    this.pulsars    = [];
-    this.orbPool    = new OrbPool(150);
+    this.hazards      = [];
+    this.pulsars      = [];
+    this.orbPool      = new OrbPool(150);
+    this.freeOrbPool  = new FreeOrbPool(30);
 
     this.sel        = null;
     this.hoverNode  = null;
@@ -79,6 +79,7 @@ export class Game {
     this.camX       = 0;
     this.camY       = 0;
     this.fogDirty   = true;
+    this._fogTimer  = 0;
     this._lastWorld = 0;
 
     this.fogRevealTimer = 0;
@@ -122,9 +123,10 @@ export class Game {
     this.cfg = cfg;
     STATE.curLvl = idx;
 
-    this.nodes = []; this.tents = []; this.freeOrbs = [];
+    this.nodes = []; this.tents = [];
     this.sel   = null; this.done = false; this.paused = false; this.scoreTime = 0;
     this.camX  = 0; this.camY = 0; this.fogDirty = true; this.fogRevealTimer = 0;
+    this._fogTimer = 0; this.freeOrbPool = new FreeOrbPool(30);
     this._frenzyLog = []; this._aiCutLog = []; this.wastedTents = 0;
     this.frenzyCount = 0; this.cutsTotal = 0; this.frenzyTimer = 0;
     this.hoverNode = null; this.hoverPin = false;
@@ -430,31 +432,32 @@ export class Game {
 
     /* Node updates */
     const frenzyActive = this.frenzyTimer > 0;
-    this.nodes.forEach(n => n.update(dt, frenzyActive));
+    for (let _i = 0; _i < this.nodes.length; _i++) this.nodes[_i].update(dt, frenzyActive);
 
     /* World systems */
     Physics.updateVortex(this, dt);
     Physics.updatePulsar(this, dt);
     Physics.updateRelay(this);
     Physics.updateSignalTower(this, dt);
-    Physics.updateFog(this);
+    Physics.updateFog(this, dt);
     Physics.updateAutoRetract(this);
     Physics.updateCamera(this, dt);
 
     /* Tent updates */
-    this.tents.forEach(t => {
-      t.update(dt);
+    for (let _i = 0; _i < this.tents.length; _i++) {
+      const _t = this.tents[_i];
+      _t.update(dt);
       /* Orb spawning delegated to OrbPool */
-      if (t.alive && (t.state === TentState.ACTIVE || t.state === TentState.ADVANCING)) {
-        if (shouldSpawnOrb(t, dt)) {
-          this.orbPool.get(t, false);
+      if (_t.alive && (_t.state === TentState.ACTIVE || _t.state === TentState.ADVANCING)) {
+        if (shouldSpawnOrb(_t, dt)) {
+          this.orbPool.get(_t, false);
         }
-        const s = t.es;
-        if (s.energy >= s.maxE * 0.93 && s.outCount > 1 && Math.random() < 0.22) {
-          this.orbPool.get(t, true);
+        const _s = _t.es;
+        if (_s.energy >= _s.maxE * 0.93 && _s.outCount > 1 && Math.random() < 0.22) {
+          this.orbPool.get(_t, true);
         }
       }
-    });
+    }
     for (let i = this.tents.length - 1; i >= 0; i--) {
       if (this.tents[i].state === TentState.DEAD) this.tents.splice(i, 1);
     }
@@ -462,8 +465,8 @@ export class Game {
     /* Orb pool */
     this.orbPool.update(dt);
 
-    /* Free orbs */
-    this.freeOrbs = this.freeOrbs.filter(o => o.update(dt));
+    /* Free orbs (pooled — no allocation) */
+    this.freeOrbPool.update(dt);
 
     /* AI */
     this.ai.update(dt);
@@ -578,7 +581,7 @@ export class Game {
   /* ─────────────────────────────── INPUT ── */
   click(x, y) {
     const cx = x - (this.camX || 0), cy = y - (this.camY || 0);
-    const hit = this.nodes.find(n => n.type !== NodeType.HAZARD && vd(cx, cy, n.x, n.y) <= n.radius + 12);
+    const hit = this.nodes.find(n => n.type !== NodeType.HAZARD && vdSq(cx, cy, n.x, n.y) <= (n.radius + 12) * (n.radius + 12));
 
     if (!hit) { this.clearSel(); this.hoverPin = false; this.hoverNode = null; return; }
 
@@ -732,7 +735,7 @@ export class Game {
       const nOrbs = Math.min(6, Math.round(tgtShare / 2) + 2);
       for (let i = 0; i < nOrbs; i++) {
         const sp2 = bezPt(actualCut, t.source.x, t.source.y, cp2.x, cp2.y, t.target.x, t.target.y);
-        this.freeOrbs.push(new FreeOrb(sp2.x + (Math.random()-0.5)*12, sp2.y + (Math.random()-0.5)*12, tgtNode.x, tgtNode.y, col2, tgtShare));
+        this.freeOrbPool.get(sp2.x + (Math.random()-0.5)*12, sp2.y + (Math.random()-0.5)*12, tgtNode.x, tgtNode.y, col2, tgtShare);
       }
 
       t.kill();
@@ -767,7 +770,7 @@ export class Game {
     }
     const camX = this.camX || 0, camY = this.camY || 0;
     const hov  = this.nodes.find(n =>
-      n !== this.sel && vd(this.mx - camX, this.my - camY, n.x, n.y) <= n.radius + 16
+      n !== this.sel && vdSq(this.mx - camX, this.my - camY, n.x, n.y) <= (n.radius + 16) * (n.radius + 16)
     );
     const el = $id(IDS.DC);
     if (!el) return;
@@ -840,7 +843,7 @@ export class Game {
       if (!this.hoverPin && this.state === 'playing' && !this.paused) {
         const camX = this.camX || 0, camY = this.camY || 0;
         this.hoverNode = this.nodes.find(n =>
-          !n.isRelay && vd(e.offsetX - camX, e.offsetY - camY, n.x, n.y) <= n.radius + 14
+          !n.isRelay && vdSq(e.offsetX - camX, e.offsetY - camY, n.x, n.y) <= (n.radius + 14) * (n.radius + 14)
         ) || null;
       }
     });
@@ -869,7 +872,7 @@ export class Game {
           if (!this._tapStart) return;
           const camX = this.camX || 0, camY = this.camY || 0;
           const hit  = this.nodes.find(n =>
-            Math.hypot((tx - camX) - n.x, (ty - camY) - n.y) <= n.radius + 14 && !n.isRelay
+            !n.isRelay && vdSq(tx - camX, ty - camY, n.x, n.y) <= (n.radius + 14) * (n.radius + 14)
           );
           if (hit) { this.hoverNode = hit; this.hoverPin = true; }
         }, 400);

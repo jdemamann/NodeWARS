@@ -110,7 +110,17 @@ export class OrbPool {
 /* ── FREE ORB (post-cut energy burst particle) ── */
 
 export class FreeOrb {
-  constructor(x, y, tx, ty, col, energy) {
+  constructor() { this._reset(); }
+
+  _reset() {
+    this.x = 0; this.y = 0;
+    this.tx = 0; this.ty = 0;
+    this.col = '#fff'; this.energy = 0;
+    this.alive = false; this.age = 0;
+    this.vx = 0; this.vy = 0;
+  }
+
+  init(x, y, tx, ty, col, energy) {
     this.x = x; this.y = y;
     this.tx = tx; this.ty = ty;
     this.col = col; this.energy = energy;
@@ -118,6 +128,7 @@ export class FreeOrb {
     const d = Math.hypot(tx - x, ty - y) || 1;
     this.vx = (tx - x) / d * 280;
     this.vy = (ty - y) / d * 280;
+    return this;
   }
 
   update(dt) {
@@ -135,6 +146,42 @@ export class FreeOrb {
     ctx.fillStyle = this.col; ctx.globalAlpha = a * 0.9;
     ctx.shadowColor = this.col; ctx.shadowBlur = 8;
     ctx.fill(); ctx.restore();
+  }
+}
+
+/* ── FREE ORB POOL ── */
+
+export class FreeOrbPool {
+  constructor(capacity = 30) {
+    this._pool   = Array.from({ length: capacity }, () => new FreeOrb());
+    this._active = [];
+  }
+
+  get(x, y, tx, ty, col, energy) {
+    const o = this._pool.pop() || new FreeOrb();
+    o.init(x, y, tx, ty, col, energy);
+    this._active.push(o);
+    return o;
+  }
+
+  update(dt) {
+    let i = this._active.length;
+    while (i--) {
+      const o = this._active[i];
+      o.update(dt);
+      if (!o.alive) {
+        this._pool.push(o);
+        this._active.splice(i, 1);
+      }
+    }
+  }
+
+  draw(ctx) {
+    for (const o of this._active) o.draw(ctx);
+  }
+
+  reset() {
+    while (this._active.length) this._pool.push(this._active.pop());
   }
 }
 

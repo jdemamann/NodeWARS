@@ -17,6 +17,7 @@ export const LANG = {
     credits:'◈ CREDITS',
     /* Settings labels */
     setWorlds:'WORLDS', setGameplay:'GAMEPLAY', setDisplay:'DISPLAY', setDeveloper:'DEVELOPER',
+    setHighGfx:'✦ HIGH GRAPHICS', setHighGfxDesc:'Shadow & glow effects · disable for better performance',
     setW2:'⊗ WORLD 2: THE VOID', setW2desc:'Hazardous vortexes drain energy in transit',
     setW3:'⚡ WORLD 3: NEXUS PRIME', setW3desc:'Relays boost flow · Pulsars broadcast energy',
     setSfx:'SOUND EFFECTS', setSfxDesc:'Procedural audio feedback',
@@ -140,6 +141,7 @@ export const LANG = {
     credits:'◈ CRÉDITOS',
     /* Settings labels */
     setWorlds:'MUNDOS', setGameplay:'GAMEPLAY', setDisplay:'EXIBIÇÃO', setDeveloper:'DESENVOLVEDOR',
+    setHighGfx:'✦ GRÁFICOS ALTOS', setHighGfxDesc:'Sombras e brilhos · desative para melhor desempenho',
     setW2:'⊗ MUNDO 2: O VAZIO', setW2desc:'Vórtices drenam energia em trânsito',
     setW3:'⚡ MUNDO 3: NEXO PRIME', setW3desc:'Retransmissores aumentam fluxo · Pulsares emitem energia',
     setSfx:'EFEITOS SONOROS', setSfxDesc:'Feedback de áudio procedural',

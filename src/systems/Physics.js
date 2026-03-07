@@ -8,7 +8,7 @@
    ================================================================ */
 
 import { FOG_R, NodeType, TentState } from '../constants.js';
-import { bezPt } from '../utils.js';
+import { bezPt, vdSq } from '../utils.js';
 import { bus } from '../EventBus.js';
 
 export class Physics {
@@ -16,7 +16,11 @@ export class Physics {
   static updateVortex(game, dt) {
     if (!game.hazards?.length) return;
 
-    game.hazards.forEach(hz => {
+    const hazards = game.hazards;
+    const tents   = game.tents;
+
+    for (let hi = 0; hi < hazards.length; hi++) {
+      const hz = hazards[hi];
       hz.phase += dt * 1.3;
 
       /* Moving vortex: sinusoidal drift around anchor */
@@ -40,24 +44,29 @@ export class Physics {
       /* Skip drain while inactive (pulsing OFF state) */
       if (hz.pulsing && !hz.pulseActive) {
         hz._warn = Math.max(0, (hz._warn || 0) - dt * 3);
-        return;
+        continue;
       }
 
       hz._warn = 0;
 
-      game.tents.forEach(t => {
-        if (!t.alive || !t.source || !t.target) return;
-        if (t.state !== TentState.ACTIVE && t.state !== TentState.ADVANCING) return;
+      for (let ti = 0; ti < tents.length; ti++) {
+        const t = tents[ti];
+        if (!t.alive || !t.source || !t.target) continue;
+        if (t.state !== TentState.ACTIVE && t.state !== TentState.ADVANCING) continue;
 
         const cp  = t.getCP();
-        const pts = [
-          bezPt(0.25, t.source.x, t.source.y, cp.x, cp.y, t.target.x, t.target.y),
-          bezPt(0.50, t.source.x, t.source.y, cp.x, cp.y, t.target.x, t.target.y),
-          bezPt(0.75, t.source.x, t.source.y, cp.x, cp.y, t.target.x, t.target.y),
-        ];
+        /* Inline three bezier sample points to avoid allocating an array of objects */
+        const sx  = t.source.x, sy  = t.source.y;
+        const tx2 = t.target.x, ty2 = t.target.y;
+        const cpx = cp.x,       cpy = cp.y;
 
-        pts.forEach(pt => {
-          const d = Math.hypot(pt.x - hz.x, pt.y - hz.y);
+        for (let bi = 0; bi < 3; bi++) {
+          const bt  = 0.25 * (bi + 1);   // 0.25, 0.50, 0.75
+          const bm  = 1 - bt;
+          const ptx = bm * bm * sx + 2 * bm * bt * cpx + bt * bt * tx2;
+          const pty = bm * bm * sy + 2 * bm * bt * cpy + bt * bt * ty2;
+          const dx  = ptx - hz.x, dy = pty - hz.y;
+          const d   = Math.sqrt(dx * dx + dy * dy);
           if (d < hz.r) {
             const intensity = 1 - d / hz.r;
             const drain     = hz.drainRate * intensity * dt;
@@ -69,18 +78,22 @@ export class Physics {
               hz._drainCd = 0.3;
             }
           }
-        });
-      });
+        }
+      }
 
       hz._warn = Math.max(0, (hz._warn || 0) - dt * 2);
-    });
+    }
   }
 
   /* ── W3: Pulsar broadcast ── */
   static updatePulsar(game, dt) {
     if (!game.pulsars?.length) return;
 
-    game.pulsars.forEach(ps => {
+    const pulsars = game.pulsars;
+    const nodes   = game.nodes;
+
+    for (let pi = 0; pi < pulsars.length; pi++) {
+      const ps = pulsars[pi];
       ps.phase      += dt * 0.8;
       ps.timer      -= dt;
       ps.chargeTimer = Math.max(0, (ps.chargeTimer || 0) - dt);
@@ -92,55 +105,76 @@ export class Physics {
       }
 
       if (ps.timer <= 0) {
-        ps.timer   = ps.interval;
-        ps.charging= false;
-        ps.pulse   = 1;
+        ps.timer    = ps.interval;
+        ps.charging = false;
+        ps.pulse    = 1;
         bus.emit('pulsar:fire', ps);
 
-        game.nodes.forEach(n => {
-          if (n.isRelay) return;
-          const d = Math.hypot(n.x - ps.x, n.y - ps.y);
-          const inRange = ps.isSuper || d < ps.r;
+        const rSq = ps.r * ps.r;
+        for (let ni = 0; ni < nodes.length; ni++) {
+          const n = nodes[ni];
+          if (n.isRelay) continue;
+          const dSq     = vdSq(n.x, n.y, ps.x, ps.y);
+          const inRange = ps.isSuper || dSq < rSq;
           if (inRange && n.owner !== 0) {
             const share = ps.isSuper
-              ? ps.strength * 0.55              // uniform broadcast for super-pulsar
-              : ps.strength * (1 - d / ps.r);
+              ? ps.strength * 0.55
+              : ps.strength * (1 - Math.sqrt(dSq) / ps.r);
             n.energy    = Math.min(n.maxE, n.energy + share);
             n.cFlash    = 0.6;
             if (n.owner === 1) n.burstPulse = (n.burstPulse || 0) + (ps.isSuper ? 0.6 : 0.3);
           }
-        });
+        }
       }
 
       ps.pulse = Math.max(0, (ps.pulse || 0) - dt * 0.9);
-    });
+    }
   }
 
   /* ── W3: Relay capture detection ── */
   static updateRelay(game) {
-    game.nodes.forEach(n => {
-      if (!n.isRelay) return;
+    const nodes = game.nodes;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (!n.isRelay) continue;
       if (n.owner !== 0 && n._prevOwner === 0) {
         bus.emit('relay:capture', n);
         game.fogDirty = true;
       }
       n._prevOwner = n.owner;
-    });
+    }
   }
 
-  /* ── Fog of war (recomputed only when fogDirty) ── */
-  static updateFog(game) {
+  /* ── Fog of war (throttled: at most 2× per second when fogDirty) ── */
+  static updateFog(game, dt) {
     /* Signal Tower reveal: full visibility for player for 8 seconds */
     if (game.fogRevealTimer > 0) {
-      game.nodes.forEach(n => { n.inFog = false; });
+      const nodes = game.nodes;
+      for (let i = 0; i < nodes.length; i++) nodes[i].inFog = false;
       return;
     }
     if (!game.fogDirty) return;
+
+    /* Throttle: run heavy nested loop at most 2× per second */
+    game._fogTimer = (game._fogTimer || 0) - dt;
+    if (game._fogTimer > 0) return;
+    game._fogTimer = 0.5;
+
     game.fogDirty = false;
-    const playerCells = game.nodes.filter(n => n.owner === 1);
-    game.nodes.forEach(n => {
-      n.inFog = n.owner !== 1 && !playerCells.some(p => Math.hypot(p.x - n.x, p.y - n.y) < FOG_R);
-    });
+    const nodes    = game.nodes;
+    const FOG_R_SQ = FOG_R * FOG_R;
+
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.owner === 1) { n.inFog = false; continue; }
+      let visible = false;
+      for (let j = 0; j < nodes.length; j++) {
+        const p = nodes[j];
+        if (p.owner !== 1) continue;
+        if (vdSq(p.x, p.y, n.x, n.y) < FOG_R_SQ) { visible = true; break; }
+      }
+      n.inFog = !visible;
+    }
   }
 
   /* ── W3 Signal Tower: capture triggers fog reveal ── */
@@ -150,58 +184,75 @@ export class Physics {
       /* When timer expires, re-enable normal fog */
       if (game.fogRevealTimer === 0) game.fogDirty = true;
     }
-    game.nodes.forEach(n => {
-      if (n.type !== NodeType.SIGNAL) return;
+    const nodes = game.nodes;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.type !== NodeType.SIGNAL) continue;
       if (n.owner === 1 && n._prevOwner !== 1) {
         game.fogRevealTimer = 8.0;
         game.fogDirty       = true;
         bus.emit('signal:capture', n);
       }
       n._prevOwner = n.owner;
-    });
+    }
   }
 
   /* ── Auto-retract: pull back tentacles from dying cells ── */
   static updateAutoRetract(game) {
-    game.nodes.forEach(n => {
-      if (!n.autoRetract) return;
+    const nodes = game.nodes;
+    const tents = game.tents;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (!n.autoRetract) continue;
       n.autoRetract = false;
-      const killed = game.tents.filter(t =>
-        t.alive && !t.reversed && t.source === n && t.target.owner !== n.owner
-      );
-      killed.forEach(t => t.kill());
-      if (n.owner === 1 && killed.length > 0) {
+      let killedAny = false;
+      for (let j = 0; j < tents.length; j++) {
+        const t = tents[j];
+        if (t.alive && !t.reversed && t.source === n && t.target.owner !== n.owner) {
+          t.kill();
+          killedAny = true;
+        }
+      }
+      if (n.owner === 1 && killedAny) {
         bus.emit('autoretract', n);
       }
-    });
+    }
   }
 
   /* ── Camera soft-follow: centroid of player cells ── */
   static updateCamera(game, dt) {
-    const pN = game.nodes.filter(n => n.owner === 1 && !n.isRelay);
-    if (!pN.length) return;
-    const cx = pN.reduce((s, n) => s + n.x, 0) / pN.length - game.W / 2;
-    const cy = pN.reduce((s, n) => s + n.y, 0) / pN.length - game.H / 2;
-    const tX = Math.max(-60, Math.min(60, -cx * 0.18));
-    const tY = Math.max(-60, Math.min(60, -cy * 0.18));
+    const nodes = game.nodes;
+    let sumX = 0, sumY = 0, count = 0;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.owner === 1 && !n.isRelay) { sumX += n.x; sumY += n.y; count++; }
+    }
+    if (!count) return;
+    const tX = Math.max(-60, Math.min(60, -(sumX / count - game.W / 2) * 0.18));
+    const tY = Math.max(-60, Math.min(60, -(sumY / count - game.H / 2) * 0.18));
     game.camX += (tX - game.camX) * Math.min(1, dt * 1.8);
     game.camY += (tY - game.camY) * Math.min(1, dt * 1.8);
   }
 
   /* ── outCount + tentFeedPerSec: computed once per frame ── */
   static updateOutCounts(game) {
+    const nodes = game.nodes;
+    const tents = game.tents;
+
     /* Save last frame's inFlow before resetting — used for triangle feedback */
-    game.nodes.forEach(n => {
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
       n._prevInFlow = n.inFlow || 0;
       n.outCount    = 0;
       n.inFlow      = 0;
-    });
+    }
 
-    game.tents.forEach(t => {
-      if (!t.alive || t.state === TentState.DEAD || t.state === TentState.RETRACTING) return;
+    for (let i = 0; i < tents.length; i++) {
+      const t = tents[i];
+      if (!t.alive || t.state === TentState.DEAD || t.state === TentState.RETRACTING) continue;
       const src = t.reversed ? t.target : t.source;
       src.outCount++;
-    });
+    }
 
     /* tentFeedPerSec: energy rate available to each outgoing tentacle.
        Design rules:
@@ -211,22 +262,21 @@ export class Physics {
          • Under attack : own regen is reserved for defense; no self-feed
          • Triangle feedback : friendly inFlow from last frame always adds on top
     */
-    game.nodes.forEach(n => {
-      const { regenMult } = game._utils;
-      const baseRegen  = (n.regen || 0) * regenMult(n.level);
+    const { regenMult } = game._utils;
+    for (let i = 0; i < nodes.length; i++) {
+      const n         = nodes[i];
+      const baseRegen = (n.regen || 0) * regenMult(n.level);
       const isAttacked = n.underAttack > 0.5;
       const isFull     = n.energy >= n.maxE * 0.99;
 
       let selfFeed = 0;
       if (!isAttacked) {
-        selfFeed = baseRegen * 0.5;         // base: half regen per tentacle
-        if (isFull) selfFeed = baseRegen;   // overflow: full regen flows out
+        selfFeed = baseRegen * 0.5;
+        if (isFull) selfFeed = baseRegen;
       }
 
-      /* Triangle / cascade feedback — only passes through when node is NOT full.
-         A full node already converts its own regen to outflow (selfFeed = baseRegen).
-         Adding prevInFlow on top when full causes exponential amplification in loops. */
+      /* Triangle / cascade feedback — only passes through when node is NOT full. */
       n.tentFeedPerSec = Math.max(0, selfFeed + (isFull ? 0 : (n._prevInFlow || 0)));
-    });
+    }
   }
 }

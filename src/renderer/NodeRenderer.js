@@ -7,6 +7,7 @@
 
 import { MAX_SLOTS, NodeType, EMBRYO } from '../constants.js';
 import { elvl, maxRange, poly } from '../utils.js';
+import { STATE } from '../GameState.js';
 
 /* Colour palettes per level (0-5) */
 const CP = ['#00b8d9','#00ccb8','#00e5ff','#55faff','#ffffff','#ffffaa'];
@@ -17,6 +18,14 @@ function nodeCol(n) {
   if (n.owner === 1) return CP[Math.min(n.level, CP.length - 1)];
   if (n.owner === 2) return CE[Math.min(n.level, CE.length - 1)];
   return '#5a6878';
+}
+
+/** Apply shadow only when high-graphics mode is on. */
+function sg(ctx, color, blur) {
+  if (STATE.settings.highGraphics) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = blur;
+  }
 }
 
 export class NodeRenderer {
@@ -54,8 +63,7 @@ export class NodeRenderer {
         ctx.strokeStyle  = col;
         ctx.lineWidth    = 0.65 + lvl * 0.11;
         ctx.globalAlpha  = fogAlpha * (0.26 + lvl * 0.07);
-        ctx.shadowColor  = col;
-        ctx.shadowBlur   = 3;
+        sg(ctx, col, 3);
         ctx.stroke();
       }
       ctx.restore();
@@ -115,8 +123,7 @@ export class NodeRenderer {
         ctx.arc(n.x, n.y, r + 5, sA, sA + frac);
         ctx.strokeStyle = c;
         ctx.lineWidth   = 3;
-        ctx.shadowColor = c;
-        ctx.shadowBlur  = 8;
+        sg(ctx, c, 8);
         ctx.globalAlpha = 0.9;
         ctx.stroke();
         sA += frac;
@@ -138,8 +145,7 @@ export class NodeRenderer {
     if (n.owner !== 0 && n.energy >= n.maxE * 0.94 && n.outCount > 0) {
       ctx.save();
       ctx.globalAlpha = 0.1 + Math.sin(time * 4 + n.pulse) * 0.07;
-      ctx.shadowColor = '#f5c518';
-      ctx.shadowBlur  = 22;
+      sg(ctx, '#f5c518', 22);
       poly(ctx, n.x, n.y, r + 9, sides, ang);
       ctx.strokeStyle = '#f5c518';
       ctx.lineWidth   = 1.5;
@@ -152,8 +158,7 @@ export class NodeRenderer {
       const atkCol = n.owner === 1 ? '#ff3d5a' : '#f5c518';
       ctx.save();
       ctx.globalAlpha = n.underAttack * 0.42;
-      ctx.shadowColor = atkCol;
-      ctx.shadowBlur  = 26;
+      sg(ctx, atkCol, 26);
       poly(ctx, n.x, n.y, r + 13, sides, ang);
       ctx.strokeStyle = atkCol;
       ctx.lineWidth   = 2;
@@ -165,8 +170,7 @@ export class NodeRenderer {
     if (frenzyActive && n.owner === 1) {
       ctx.save();
       ctx.globalAlpha = 0.5 * (0.3 + Math.sin(Date.now() * 0.015) * 0.15);
-      ctx.shadowColor = '#f5c518';
-      ctx.shadowBlur  = 30;
+      sg(ctx, '#f5c518', 30);
       poly(ctx, n.x, n.y, r * 1.8, sides, ang);
       ctx.fillStyle   = '#f5c518';
       ctx.fill();
@@ -176,8 +180,7 @@ export class NodeRenderer {
     /* Ambient halo */
     ctx.save();
     ctx.globalAlpha = fogAlpha * (n.owner === 0 ? 0.09 : 0.18 + lvl * 0.05);
-    ctx.shadowColor = col;
-    ctx.shadowBlur  = 22 + lvl * 8;
+    sg(ctx, col, 22 + lvl * 8);
     poly(ctx, n.x, n.y, r * 1.5, sides, ang);
     ctx.fillStyle   = col;
     ctx.fill();
@@ -188,15 +191,14 @@ export class NodeRenderer {
       const lf = n.lvlFlash;
       ctx.save();
       ctx.globalAlpha = lf * 0.7;
-      ctx.shadowColor = col;
-      ctx.shadowBlur  = 50;
+      sg(ctx, col, 50);
       ctx.beginPath();
       ctx.arc(n.x, n.y, r * (1 + lf * 1.2), 0, Math.PI * 2);
       ctx.strokeStyle = col;
       ctx.lineWidth   = 2;
       ctx.stroke();
       ctx.globalAlpha = lf * 0.9;
-      ctx.shadowBlur  = 40;
+      if (STATE.settings.highGraphics) ctx.shadowBlur = 40;
       poly(ctx, n.x, n.y, r * (1 + lf * 0.65), sides, ang);
       ctx.strokeStyle = col;
       ctx.lineWidth   = 3;
@@ -206,7 +208,7 @@ export class NodeRenderer {
       ctx.globalAlpha  = lf * 0.95;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
-      ctx.shadowBlur   = 20;
+      if (STATE.settings.highGraphics) ctx.shadowBlur = 20;
       ctx.fillText('LVL ' + (lvl + 1), n.x, n.y - r - 18 - lf * 10);
       ctx.restore();
     }
@@ -220,8 +222,7 @@ export class NodeRenderer {
       ctx.strokeStyle = '#f5c518';
       ctx.lineWidth   = 2.5;
       ctx.globalAlpha = sf * 0.8;
-      ctx.shadowColor = '#f5c518';
-      ctx.shadowBlur  = 14 * sf;
+      sg(ctx, '#f5c518', 14 * sf);
       ctx.stroke();
       ctx.restore();
     }
@@ -244,8 +245,7 @@ export class NodeRenderer {
       poly(ctx, n.x, n.y, r + 8, sides, ang);
       ctx.strokeStyle = '#ff3d5a';
       ctx.lineWidth   = 2.5;
-      ctx.shadowColor = '#ff3d5a';
-      ctx.shadowBlur  = 12;
+      sg(ctx, '#ff3d5a', 12);
       ctx.stroke();
       ctx.restore();
     }
@@ -307,8 +307,7 @@ export class NodeRenderer {
     ctx.textBaseline  = 'middle';
     ctx.fillStyle     = col;
     ctx.globalAlpha   = n.inFog ? 0 : (n.owner === 0 ? 0.36 : 1);
-    ctx.shadowColor   = col;
-    ctx.shadowBlur    = 5;
+    sg(ctx, col, 5);
     if (!n.inFog) ctx.fillText(n.dispE, n.x, n.y);
     ctx.restore();
 
@@ -352,8 +351,7 @@ export class NodeRenderer {
       ctx.strokeStyle = '#f5c518';
       ctx.lineWidth   = 2;
       ctx.globalAlpha = fogAlpha * 0.7 * pulse;
-      ctx.shadowColor = '#f5c518';
-      ctx.shadowBlur  = 10;
+      sg(ctx, '#f5c518', 10);
       ctx.stroke();
       ctx.shadowBlur  = 0;
       /* Capture progress fraction against reinforced threshold */
@@ -398,8 +396,7 @@ export class NodeRenderer {
     ctx.closePath();
     ctx.strokeStyle = rc;
     ctx.lineWidth   = 2.5;
-    ctx.shadowColor = rc;
-    ctx.shadowBlur  = 14 + Math.sin(time * 3) * 4;
+    sg(ctx, rc, 14 + Math.sin(time * 3) * 4);
     ctx.stroke();
     ctx.shadowBlur  = 0;
 
@@ -445,8 +442,7 @@ export class NodeRenderer {
       ctx.lineWidth   = 2;
       ctx.globalAlpha = fogAlpha * 0.6 * pulse;
       ctx.setLineDash([6, 6]);
-      ctx.shadowColor = '#f5c518';
-      ctx.shadowBlur  = 8;
+      sg(ctx, '#f5c518', 8);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.shadowBlur  = 0;
@@ -479,13 +475,12 @@ export class NodeRenderer {
       /* Core dot */
       ctx.beginPath();
       ctx.arc(x, y, 8, 0, Math.PI * 2);
-      const sg = ctx.createRadialGradient(x, y, 0, x, y, 8);
-      sg.addColorStop(0, sigCol);
-      sg.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle   = sg;
+      const sg2 = ctx.createRadialGradient(x, y, 0, x, y, 8);
+      sg2.addColorStop(0, sigCol);
+      sg2.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle   = sg2;
       ctx.globalAlpha = fogA * 0.9;
-      ctx.shadowColor = sigCol;
-      ctx.shadowBlur  = 14;
+      sg(ctx, sigCol, 14);
       ctx.fill();
       ctx.shadowBlur  = 0;
       /* 4 radiating antenna lines */
@@ -497,8 +492,7 @@ export class NodeRenderer {
         ctx.strokeStyle = sigCol;
         ctx.lineWidth   = 1.5;
         ctx.globalAlpha = fogA * 0.55;
-        ctx.shadowColor = sigCol;
-        ctx.shadowBlur  = 6;
+        sg(ctx, sigCol, 6);
         ctx.stroke();
         ctx.shadowBlur  = 0;
       }
@@ -527,8 +521,7 @@ export class NodeRenderer {
         }
         ctx.strokeStyle = ri === 0 ? '#ff1a3a' : ri === 1 ? '#880015' : '#440008';
         ctx.lineWidth   = 1.8 - ri * 0.4;
-        ctx.shadowColor = '#ff0020';
-        ctx.shadowBlur  = 10 + ri * 5;
+        sg(ctx, '#ff0020', 10 + ri * 5);
         ctx.globalAlpha = 0.55 - ri * 0.1;
         ctx.stroke();
       }
@@ -538,7 +531,7 @@ export class NodeRenderer {
         ctx.strokeStyle = '#ff3d5a';
         ctx.lineWidth   = 2;
         ctx.globalAlpha = fl * 0.7;
-        ctx.shadowBlur  = 24;
+        if (STATE.settings.highGraphics) ctx.shadowBlur = 24;
         ctx.stroke();
       }
       ctx.beginPath();
@@ -548,8 +541,7 @@ export class NodeRenderer {
       g.addColorStop(1, 'rgba(8,0,4,.8)');
       ctx.fillStyle   = g;
       ctx.globalAlpha = 0.95;
-      ctx.shadowColor = '#ff0020';
-      ctx.shadowBlur  = 16;
+      sg(ctx, '#ff0020', 16);
       ctx.fill();
       ctx.font          = 'bold 10px monospace';
       ctx.fillStyle     = '#ff8090';

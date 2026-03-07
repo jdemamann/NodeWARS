@@ -367,7 +367,7 @@ export function endLevel(win, game) {
 
 /* ── Settings UI ── */
 export function refreshSettingsUI() {
-  ['w2','w3','debug','sound','music'].forEach(k => {
+  ['w2','w3','debug','sound','music','highGraphics'].forEach(k => {
     const id  = 'tog' + k.charAt(0).toUpperCase() + k.slice(1);
     const btn = $(id);
     if (!btn) return;

@@ -4,6 +4,16 @@
    Draws W2 vortex hazards and W3 pulsar beacons.
    ================================================================ */
 
+import { STATE } from '../GameState.js';
+
+/** Apply shadow only when high-graphics mode is on. */
+function sg(ctx, color, blur) {
+  if (STATE.settings.highGraphics) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = blur;
+  }
+}
+
 export class HazardRenderer {
   /* ── W2: Vortex hazards ── */
   static drawVortex(ctx, hz, time) {
@@ -28,8 +38,7 @@ export class HazardRenderer {
         ctx.arc(x, y, r * 0.55, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
         ctx.strokeStyle = `rgba(200,60,255,${0.25 + prog * 0.45})`;
         ctx.lineWidth   = 3;
-        ctx.shadowColor = '#c040ff';
-        ctx.shadowBlur  = 10 * prog;
+        sg(ctx, '#c040ff', 10 * prog);
         ctx.stroke();
         ctx.shadowBlur  = 0;
       }
@@ -66,8 +75,7 @@ export class HazardRenderer {
       ctx.arc(x, y, r * 0.6, a, a + 1.2);
       ctx.strokeStyle = `rgba(160,0,255,${0.35 + warn * 0.25})`;
       ctx.lineWidth   = 2.5;
-      ctx.shadowColor = '#a000ff';
-      ctx.shadowBlur  = 12 + warn * 8;
+      sg(ctx, '#a000ff', 12 + warn * 8);
       ctx.stroke();
     }
 
@@ -75,8 +83,7 @@ export class HazardRenderer {
     ctx.beginPath();
     ctx.arc(x, y, r * 0.22, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(220,80,255,${0.4 + Math.sin(time * 8) * 0.15})`;
-    ctx.shadowColor = '#e060ff';
-    ctx.shadowBlur  = 18;
+    sg(ctx, '#e060ff', 18);
     ctx.fill();
     ctx.shadowBlur  = 0;
 
@@ -103,8 +110,7 @@ export class HazardRenderer {
       ctx.fillStyle     = `rgba(255,80,255,${0.7 + Math.sin(time * 4) * 0.2})`;
       ctx.textAlign     = 'center';
       ctx.textBaseline  = 'middle';
-      ctx.shadowColor   = '#ff00ff';
-      ctx.shadowBlur    = 14;
+      sg(ctx, '#ff00ff', 14);
       ctx.fillText('Ⓢ VOID CORE', x, y + r * 1.72 + 14);
       ctx.shadowBlur    = 0;
     } else if (warn > 0.1) {
@@ -113,8 +119,7 @@ export class HazardRenderer {
       ctx.fillStyle     = `rgba(255,100,255,${warn * 0.9})`;
       ctx.textAlign     = 'center';
       ctx.textBaseline  = 'middle';
-      ctx.shadowColor   = '#ff00ff';
-      ctx.shadowBlur    = 10;
+      sg(ctx, '#ff00ff', 10);
       ctx.fillText('VORTEX', x, y + r + 14);
       ctx.shadowBlur    = 0;
     }
@@ -146,8 +151,7 @@ export class HazardRenderer {
       ctx.arc(x, y, waveR, 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(255,200,50,${pulse * 0.7})`;
       ctx.lineWidth   = 2 + pulse * 3;
-      ctx.shadowColor = '#ffc800';
-      ctx.shadowBlur  = 20 * pulse;
+      sg(ctx, '#ffc800', 20 * pulse);
       ctx.stroke();
       ctx.shadowBlur  = 0;
     }
@@ -158,8 +162,7 @@ export class HazardRenderer {
       ctx.arc(x, y, 28, 0, Math.PI * 2 * charge);
       ctx.strokeStyle = `rgba(255,200,50,${0.7 * charge})`;
       ctx.lineWidth   = 3;
-      ctx.shadowColor = '#ffaa00';
-      ctx.shadowBlur  = 14 * charge;
+      sg(ctx, '#ffaa00', 14 * charge);
       ctx.stroke();
       ctx.shadowBlur  = 0;
     }
@@ -184,8 +187,7 @@ export class HazardRenderer {
       ctx.lineTo(ax, ay);
       ctx.strokeStyle = `rgba(255,180,0,${0.45 + charge * 0.3})`;
       ctx.lineWidth   = 2;
-      ctx.shadowColor = '#ffcc00';
-      ctx.shadowBlur  = 8;
+      sg(ctx, '#ffcc00', 8);
       ctx.stroke();
       ctx.shadowBlur  = 0;
     }
@@ -195,7 +197,7 @@ export class HazardRenderer {
     ctx.textAlign     = 'center';
     ctx.textBaseline  = 'middle';
     ctx.shadowColor   = ps.isSuper ? '#ffdd00' : 'transparent';
-    ctx.shadowBlur    = ps.isSuper ? 10 : 0;
+    ctx.shadowBlur    = ps.isSuper ? (STATE.settings.highGraphics ? 10 : 0) : 0;
     ctx.fillText(ps.isSuper ? 'NEXUS CORE' : 'PULSAR', x, y + 28);
     ctx.shadowBlur    = 0;
 
@@ -215,8 +217,7 @@ export class HazardRenderer {
         ctx.arc(x, y, Math.max(30, wR), 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(255,220,60,${ps.pulse * 0.5})`;
         ctx.lineWidth   = 3 + ps.pulse * 5;
-        ctx.shadowColor = '#ffcc00';
-        ctx.shadowBlur  = 30 * ps.pulse;
+        sg(ctx, '#ffcc00', 30 * ps.pulse);
         ctx.stroke();
         ctx.shadowBlur  = 0;
       }

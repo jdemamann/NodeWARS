@@ -8,6 +8,7 @@
 
 import { TentState } from '../constants.js';
 import { bezPt, drawBSeg } from '../utils.js';
+import { STATE } from '../GameState.js';
 
 /* Build a filled tapered polygon along a quadratic bezier.
    t0..t1 is the visible range; widthBase/widthTip are half-widths at each end. */
@@ -42,6 +43,14 @@ function tentCol(tent) {
   const lvl = src.level;
   return src.owner === 1 ? CP[Math.min(lvl, CP.length - 1)]
                          : CE[Math.min(lvl, CE.length - 1)];
+}
+
+/** Apply shadow only when high-graphics mode is on. */
+function sg(ctx, color, blur) {
+  if (STATE.settings.highGraphics) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = blur;
+  }
 }
 
 export class TentRenderer {
@@ -100,8 +109,7 @@ export class TentRenderer {
     ctx.strokeStyle  = col;
     ctx.lineWidth    = glowW;
     ctx.globalAlpha  = glowA;
-    ctx.shadowColor  = col;
-    ctx.shadowBlur   = glowBlur;
+    sg(ctx, col, glowBlur);
     ctx.stroke();
     ctx.restore();
 
@@ -115,8 +123,7 @@ export class TentRenderer {
       ctx.arc(tipPt.x, tipPt.y, 5 + lvl * 0.5, 0, Math.PI * 2);
       ctx.fillStyle   = col;
       ctx.globalAlpha = tipPulse * 0.9;
-      ctx.shadowColor = col;
-      ctx.shadowBlur  = 14;
+      sg(ctx, col, 14);
       ctx.fill();
       ctx.beginPath();
       ctx.arc(tipPt.x, tipPt.y, (8 + lvl) * (1 - costProg * 0.5), 0, Math.PI * 2);
@@ -135,8 +142,7 @@ export class TentRenderer {
       ctx.strokeStyle = 'rgba(255,255,255,' + (0.12 + FR * 0.28) + ')';
       ctx.lineWidth   = 1 + FR * 2.5;
       ctx.globalAlpha = 1;
-      ctx.shadowColor = '#fff';
-      ctx.shadowBlur  = 8 + FR * 16;
+      sg(ctx, '#fff', 8 + FR * 16);
       ctx.stroke();
       ctx.restore();
     }
@@ -180,18 +186,22 @@ export class TentRenderer {
         ctx.beginPath();
         ctx.arc(tip.x, tip.y, sz * 2.2 * pulse, 0, Math.PI * 2);
         ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.45;
-        ctx.shadowColor = col; ctx.shadowBlur = 22; ctx.stroke();
+        sg(ctx, col, 22); ctx.stroke();
       }
       ctx.beginPath();
       ctx.arc(tip.x, tip.y, sz * 1.8 * pulse, 0, Math.PI * 2);
       ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.28;
-      ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.stroke();
+      sg(ctx, col, 14); ctx.stroke();
       ctx.beginPath();
       ctx.arc(tip.x, tip.y, sz, 0, Math.PI * 2);
-      ctx.fillStyle = col; ctx.globalAlpha = 0.93; ctx.shadowBlur = 20; ctx.fill();
+      ctx.fillStyle = col; ctx.globalAlpha = 0.93;
+      if (STATE.settings.highGraphics) ctx.shadowBlur = 20;
+      ctx.fill();
       ctx.beginPath();
       ctx.arc(tip.x, tip.y, sz * 0.4, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.88; ctx.shadowBlur = 6; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.88;
+      if (STATE.settings.highGraphics) ctx.shadowBlur = 6;
+      ctx.fill();
       for (let ri = 0; ri < 2; ri++) {
         const ph = Date.now() * 0.006 + ri * Math.PI;
         const rs = sz * (1.1 + 0.7 * Math.abs(Math.sin(ph)));
@@ -244,20 +254,23 @@ export class TentRenderer {
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, (14 + spark * 8) * pulse, 0, Math.PI * 2);
       ctx.strokeStyle = '#f5c518'; ctx.lineWidth = 1.5;
-      ctx.globalAlpha = spark * 0.55 * pulse; ctx.shadowColor = '#f5c518'; ctx.shadowBlur = 28;
+      ctx.globalAlpha = spark * 0.55 * pulse;
+      sg(ctx, '#f5c518', 28);
       ctx.stroke();
 
       /* Mid ring */
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, 7 + spark * 5, 0, Math.PI * 2);
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-      ctx.globalAlpha = spark * 0.72; ctx.shadowColor = '#fff'; ctx.shadowBlur = 14;
+      ctx.globalAlpha = spark * 0.72;
+      sg(ctx, '#fff', 14);
       ctx.stroke();
 
       /* Core hot dot */
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, 3.5 + spark * 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.92; ctx.shadowBlur = 16;
+      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.92;
+      if (STATE.settings.highGraphics) ctx.shadowBlur = 16;
       ctx.fill();
 
       /* 8 spark rays, rotating */
@@ -271,7 +284,7 @@ export class TentRenderer {
         ctx.strokeStyle = i % 2 === 0 ? '#f5c518' : col;
         ctx.lineWidth = 1.2;
         ctx.globalAlpha = spark * 0.55;
-        ctx.shadowColor = '#f5c518'; ctx.shadowBlur = 10;
+        sg(ctx, '#f5c518', 10);
         ctx.stroke();
       }
 
@@ -281,7 +294,7 @@ export class TentRenderer {
         ctx.fillStyle = '#f5c518';
         ctx.globalAlpha = 0.78 + Math.sin(now * 0.006) * 0.22;
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-        ctx.shadowColor = '#f5c518'; ctx.shadowBlur = 8;
+        sg(ctx, '#f5c518', 8);
         ctx.fillText('CLASH', sp.x, sp.y - 18);
       }
 
@@ -335,7 +348,7 @@ export class TentRenderer {
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, r2 * 0.45, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255,255,255,' + (alpha * 0.9) + ')';
-      ctx.shadowColor = '#f5c518'; ctx.shadowBlur = 20 * alpha;
+      sg(ctx, '#f5c518', 20 * alpha);
       ctx.fill();
       for (let a = 0; a < 6; a++) {
         const ang2 = a * Math.PI / 3 + t.age * 4;
@@ -345,7 +358,7 @@ export class TentRenderer {
         ctx.lineTo(sp.x + Math.cos(ang2) * len, sp.y + Math.sin(ang2) * len);
         ctx.strokeStyle = 'rgba(245,197,24,' + (alpha * 0.8) + ')';
         ctx.lineWidth   = 1.5;
-        ctx.shadowBlur  = 8;
+        if (STATE.settings.highGraphics) ctx.shadowBlur = 8;
         ctx.stroke();
       }
       ctx.restore();
