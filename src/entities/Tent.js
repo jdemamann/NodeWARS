@@ -6,8 +6,8 @@
    Orb spawning is delegated to OrbPool via the shouldSpawnOrb helper.
    ================================================================ */
 
-import { TentState, GROW_PPS, ADV_PPS, MAX_E, EMBRYO } from '../constants.js';
-import { vd, bldC, wireEff, travelT, efAtk, domR, defR, baseRegen, clamp } from '../utils.js';
+import { TentState, GROW_PPS, ADV_PPS, EMBRYO, TIER_REGEN, GAME_BALANCE } from '../constants.js';
+import { vd, bldC, wireEff, travelT, efAtk, domR, defR, clamp } from '../utils.js';
 import { bus } from '../EventBus.js';
 
 export class Tent {
@@ -21,7 +21,10 @@ export class Tent {
     this.rate      = 5.5;            // kept for Orb spawning; no longer distance-based
     this.eff       = wireEff(this.d);
     this.tt        = travelT(this.d);
-    this.pCap      = 300;            // pipe buffer cap (for clash energyInPipe)
+    this.pCap         = 300;         // pipe buffer cap (for clash energyInPipe)
+    // Hard bandwidth cap: tier regen × tolerance (default 1.1 = 10% headroom).
+    // This makes maxBandwidth a real constraint — previously it was 10–35 e/s and never reached.
+    this.maxBandwidth = (TIER_REGEN[src.level] ?? TIER_REGEN[0]) * GAME_BALANCE.TENTACLE_BANDWIDTH_TOLERANCE;
 
     /* State machine */
     this.state    = TentState.GROWING;
@@ -236,7 +239,7 @@ export class Tent {
        Half regen per tentacle (not divided by outCount — each tent is independently powered).
        Overflow nodes push their full regen. Under-attack nodes stop self-feeding.
        Triangle partners always add their inFlow on top (cascade feedback). */
-    const feed = s.tentFeedPerSec || 0;
+    const feed = Math.min(s.tentFeedPerSec || 0, this.maxBandwidth);
 
     let delivered = 0;
 
@@ -253,10 +256,14 @@ export class Tent {
       }
 
     } else if (t.owner === 0) {
-      /* ── VIRGIN CAPTURE ── */
+      /* ── VIRGIN CAPTURE ──
+         contrib is scaled by CAPTURE_SPEED_MULT (default 4.0) so that a tier-0 node
+         captures a neutral cell in ~6s instead of ~24s. This compensates for the low
+         tier-0 regen (0.5 e/s) that would otherwise make early-game captures painfully slow.
+         Late-game nodes (tier 4-5) are already fast, so the multiplier feels natural there too. */
       if (pipeReady) {
         const entering = feed * eff * relayMult * dt;
-        const contrib  = entering * domR(s.level);
+        const contrib  = entering * domR(s.level) * GAME_BALANCE.CAPTURE_SPEED_MULT;
 
         if (!t.contest) t.contest = {};
         if (!t.contest[s.owner]) t.contest[s.owner] = 0;
@@ -275,7 +282,7 @@ export class Tent {
           const bonus = t.contest[s.owner] - EMBRYO;
           const prevOwner = t.owner;
           t.owner  = s.owner;
-          t.regen  = baseRegen() + Math.random() * 1.5;
+          t.regen  = 0; // tier-based — no longer used directly
           t.cFlash = 1; t.contest = null;
           t.energy = Math.min(t.maxE, t.energy + bonus * 0.5);
           if (this.game) this.game.fogDirty = true;
@@ -299,8 +306,9 @@ export class Tent {
 
       if (pipeReady) {
         const entering = commit * eff * relayMult;
-        /* domR: attacker level bonus; defR: defender level resistance */
-        const dmg = entering * domR(s.level) / defR(t.level);
+        /* domR: attacker level bonus; defR: defender level resistance.
+           ATTACK_DAMAGE_MULT scales overall combat aggression without touching level scaling. */
+        const dmg = entering * domR(s.level) / defR(t.level) * GAME_BALANCE.ATTACK_DAMAGE_MULT;
 
         t.energy    -= dmg;
         t.underAttack = 1;
@@ -309,7 +317,7 @@ export class Tent {
           const overflow = Math.abs(t.energy) * 0.10;
           const prevOwner = t.owner;
           t.owner  = s.owner;
-          t.regen  = baseRegen() + Math.random() * 1.5;
+          t.regen  = 0; // tier-based — no longer used directly
           t.energy = overflow;
           t.cFlash = 1; t.contest = null; t.shieldFlash = 0;
           if (this.game) this.game.fogDirty = true;
@@ -372,7 +380,7 @@ export class Tent {
         t.energy = Math.abs(t.energy) * 0.10;
         const prevOwner = t.owner;
         t.owner  = s.owner;
-        t.regen  = baseRegen() + Math.random() * 1.5;
+        t.regen  = 0; // tier-based — no longer used directly
         t.cFlash = 1;
         if (this.game) this.game.fogDirty = true;
         bus.emit('node:owner_change', t, prevOwner);

@@ -20,7 +20,7 @@ You control a network of **nodes** connected by **tentacles** that carry energy.
 | **Reverse flow** | Click a node already receiving your tentacle |
 | **Cut links** | Right-click drag across tentacles |
 
-**Energy** flows continuously through tentacles. Nodes evolve through 5 levels as they accumulate energy, unlocking more outgoing tentacle slots and increasing damage output. A freshly captured node starts at level 0 with minimum energy — protect it fast.
+**Energy** flows through tentacles using a **zero-sum model**: a node's total energy budget is split among its active tentacles — the node does *not* self-regenerate while it is draining. Nodes evolve through 5 tiers as they accumulate energy, unlocking more outgoing tentacle slots and increasing damage output. A freshly captured node starts at tier 0 with minimum energy — protect it fast.
 
 ### Scoring
 
@@ -33,6 +33,78 @@ Stars are awarded based on score at the moment of victory:
 | ⭐ | ≥ 200 |
 
 Par time is shown per level. Beat it to maximize your score.
+
+---
+
+## Energy Physics — Zero-Sum Flow
+
+NODE WARS uses the same **zero-sum energy model** as the original *Tentacle Wars*.
+
+### Tier Regeneration
+
+Each node regenerates at a fixed rate determined by its evolution tier. There is no randomness — tier is everything:
+
+| Tier | Name       | Regen    | Tentacle slots | Polygon |
+|------|------------|----------|----------------|---------|
+| 0    | Spore      | 0.5 e/s  | 1              | circle  |
+| 1    | Embryo     | 1.0 e/s  | 2              | triangle|
+| 2    | Pulsar     | 1.5 e/s  | 3              | square  |
+| 3    | Gamma      | 2.0 e/s  | 4              | hexagon |
+| 4    | Solar      | 4.0 e/s  | 5              | octagon |
+| 5    | Dominator  | 8.0 e/s  | 5              | decagon |
+
+Tier 0 to Tier 5 is a **16× regen increase**. Evolving a node is the core strategic imperative.
+
+### Zero-Sum Rule
+
+A node's tier regen is its **total energy budget** per second. That budget is redirected entirely into its active tentacles — the node stops self-regenerating while tentacles are draining it. With 2 tentacles active, each receives half the budget. With 3, each receives a third.
+
+This means:
+- Sending many tentacles from a weak node dilutes each one — spread too thin and nothing gets done.
+- Evolving a node before expanding is almost always the better play.
+- Cutting an enemy's tentacles restores their self-regen and slows their evolution.
+
+### Split Budget (Self vs. Tentacle)
+
+While a node has active tentacles, its tier regen is split between self-growth and tentacle feed. The split is controlled by `SELF_REGEN_FRAC` (default `0.3`):
+
+```
+Tier 0 node (0.5 e/s), 1 active tentacle, SELF_REGEN_FRAC = 0.3:
+  Node self-regen:  0.5 × 0.30 = 0.15 e/s  (source still grows, slowly)
+  Tentacle carries: 0.5 × 0.70 = 0.35 e/s  (sent to ally/neutral)
+  Total generated:  0.50 e/s  ← zero-sum preserved, no energy duplication
+```
+
+When idle (no active tentacles), the node keeps 100% of its regen.
+
+With `SELF_REGEN_FRAC = 0.0` the model is pure soma-zero — source frozen while feeding, exactly like original Tentacle Wars. The default `0.3` prevents low-tier nodes from stalling permanently after paying the build cost of a tentacle.
+
+### Bandwidth Cap
+
+Each tentacle has a hard bandwidth ceiling of `tier_regen × 1.1`. This cap is real and tight — a tier-0 tentacle can carry at most **0.55 e/s**, not the 10–35 e/s the game previously allowed. Higher-tier tentacles carry proportionally more.
+
+---
+
+## Balancing (GAME_BALANCE)
+
+All physics pacing lives in a single object in `src/constants.js`:
+
+```js
+export const GAME_BALANCE = {
+  TIER_REGEN: [0.5, 1.0, 1.5, 2.0, 4.0, 8.0], // e/s per tier
+  EMBRYO_COST: 10,           // energy to capture a neutral cell
+
+  GLOBAL_REGEN_MULT:  1.0,   // scales ALL regeneration — raise to speed the whole game up
+  CAPTURE_SPEED_MULT: 4.0,   // how fast neutral cells are captured (4.0 ≈ 6s at tier 0)
+  ATTACK_DAMAGE_MULT: 1.0,   // scales combat damage — raise for more aggressive combat
+  TENTACLE_BANDWIDTH_TOLERANCE: 1.1, // tentacles can carry 10% above tier regen
+
+  SELF_REGEN_FRAC: 0.3,      // fraction of tier regen kept by source while feeding
+                             // 0.0 = pure soma-zero (source frozen), 0.3 = recommended
+};
+```
+
+To speed up the early game, raise `GLOBAL_REGEN_MULT`. To make captures feel snappier, raise `CAPTURE_SPEED_MULT`. To create a more defensive meta, lower `ATTACK_DAMAGE_MULT`. No other file needs touching.
 
 ---
 
@@ -86,7 +158,7 @@ nodewars-v2/
     ├── Game.js             # Game loop, input handling, level loading, update pipeline
     ├── GameState.js        # Singleton STATE — persistent cross-cutting state
     ├── EventBus.js         # Pub/sub bus for decoupled audio/UI event wiring
-    ├── constants.js        # Enums, physics constants, world data, all 32 level configs
+    ├── constants.js        # Enums, GAME_BALANCE (pacing config), world data, all 32 level configs
     ├── utils.js            # Pure math helpers (distance, bezier, build cost, etc.)
     ├── storage.js          # Safe localStorage wrapper (falls back to in-memory)
     ├── i18n.js             # PT/EN translation strings + applyLang()
@@ -97,7 +169,7 @@ nodewars-v2/
     │   └── Orb.js          # Energy orb particles + OrbPool + FreeOrbPool
     │
     ├── systems/
-    │   ├── Physics.js      # All simulation: energy flow, clash, vortex/pulsar, fog, camera
+    │   ├── Physics.js      # Zero-sum energy flow, clash resolution, vortex/pulsar, fog, camera
     │   ├── AI.js           # Enemy AI with personality-driven scoring weights
     │   └── Tutorial.js     # Step-by-step tutorial overlay system
     │
@@ -166,6 +238,7 @@ Every level is a plain object in `constants.js → LEVELS[]`. To design a level,
   w:    3,           // world (1, 2, or 3)
   name: 'MY LEVEL',  // display name
 
+  ec:    150,        // energy cap for all nodes in this level (80–200 across worlds)
   nodes: 10,         // total node count (player + enemy + neutral)
   ai:    2,          // number of AI-controlled enemy factions
   aiE:   32,         // starting energy for each AI node

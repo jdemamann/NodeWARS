@@ -111,7 +111,7 @@ export class AI {
           if (defensive && tgt.energy < tgt.maxE * 0.4) sc = 55 + prox;
         }
 
-        if (sc > 0) moves.push({ src, tgt, sc, cost: bldC(d) });
+        if (sc > 0) moves.push({ src, tgt, sc, cost: bldC(d) + d * dm });
       });
     });
 

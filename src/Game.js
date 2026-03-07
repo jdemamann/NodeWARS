@@ -5,8 +5,8 @@
    main update pipeline.  Rendering is delegated to Renderer.
    ================================================================ */
 
-import { LEVELS, TentState, NodeType, MAX_SLOTS, EMBRYO } from './constants.js';
-import { vd, vdSq, bldC, bezPt, findCutT, maxRange, baseRegen, domR, clamp } from './utils.js';
+import { LEVELS, TentState, NodeType, MAX_SLOTS, EMBRYO, TIER_REGEN } from './constants.js';
+import { vd, vdSq, bldC, bezPt, findCutT, maxRange, domR, clamp, erad } from './utils.js';
 import { bus }          from './EventBus.js';
 import { STATE }        from './GameState.js';
 import { T }            from './i18n.js';
@@ -32,7 +32,6 @@ function makeUtils(game) {
       /* outCount is updated every frame by Physics.updateOutCounts — reuse it directly */
       return n.outCount || 0;
     },
-    regenMult(lvl) { return 1 + lvl * 0.30; },
     starsFor(sc) {
       if (sc === null || sc <= 0) return 0;
       if (sc >= 700) return 3;
@@ -157,6 +156,10 @@ export class Game {
       this._lastWorld = w || this._lastWorld;
     }
 
+    /* Apply per-level energy cap to every node */
+    const ec = cfg.ec || 200;
+    for (let i = 0; i < this.nodes.length; i++) this.nodes[i].maxE = ec;
+
     this.ai    = new AI(this, cfg);
     this.state = 'playing';
 
@@ -177,26 +180,25 @@ export class Game {
 
     if (tw === 1) {
       this.nodes.push(new GNode(0, cx * 0.28, cy, 55, 1));
-      this.nodes[0].regen = 5;
       [[cx*0.64,cy*0.48,30],[cx*0.88,cy*0.88,35],[cx*0.62,cy*1.36,25],[cx*1.1,cy,20]].forEach((p,i) =>
         this.nodes.push(new GNode(i+1, p[0], p[1], p[2], 0)));
       this.hazards = []; this.pulsars = [];
     } else if (tw === 2) {
-      this.nodes.push(new GNode(0, cx*0.28, cy, 55, 1)); this.nodes[0].regen = 5;
+      this.nodes.push(new GNode(0, cx*0.28, cy, 55, 1));
       this.nodes.push(new GNode(1, cx*0.72, cy*0.6,  30, 0));
       this.nodes.push(new GNode(2, cx*0.72, cy*1.4,  28, 0));
       this.nodes.push(new GNode(3, cx*1.15, cy*0.55, 25, 0));
-      const aiN = new GNode(4, cx*1.22, cy, 22, 2); aiN.energy = 20; aiN.regen = 2.5;
+      const aiN = new GNode(4, cx*1.22, cy, 22, 2); aiN.energy = 20;
       this.nodes.push(aiN);
       this.hazards = [{ x:cx*0.72, y:cy*0.95, r:52, phase:0, drainRate:7, warningR:78, _drainCd:0 }];
       this.pulsars = [];
     } else if (tw === 3) {
-      this.nodes.push(new GNode(0, cx*0.25, cy, 55, 1)); this.nodes[0].regen = 5;
+      this.nodes.push(new GNode(0, cx*0.25, cy, 55, 1));
       const relay = new GNode(1, cx*0.72, cy, 0, 0, NodeType.RELAY);
       this.nodes.push(relay);
       this.nodes.push(new GNode(2, cx*1.08, cy*0.5,  28, 0));
       this.nodes.push(new GNode(3, cx*1.08, cy*1.5,  25, 0));
-      const aiN = new GNode(4, cx*1.35, cy, 22, 2); aiN.energy = 20; aiN.regen = 2.5;
+      const aiN = new GNode(4, cx*1.35, cy, 22, 2); aiN.energy = 20;
       this.nodes.push(aiN);
       this.hazards = [];
       this.pulsars = [{ x:cx*0.72, y:cy*0.18, r:180, timer:3, interval:4.5, strength:22, pulse:0, phase:0, chargeTimer:0 }];
@@ -221,10 +223,10 @@ export class Game {
           const x = rnd(mg, W / 2 - 72);
           const y = rnd(mg, H - mg);
           const e = rnd(cfg.nr[0], cfg.nr[1]);
-          const r2 = 16 + (e / 250) * 42;
+          const r2 = erad(e, cfg.ec || 200);
           let cl = true;
           for (const ln of leftPts) {
-            const lr = 16 + (ln.e / 250) * 42;
+            const lr = erad(ln.e, cfg.ec || 200);
             if (vd(x,y,ln.x,ln.y)       < MR + r2 + lr) { cl = false; break; }
             if (vd(x,y,W - ln.x, ln.y)  < MR + r2 + lr) { cl = false; break; }
           }
@@ -248,7 +250,7 @@ export class Game {
         for (let a = 0; a < 900 && !ok; a++) {
           const x = rnd(mg, W - mg), y = rnd(mg, H - mg);
           const e = rnd(cfg.nr[0], cfg.nr[1]);
-          const r2 = 16 + (e / 250) * 42;
+          const r2 = erad(e, cfg.ec || 200);
           let cl = true;
           for (const n of this.nodes) if (vd(x,y,n.x,n.y) < MR + r2 + n.radius) { cl = false; break; }
           if (cl) { this.nodes.push(new GNode(i, x, y, e, 0)); ok = true; }
@@ -260,13 +262,11 @@ export class Game {
     const sorted = [...this.nodes].sort((a, b) => a.x - b.x);
     sorted[0].owner  = 1;
     sorted[0].energy = cfg.pE || 22;
-    sorted[0].regen  = baseRegen() * 1.2;
     const aiC = sorted.slice(Math.max(1, sorted.length - cfg.ai * 2));
     aiC.sort(() => Math.random() - 0.5);
     for (let i = 0; i < cfg.ai && i < aiC.length; i++) {
       aiC[i].owner  = 2;
       aiC[i].energy = cfg.aiE + (rnd(-5, 8));
-      aiC[i].regen  = baseRegen();
     }
 
     /* Apply bunker upgrades to neutral normal nodes */
@@ -491,7 +491,7 @@ export class Game {
       if (this.nodes.some(n => n.owner !== 0)) {
         console.groupCollapsed(`[ENERGY t=${this.time.toFixed(0)}s]`);
         this.nodes.filter(n => n.owner !== 0 && !n.isRelay).forEach(n => {
-          const regen   = (n.regen || 0) * this._utils.regenMult(n.level);
+          const regen   = TIER_REGEN[n.level] ?? TIER_REGEN[0];
           const outFlow = this.tents
             .filter(t => t.alive && t.es === n)
             .reduce((s, t) => s + (t.flowRate || 0), 0);
@@ -625,12 +625,17 @@ export class Game {
     const maxT = MAX_SLOTS[this.sel.level];
     if (lo >= maxT) { showToast(T('slotsFullMsg', lo + '/' + maxT)); this.clearSel(); return; }
 
-    /* Energy cost */
-    const d    = vd(this.sel.x, this.sel.y, hit.x, hit.y);
-    const cost = bldC(d);
+    /* Energy cost — must match maxRange() and HUD display.
+       Total cost = base build cost (BUILD_B + d×BUILD_PX) + range surcharge (d×dm).
+       The dm field acts as an extra per-pixel cost that scales with world difficulty,
+       making long-range tentacles progressively more expensive in harder worlds. */
+    const d          = vd(this.sel.x, this.sel.y, hit.x, hit.y);
+    const baseCost   = bldC(d);
+    const rangeCost  = d * this.cfg.dm;
+    const cost       = baseCost + rangeCost;
     if (this.sel.energy < cost + 1) {
       hit.rFlash = 1;
-      showToast(T('needEnergy', Math.ceil(cost+1), Math.ceil(cost), Math.ceil(d*this.cfg.dm), Math.floor(this.sel.energy)));
+      showToast(T('needEnergy', Math.ceil(cost+1), Math.ceil(baseCost), Math.ceil(rangeCost), Math.floor(this.sel.energy)));
       this.clearSel(); return;
     }
 
@@ -671,39 +676,56 @@ export class Game {
       const actualCut = t.reversed ? (1 - cutT) : cutT;
       const spentCost = t.state === TentState.GROWING ? (t.paidCost || 0) : t.buildCost;
       const totalPool = spentCost + Math.max(0, t.energyInPipe);
-      const srcShare  = totalPool * actualCut;
-      const tgtShare  = totalPool * (1 - actualCut);
       const srcNode   = t.reversed ? t.target : t.source;
       const tgtNode   = t.reversed ? t.source : t.target;
 
+      /* Tentacle Wars cut physics:
+           cut < 0.3 (near source)  → defensive refund: all energy returns to source
+           cut > 0.7 (near target)  → offensive burst:  all energy rushes to target
+           0.3–0.7 (middle zone)    → linear blend between the two extremes */
+      let srcShare, tgtShare;
+      if (actualCut < 0.3) {
+        srcShare = totalPool;
+        tgtShare = 0;
+      } else if (actualCut > 0.7) {
+        srcShare = 0;
+        tgtShare = totalPool;
+      } else {
+        const blend = (actualCut - 0.3) / 0.4;
+        srcShare = totalPool * (1 - blend);
+        tgtShare = totalPool * blend;
+      }
+
       srcNode.energy = Math.min(srcNode.maxE, srcNode.energy + srcShare);
 
-      if (tgtNode.owner === srcNode.owner || tgtNode.owner === 0) {
-        if (tgtNode.owner === 0) {
-          if (!tgtNode.contest) tgtNode.contest = {};
-          if (!tgtNode.contest[srcNode.owner]) tgtNode.contest[srcNode.owner] = 0;
-          tgtNode.contest[srcNode.owner] += tgtShare * 0.9;
-          if (tgtNode.contest[srcNode.owner] >= EMBRYO) {
-            const over = tgtNode.contest[srcNode.owner] - EMBRYO;
-            tgtNode.owner  = srcNode.owner;
-            tgtNode.regen  = baseRegen();
-            tgtNode.cFlash = 1; tgtNode.contest = null;
-            tgtNode.energy = Math.min(tgtNode.maxE, tgtNode.energy + over * 0.5);
-            this.fogDirty  = true;
+      if (tgtShare > 0) {
+        if (tgtNode.owner === srcNode.owner || tgtNode.owner === 0) {
+          if (tgtNode.owner === 0) {
+            if (!tgtNode.contest) tgtNode.contest = {};
+            if (!tgtNode.contest[srcNode.owner]) tgtNode.contest[srcNode.owner] = 0;
+            tgtNode.contest[srcNode.owner] += tgtShare * 0.9;
+            if (tgtNode.contest[srcNode.owner] >= EMBRYO) {
+              const over = tgtNode.contest[srcNode.owner] - EMBRYO;
+              tgtNode.owner  = srcNode.owner;
+              tgtNode.regen  = 0; // tier-based
+              tgtNode.cFlash = 1; tgtNode.contest = null;
+              tgtNode.energy = Math.min(tgtNode.maxE, tgtNode.energy + over * 0.5);
+              this.fogDirty  = true;
+            }
+          } else {
+            tgtNode.energy = Math.min(tgtNode.maxE, tgtNode.energy + tgtShare);
           }
         } else {
-          tgtNode.energy = Math.min(tgtNode.maxE, tgtNode.energy + tgtShare);
-        }
-      } else {
-        const dmg = tgtShare * 0.8 * domR(srcNode.level);
-        tgtNode.energy -= dmg;
-        tgtNode.underAttack = 1;
-        if (tgtNode.energy <= 0) {
-          tgtNode.energy  = Math.abs(tgtNode.energy) * 0.12;
-          tgtNode.owner   = srcNode.owner;
-          tgtNode.regen   = baseRegen();
-          tgtNode.cFlash  = 1; tgtNode.contest = null;
-          this.fogDirty   = true;
+          const dmg = tgtShare * 0.8 * domR(srcNode.level);
+          tgtNode.energy -= dmg;
+          tgtNode.underAttack = 1;
+          if (tgtNode.energy <= 0) {
+            tgtNode.energy  = Math.abs(tgtNode.energy) * 0.12;
+            tgtNode.owner   = srcNode.owner;
+            tgtNode.regen   = 0; // tier-based
+            tgtNode.cFlash  = 1; tgtNode.contest = null;
+            this.fogDirty   = true;
+          }
         }
       }
 
@@ -732,10 +754,11 @@ export class Game {
       const col2 = srcNode.owner === 1 ? ['#00b8d9','#00ccb8','#00e5ff','#55faff','#ffffff','#ffffaa'][srcNode.level]
                                         : ['#c01830','#ee1e3e','#ff3d5a','#ff7090','#ffb8c8','#ffddee'][srcNode.level];
       const cp2   = t.getCP();
-      const nOrbs = Math.min(6, Math.round(tgtShare / 2) + 2);
+      const orbTarget = tgtShare >= srcShare ? tgtNode : srcNode;
+      const nOrbs = Math.min(6, Math.round(totalPool / 2) + 2);
       for (let i = 0; i < nOrbs; i++) {
         const sp2 = bezPt(actualCut, t.source.x, t.source.y, cp2.x, cp2.y, t.target.x, t.target.y);
-        this.freeOrbPool.get(sp2.x + (Math.random()-0.5)*12, sp2.y + (Math.random()-0.5)*12, tgtNode.x, tgtNode.y, col2, tgtShare);
+        this.freeOrbPool.get(sp2.x + (Math.random()-0.5)*12, sp2.y + (Math.random()-0.5)*12, orbTarget.x, orbTarget.y, col2, totalPool);
       }
 
       t.kill();
@@ -780,7 +803,7 @@ export class Game {
       const range= Math.ceil(d * this.cfg.dm);
       const tot  = cost + range;
       const have = Math.floor(this.sel.energy);
-      const ok   = have >= tot;
+      const ok   = have >= tot + 1;
       const lu   = this._utils.liveOut(this.sel);
       const slots= MAX_SLOTS[this.sel.level] - lu;
       const fwd  = this.tents.find(t => t.alive && t.source === this.sel && t.target === hov);

@@ -8,8 +8,8 @@
    'r' (RELAY) now handles both roles — isRelay is a computed getter.
    ================================================================ */
 
-import { NodeType, MAX_E, LVL_STEP, MAX_SLOTS } from '../constants.js';
-import { elvl, erad, regenMult, baseRegen } from '../utils.js';
+import { NodeType, LVL_STEP, MAX_SLOTS, TIER_REGEN, GAME_BALANCE } from '../constants.js';
+import { elvl, erad } from '../utils.js';
 import { bus } from '../EventBus.js';
 
 export class GNode {
@@ -17,12 +17,12 @@ export class GNode {
     this.id     = id;
     this.x      = x;
     this.y      = y;
-    this.maxE   = MAX_E;
+    this.maxE   = 200;   // overridden per-level by Game.loadLevel via cfg.ec
     this.energy = energy;
     this.owner  = owner;
     this.type   = type;
 
-    this.regen  = owner < 1 ? 0 : baseRegen();
+    this.regen  = 0; // deprecated — regen is now tier-based via TIER_REGEN[level]
 
     /* Visual state (read by NodeRenderer) */
     this.pulse      = Math.random() * Math.PI * 2;
@@ -62,7 +62,7 @@ export class GNode {
   }
 
   /* ── Computed properties ── */
-  get radius()  { return erad(this.energy); }
+  get radius()  { return erad(this.energy, this.maxE); }
   get level()   { return elvl(this.energy); }
   get dispE()   { return Math.floor(this.energy); }
   get isRelay() { return this.type === NodeType.RELAY; }
@@ -81,11 +81,16 @@ export class GNode {
       return;
     }
 
-    /* Energy regen */
+    /* Energy regen — modified soma-zero:
+       When tentacles are active, SELF_REGEN_FRAC of tier regen goes to the source node
+       and (1 - SELF_REGEN_FRAC) goes through tentacles (see Physics.updateOutCounts).
+       Total energy per second = TIER_REGEN[level] — zero-sum preserved, no duplication.
+       When idle (no tentacles), 100% of regen goes to self as usual. */
     if (this.owner !== 0) {
-      const scaledRegen = this.regen * regenMult(this.level);
-      const boost       = (frenzyActive && this.owner === 1) ? 1.35 : 1.0;
-      this.energy       = Math.min(this.maxE, this.energy + scaledRegen * boost * dt);
+      const tierRegen  = TIER_REGEN[this.level] ?? TIER_REGEN[0];
+      const boost      = (frenzyActive && this.owner === 1) ? 1.10 : 1.0;
+      const selfFrac   = this.outCount > 0 ? GAME_BALANCE.SELF_REGEN_FRAC : 1.0;
+      this.energy      = Math.min(this.maxE, this.energy + tierRegen * selfFrac * boost * GAME_BALANCE.GLOBAL_REGEN_MULT * dt);
     }
 
     /* Decay visual flashes */

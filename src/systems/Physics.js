@@ -7,7 +7,7 @@
    Extracted from Game.update() to reduce God Object scope.
    ================================================================ */
 
-import { FOG_R, NodeType, TentState } from '../constants.js';
+import { FOG_R, NodeType, TentState, TIER_REGEN, GAME_BALANCE } from '../constants.js';
 import { bezPt, vdSq } from '../utils.js';
 import { bus } from '../EventBus.js';
 
@@ -239,12 +239,10 @@ export class Physics {
     const nodes = game.nodes;
     const tents = game.tents;
 
-    /* Save last frame's inFlow before resetting — used for triangle feedback */
     for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
-      n._prevInFlow = n.inFlow || 0;
-      n.outCount    = 0;
-      n.inFlow      = 0;
+      const n    = nodes[i];
+      n.outCount = 0;
+      n.inFlow   = 0;
     }
 
     for (let i = 0; i < tents.length; i++) {
@@ -254,29 +252,20 @@ export class Physics {
       src.outCount++;
     }
 
-    /* tentFeedPerSec: energy rate available to each outgoing tentacle.
-       Design rules:
-         • Normal (not full, not attacked) : half regen per tentacle
-         • Overflow (energy = maxE, not attacked) : full regen per tentacle
-           (the regen that would be capped/wasted flows out instead)
-         • Under attack : own regen is reserved for defense; no self-feed
-         • Triangle feedback : friendly inFlow from last frame always adds on top
-    */
-    const { regenMult } = game._utils;
+    /* tentFeedPerSec: soma-zero model (original Tentacle Wars).
+       Tier regen is DIVIDED equally among all active tentacles.
+       Under attack: no self-feed (energy reserved for defense).
+       Node stops self-regenerating in GNode.update while outCount > 0. */
     for (let i = 0; i < nodes.length; i++) {
-      const n         = nodes[i];
-      const baseRegen = (n.regen || 0) * regenMult(n.level);
+      const n          = nodes[i];
       const isAttacked = n.underAttack > 0.5;
-      const isFull     = n.energy >= n.maxE * 0.99;
+      const outSlots   = Math.max(1, n.outCount);
+      const tierRegen  = TIER_REGEN[n.level] ?? TIER_REGEN[0];
 
-      let selfFeed = 0;
-      if (!isAttacked) {
-        selfFeed = baseRegen * 0.5;
-        if (isFull) selfFeed = baseRegen;
-      }
-
-      /* Triangle / cascade feedback — only passes through when node is NOT full. */
-      n.tentFeedPerSec = Math.max(0, selfFeed + (isFull ? 0 : (n._prevInFlow || 0)));
+      // Tentacles carry (1 - SELF_REGEN_FRAC) of tier regen, split across outSlots.
+      // Combined with GNode self-regen (SELF_REGEN_FRAC), total = TIER_REGEN — zero-sum.
+      const tentFrac = 1.0 - GAME_BALANCE.SELF_REGEN_FRAC;
+      n.tentFeedPerSec = isAttacked ? 0 : (tierRegen * tentFrac / outSlots) * GAME_BALANCE.GLOBAL_REGEN_MULT;
     }
   }
 }

@@ -2,7 +2,7 @@
    NODE WARS v3 — Math & Geometry Utilities
    ================================================================ */
 
-import { MAX_E, LVL_STEP, BUILD_B, BUILD_PX } from './constants.js';
+import { LVL_STEP, BUILD_B, BUILD_PX } from './constants.js';
 
 /* ── MATH ── */
 export const vd    = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
@@ -12,7 +12,7 @@ export const rnd   = (a, b)           => a + Math.random() * (b - a);
 
 /* ── CELL PHYSICS ── */
 export const elvl     = e  => clamp(Math.floor(e / LVL_STEP), 0, 5);
-export const erad     = e  => 16 + (e / MAX_E) * 42;
+export const erad     = (e, maxE = 200) => 16 + (e / maxE) * 42;
 export const bldC     = d  => BUILD_B + d * BUILD_PX;
 export const maxRange = (e, dm) => Math.max(0, (e - BUILD_B) / (BUILD_PX + dm));
 
@@ -35,11 +35,11 @@ export const wireEff   = d   => Math.max(0.55, 1 - d * 0.00045);
 /** Travel time (s): how long for energy to cross the tentacle. */
 export const travelT   = d   => Math.max(0.18, d / 160);
 
-/** Regen scaling per level: level 0=1x, level 5=2.5x. */
-export const regenMult = lvl => 1 + lvl * 0.30;
+/** @deprecated Use TIER_REGEN[level] from constants.js instead. */
+export const regenMult = lvl => 1;
 
-/** Random base regen for a freshly captured cell. */
-export const baseRegen = ()  => 2.0 + Math.random() * 1.5;
+/** @deprecated Use TIER_REGEN[level] from constants.js instead. */
+export const baseRegen = ()  => 0;
 
 /* ── GEOMETRY ── */
 

@@ -8,7 +8,7 @@
      • Preview line (selection → cursor)
    ================================================================ */
 
-import { MAX_SLOTS } from '../constants.js';
+import { MAX_SLOTS, TIER_REGEN } from '../constants.js';
 import { bldC, maxRange } from '../utils.js';
 import { roundRect } from '../utils.js';
 
@@ -73,9 +73,8 @@ export class UIRenderer {
       flow_in:'FLOW IN', flow_out:'FLOW OUT', under_attack:'UNDER ATTACK',
     };
 
-    const baseRegenRate= isNeutral ? 0 : +(n.regen * (1 + n.level * 0.30)).toFixed(1);
-    const cascadeIn    = isNeutral ? 0 : +Math.max(0, n._prevInFlow || 0).toFixed(1);
-    const regen        = isNeutral ? 0 : +(baseRegenRate + cascadeIn).toFixed(1);
+    const baseRegenRate= isNeutral ? 0 : +(TIER_REGEN[n.level] ?? TIER_REGEN[0]);
+    const regen        = isNeutral ? 0 : +baseRegenRate.toFixed(1);
     const totalSlots   = MAX_SLOTS[Math.min(lvl, MAX_SLOTS.length - 1)];
     const activeSent   = game._utils.liveOut(n);
     const incomingAtk  = game.tents.filter(t2 =>
@@ -83,9 +82,8 @@ export class UIRenderer {
       (t2.state === 'active' || t2.state === 'advancing') &&
       t2.target === n && t2.source.owner !== n.owner
     ).length;
-    const EMBRYO_VAL = 20;
     const contestPct = isNeutral && n.contest
-      ? Math.round((Math.max(0, ...Object.values(n.contest)) / EMBRYO_VAL) * 100)
+      ? Math.round((Math.max(0, ...Object.values(n.contest)) / (n.captureThreshold || 10)) * 100)
       : 0;
     const contested  = isNeutral && n.contest && Object.keys(n.contest).length > 1;
     const threatStr  = isEnemy ? (
@@ -98,9 +96,7 @@ export class UIRenderer {
     rows.push({ label: LABEL.energy, value: energy + ' / ' + maxE,
                 bar: { pct: fillPct / 100, col: isPlayer ? CP[Math.min(lvl, 4)] : isNeutral ? '#7a8fa0' : CE[Math.min(lvl, 4)] } });
     if (!isNeutral) {
-      const regenVal = cascadeIn > 0.2
-        ? '+' + baseRegenRate + ' (+' + cascadeIn + ') e/s'
-        : '+' + regen + ' e/s';
+      const regenVal = '+' + regen + ' e/s';
       rows.push({ label: LABEL.regen, value: regenVal });
       const eIn  = +(game.tents.filter(t2 => t2.alive && t2.state === 'active' && t2.target === n && t2.source.owner === n.owner)
         .reduce((s, t2) => s + (t2.flowRate || 0), 0)).toFixed(1);
@@ -258,7 +254,7 @@ export class UIRenderer {
     const dm       = game.cfg.dm;
     const maxReach = maxRange(game.sel.energy - 1, dm);
     const reach    = Math.min(d, maxReach);
-    const canFire  = game.sel.energy >= bldC(d) + 1 &&
+    const canFire  = game.sel.energy >= bldC(d) + d * game.cfg.dm + 1 &&
                      game._utils.liveOut(game.sel) < MAX_SLOTS[game.sel.level] &&
                      (!snapNode || snapNode !== game.sel);
     const nx = dx / d, ny = dy / d;
