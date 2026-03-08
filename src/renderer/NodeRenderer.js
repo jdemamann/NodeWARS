@@ -10,13 +10,16 @@ import { elvl, maxRange, poly } from '../utils.js';
 import { STATE } from '../GameState.js';
 
 /* Colour palettes per level (0-5) */
-const CP = ['#00b8d9','#00ccb8','#00e5ff','#55faff','#ffffff','#ffffaa'];
-const CE = ['#c01830','#ee1e3e','#ff3d5a','#ff7090','#ffb8c8','#ffddee'];
+const CP  = ['#00b8d9','#00ccb8','#00e5ff','#55faff','#ffffff','#ffffaa']; // player (cyan)
+const CE  = ['#c01830','#ee1e3e','#ff3d5a','#ff7090','#ffb8c8','#ffddee']; // enemy  (red)
+const CE3 = ['#9020cc','#a030dd','#c040ff','#d060ff','#e090ff','#f0b8ff']; // purple cutthroat
+
 const SIDES = [0,3,4,6,8,10];
 
 function nodeCol(n) {
-  if (n.owner === 1) return CP[Math.min(n.level, CP.length - 1)];
-  if (n.owner === 2) return CE[Math.min(n.level, CE.length - 1)];
+  if (n.owner === 1) return CP [Math.min(n.level, CP.length  - 1)];
+  if (n.owner === 2) return CE [Math.min(n.level, CE.length  - 1)];
+  if (n.owner === 3) return CE3[Math.min(n.level, CE3.length - 1)];
   return '#5a6878';
 }
 
@@ -106,7 +109,6 @@ export class NodeRenderer {
 
     /* Embryo capture arcs for virgin cells */
     if (n.owner === 0 && n.contest && !n.inFog) {
-      const EMBRYO = 20; // matches constants.js
       ctx.save();
       ctx.beginPath();
       ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
@@ -114,11 +116,11 @@ export class NodeRenderer {
       ctx.lineWidth   = 3;
       ctx.stroke();
       let sA = -Math.PI / 2;
-      [1, 2].forEach(ow => {
+      [1, 2, 3].forEach(ow => {
         const sc = n.contest[ow] || 0;
         if (sc <= 0) return;
         const frac = (sc / EMBRYO) * Math.PI * 2;
-        const c    = ow === 1 ? CP[elvl(sc)] : CE[elvl(sc)];
+        const c    = ow === 1 ? CP[elvl(sc)] : ow === 3 ? CE3[elvl(sc)] : CE[elvl(sc)];
         ctx.beginPath();
         ctx.arc(n.x, n.y, r + 5, sA, sA + frac);
         ctx.strokeStyle = c;
@@ -135,8 +137,7 @@ export class NodeRenderer {
       ctx.textAlign     = 'center';
       ctx.textBaseline  = 'middle';
       const maxContest  = Math.max(...Object.values(n.contest || {}).concat([0]));
-      const EMBRYO_VAL  = 20;
-      const pct         = Math.round((maxContest / EMBRYO_VAL) * 100);
+      const pct         = Math.round((maxContest / EMBRYO) * 100);
       ctx.fillText(pct > 0 ? pct + '%' : '○', n.x, n.y + r + 13);
       ctx.restore();
     }
@@ -381,7 +382,7 @@ export class NodeRenderer {
 
   /* ── Relay node visual ── */
   static _drawRelay(ctx, n, r, ang, time, fogAlpha) {
-    const rc = n.owner === 1 ? '#00e5ff' : n.owner === 2 ? '#ff4060' : '#40ffbb';
+    const rc = n.owner === 1 ? '#00e5ff' : n.owner === 2 ? '#ff4060' : n.owner === 3 ? '#c040ff' : '#40ffbb';
     const rb = n.owner !== 0;
     ctx.save();
     ctx.globalAlpha = fogAlpha;
@@ -457,7 +458,7 @@ export class NodeRenderer {
 
     /* ── Signal Tower ── */
     if (n.type === NodeType.SIGNAL) {
-      const sigCol = n.owner === 1 ? '#00ff88' : n.owner === 2 ? '#ff4060' : '#f5c518';
+      const sigCol = n.owner === 1 ? '#00ff88' : n.owner === 2 ? '#ff4060' : n.owner === 3 ? '#c040ff' : '#f5c518';
       const fogA   = n.inFog ? 0.28 : 1.0;
       ctx.save();
       /* 3 expanding signal rings emanating outward */

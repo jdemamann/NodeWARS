@@ -81,16 +81,15 @@ export class GNode {
       return;
     }
 
-    /* Energy regen — modified soma-zero:
-       When tentacles are active, SELF_REGEN_FRAC of tier regen goes to the source node
-       and (1 - SELF_REGEN_FRAC) goes through tentacles (see Physics.updateOutCounts).
-       Total energy per second = TIER_REGEN[level] — zero-sum preserved, no duplication.
-       When idle (no tentacles), 100% of regen goes to self as usual. */
+    /* Energy regen — Unified Pool model:
+       GNode ALWAYS regenerates its full tier regen, regardless of outCount.
+       Tent._updateNormal / _updateClash explicitly drain feed * dt from the source each frame.
+       Net result: if regen == feed, energy stays flat (zero-sum). If feed > regen (clash),
+       stored energy drains. No conditional branching needed — physics handles the balance. */
     if (this.owner !== 0) {
-      const tierRegen  = TIER_REGEN[this.level] ?? TIER_REGEN[0];
-      const boost      = (frenzyActive && this.owner === 1) ? 1.10 : 1.0;
-      const selfFrac   = this.outCount > 0 ? GAME_BALANCE.SELF_REGEN_FRAC : 1.0;
-      this.energy      = Math.min(this.maxE, this.energy + tierRegen * selfFrac * boost * GAME_BALANCE.GLOBAL_REGEN_MULT * dt);
+      const tierRegen = TIER_REGEN[this.level] ?? TIER_REGEN[0];
+      const boost     = (frenzyActive && this.owner === 1) ? 1.10 : 1.0;
+      this.energy     = Math.min(this.maxE, this.energy + tierRegen * boost * GAME_BALANCE.GLOBAL_REGEN_MULT * dt);
     }
 
     /* Decay visual flashes */

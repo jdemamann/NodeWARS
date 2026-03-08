@@ -22,6 +22,7 @@ class GameState {
       fontId:       'orbitron',
       textZoom:     1.0,
       highGraphics: false,
+      theme:        'DARK',
     };
     this._activeWorldTab = 1;  // ui state for level select screen
   }

@@ -203,10 +203,14 @@ function _makeLvBtn(lv, phaseNum, col, isLocked, isDone, isNext, worldLocked, is
           (lv.sym ? (lv.bk ? ' ' : '') + 'ECHO' : '') + '</div>'
     : '';
 
+  const purpleBadge = lv.ai3 > 0
+    ? '<div style="font-size:6px;color:#c040ff;letter-spacing:1px;margin-top:1px">⚔ CUTTHROAT×' + lv.ai3 + '</div>'
+    : '';
+
   const idLabel = isTut ? 'TUT' : String(phaseNum).padStart(2, '0');
   btn.innerHTML = '<div class="ln" style="color:' + col + '">' + idLabel + '</div>' +
                   '<div class="lna">' + lv.name + '</div>' +
-                  '<div class="ld">' + dots + '</div>' + badge + mechBadge;
+                  '<div class="ld">' + dots + '</div>' + badge + mechBadge + purpleBadge;
 
   if (!isLocked) {
     btn.addEventListener('click', () => {
@@ -374,6 +378,12 @@ export function refreshSettingsUI() {
     btn.textContent = STATE.settings[k] ? 'ON' : 'OFF';
     btn.classList.toggle('on', STATE.settings[k]);
   });
+  const themeBtn = $('togTheme');
+  if (themeBtn) {
+    const t = STATE.settings.theme || 'DARK';
+    themeBtn.textContent = t;
+    themeBtn.classList.toggle('on', t === 'LIGHT');
+  }
 }
 
 export function updateDebugInfo() {

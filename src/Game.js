@@ -5,8 +5,8 @@
    main update pipeline.  Rendering is delegated to Renderer.
    ================================================================ */
 
-import { LEVELS, TentState, NodeType, MAX_SLOTS, EMBRYO, TIER_REGEN } from './constants.js';
-import { vd, vdSq, bldC, bezPt, findCutT, maxRange, domR, clamp, erad } from './utils.js';
+import { LEVELS, TentState, NodeType, MAX_SLOTS, TIER_REGEN } from './constants.js';
+import { vd, vdSq, bldC, findCutT, maxRange, clamp, erad } from './utils.js';
 import { bus }          from './EventBus.js';
 import { STATE }        from './GameState.js';
 import { T }            from './i18n.js';
@@ -64,6 +64,7 @@ export class Game {
     this.state      = 'idle';
     this.cfg        = null;
     this.ai         = null;
+    this.ai3        = null;
 
     this.frenzyTimer = 0;
     this.frenzyCount = 0;
@@ -160,7 +161,8 @@ export class Game {
     const ec = cfg.ec || 200;
     for (let i = 0; i < this.nodes.length; i++) this.nodes[i].maxE = ec;
 
-    this.ai    = new AI(this, cfg);
+    this.ai    = new AI(this, cfg);          // owner 2 — red AI
+    this.ai3   = cfg.ai3 > 0 ? new AI(this, cfg, 3) : null; // owner 3 — purple AI
     this.state = 'playing';
 
     /* World music */
@@ -258,15 +260,29 @@ export class Game {
       }
     }
 
-    /* Assign player (leftmost) and AI (rightmost slice) */
+    /* Assign player (leftmost), red AI (rightmost), purple AI (topmost remaining) */
     const sorted = [...this.nodes].sort((a, b) => a.x - b.x);
     sorted[0].owner  = 1;
     sorted[0].energy = cfg.pE || 22;
-    const aiC = sorted.slice(Math.max(1, sorted.length - cfg.ai * 2));
+
+    // Red AI (owner 2): rightmost candidate slice
+    const redCount = cfg.ai || 0;
+    const aiC = sorted.slice(Math.max(1, sorted.length - redCount * 2));
     aiC.sort(() => Math.random() - 0.5);
-    for (let i = 0; i < cfg.ai && i < aiC.length; i++) {
+    for (let i = 0; i < redCount && i < aiC.length; i++) {
       aiC[i].owner  = 2;
-      aiC[i].energy = cfg.aiE + (rnd(-5, 8));
+      aiC[i].energy = (cfg.aiE || 22) + rnd(-5, 8);
+    }
+
+    // Purple AI (owner 3): topmost neutral nodes — creates a distinct map position
+    const purpleCount = cfg.ai3 || 0;
+    if (purpleCount > 0) {
+      const neutrals = sorted.slice(1).filter(n => n.owner === 0);
+      neutrals.sort((a, b) => a.y - b.y);
+      for (let i = 0; i < purpleCount && i < neutrals.length; i++) {
+        neutrals[i].owner  = 3;
+        neutrals[i].energy = (cfg.aiE3 || cfg.aiE || 22) + rnd(-5, 8);
+      }
     }
 
     /* Apply bunker upgrades to neutral normal nodes */
@@ -470,6 +486,7 @@ export class Game {
 
     /* AI */
     this.ai.update(dt);
+    if (this.ai3) this.ai3.update(dt);
 
     /* HUD */
     this.hud.update(this);
@@ -480,10 +497,11 @@ export class Game {
       if (el) {
         const pN  = this.nodes.filter(n => n.owner === 1 && !n.isRelay).length;
         const aiN = this.nodes.filter(n => n.owner === 2 && !n.isRelay).length;
+        const ai3N= this.nodes.filter(n => n.owner === 3 && !n.isRelay).length;
         const pTents = this.tents.filter(t => t.alive && t.es?.owner === 1);
         const totalFlow = pTents.reduce((s, t) => s + (t.flowRate || 0), 0).toFixed(1);
         el.innerHTML =
-          `Nodes: ${this.nodes.length} (P:${pN} AI:${aiN}) | Tents: ${this.tents.length} | T: ${this.time.toFixed(1)}s<br>` +
+          `Nodes: ${this.nodes.length} (P:${pN} R:${aiN} Pu:${ai3N}) | Tents: ${this.tents.length} | T: ${this.time.toFixed(1)}s<br>` +
           `Player flow out: ${totalFlow}/s`;
       }
 
@@ -532,10 +550,11 @@ export class Game {
 
   checkWin() {
     const real = this.nodes.filter(n => !n.isRelay);
-    const p = real.filter(n => n.owner === 1).length;
-    const e = real.filter(n => n.owner === 2).length;
-    if (e === 0) { this.done = true; endLevel(true, this); }
-    else if (p === 0) { this.done = true; endLevel(false, this); }
+    const p  = real.filter(n => n.owner === 1).length;
+    const e2 = real.filter(n => n.owner === 2).length;
+    const e3 = real.filter(n => n.owner === 3).length;
+    if (e2 === 0 && e3 === 0) { this.done = true; endLevel(true, this); }
+    else if (p === 0)          { this.done = true; endLevel(false, this); }
   }
 
   calcScore() {
@@ -669,66 +688,27 @@ export class Game {
       const cuttable = t.source && t.target &&
         (t.source.owner === 1 || (t.reversed && t.target.owner === 1));
       if (!cuttable) return;
-      const cp     = t.getCP();
-      const cutT   = findCutT(p1.x, p1.y, p2.x, p2.y, t.source.x, t.source.y, cp.x, cp.y, t.target.x, t.target.y);
+
+      const cp    = t.getCP();
+      const cutT  = findCutT(p1.x, p1.y, p2.x, p2.y, t.source.x, t.source.y, cp.x, cp.y, t.target.x, t.target.y);
       if (cutT < 0) return;
 
+      /* actualCut = normalised position along effective source→target axis.
+           < 0.3  → defensive refund (energy returns to source)
+           > 0.7  → kamikaze burst   (payload rushes to target via BURSTING state)
+           0.3–0.7 → normal cut      (retract, energy lost) */
       const actualCut = t.reversed ? (1 - cutT) : cutT;
-      const spentCost = t.state === TentState.GROWING ? (t.paidCost || 0) : t.buildCost;
-      const totalPool = spentCost + Math.max(0, t.energyInPipe);
       const srcNode   = t.reversed ? t.target : t.source;
       const tgtNode   = t.reversed ? t.source : t.target;
 
-      /* Tentacle Wars cut physics:
-           cut < 0.3 (near source)  → defensive refund: all energy returns to source
-           cut > 0.7 (near target)  → offensive burst:  all energy rushes to target
-           0.3–0.7 (middle zone)    → linear blend between the two extremes */
-      let srcShare, tgtShare;
-      if (actualCut < 0.3) {
-        srcShare = totalPool;
-        tgtShare = 0;
-      } else if (actualCut > 0.7) {
-        srcShare = 0;
-        tgtShare = totalPool;
-      } else {
-        const blend = (actualCut - 0.3) / 0.4;
-        srcShare = totalPool * (1 - blend);
-        tgtShare = totalPool * blend;
-      }
+      t.cutPoint = actualCut;
+      t.cutFlash = 0.6;
 
-      srcNode.energy = Math.min(srcNode.maxE, srcNode.energy + srcShare);
+      /* All energy distribution is handled inside kill() and _updateBursting() */
+      t.kill(actualCut);
 
-      if (tgtShare > 0) {
-        if (tgtNode.owner === srcNode.owner || tgtNode.owner === 0) {
-          if (tgtNode.owner === 0) {
-            if (!tgtNode.contest) tgtNode.contest = {};
-            if (!tgtNode.contest[srcNode.owner]) tgtNode.contest[srcNode.owner] = 0;
-            tgtNode.contest[srcNode.owner] += tgtShare * 0.9;
-            if (tgtNode.contest[srcNode.owner] >= EMBRYO) {
-              const over = tgtNode.contest[srcNode.owner] - EMBRYO;
-              tgtNode.owner  = srcNode.owner;
-              tgtNode.regen  = 0; // tier-based
-              tgtNode.cFlash = 1; tgtNode.contest = null;
-              tgtNode.energy = Math.min(tgtNode.maxE, tgtNode.energy + over * 0.5);
-              this.fogDirty  = true;
-            }
-          } else {
-            tgtNode.energy = Math.min(tgtNode.maxE, tgtNode.energy + tgtShare);
-          }
-        } else {
-          const dmg = tgtShare * 0.8 * domR(srcNode.level);
-          tgtNode.energy -= dmg;
-          tgtNode.underAttack = 1;
-          if (tgtNode.energy <= 0) {
-            tgtNode.energy  = Math.abs(tgtNode.energy) * 0.12;
-            tgtNode.owner   = srcNode.owner;
-            tgtNode.regen   = 0; // tier-based
-            tgtNode.cFlash  = 1; tgtNode.contest = null;
-            this.fogDirty   = true;
-          }
-        }
-      }
-
+      SFX.cut();
+      srcNode.cFlash = (srcNode.cFlash || 0) + 0.6;
       this.cutsTotal = (this.cutsTotal || 0) + 1;
 
       /* Track AI cuts for reactive defence */
@@ -743,27 +723,6 @@ export class Game {
         }
       }
 
-      srcNode.cFlash  = (srcNode.cFlash || 0) + 0.6;
-      tgtNode.cFlash  = (tgtNode.cFlash || 0) + 0.8;
-      tgtNode.burstPulse = 1.0;
-
-      t.cutPoint = actualCut;
-      t.cutFlash = 0.6;
-
-      /* Free orbs */
-      const col2 = srcNode.owner === 1 ? ['#00b8d9','#00ccb8','#00e5ff','#55faff','#ffffff','#ffffaa'][srcNode.level]
-                                        : ['#c01830','#ee1e3e','#ff3d5a','#ff7090','#ffb8c8','#ffddee'][srcNode.level];
-      const cp2   = t.getCP();
-      const orbTarget = tgtShare >= srcShare ? tgtNode : srcNode;
-      const nOrbs = Math.min(6, Math.round(totalPool / 2) + 2);
-      for (let i = 0; i < nOrbs; i++) {
-        const sp2 = bezPt(actualCut, t.source.x, t.source.y, cp2.x, cp2.y, t.target.x, t.target.y);
-        this.freeOrbPool.get(sp2.x + (Math.random()-0.5)*12, sp2.y + (Math.random()-0.5)*12, orbTarget.x, orbTarget.y, col2, totalPool);
-      }
-
-      t.kill();
-      SFX.cut();
-
       /* Frenzy trigger */
       if (srcNode.owner === 1) {
         const now = this.time;
@@ -777,9 +736,7 @@ export class Game {
           SFX.frenzy();
           bus.emit('frenzy:start');
         }
-      }
 
-      if (srcNode.owner === 1) {
         const pct = Math.round((1 - actualCut) * 100);
         showToast('✂ ' + pct + '% → ' + (tgtNode.owner === srcNode.owner ? 'ALLY' : 'TARGET'));
       }

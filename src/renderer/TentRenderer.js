@@ -70,25 +70,16 @@ export class TentRenderer {
     const isRev   = t.reversed;
     const visEnd  = isClash ? (isRev ? 1 - t.clashT : t.clashT) : t.reachT;
     const isGrow  = t.state === TentState.GROWING;
-    const isAnim  = isGrow || t.state === TentState.RETRACTING;
+    const isAnim  = isGrow || t.state === TentState.RETRACTING || t.state === TentState.BURSTING;
     const isAdv   = t.state === TentState.ADVANCING;
-
-    /* Low-efficiency dim overlay */
-    if (t.eff < 0.79 && t.state === TentState.ACTIVE && !isClash) {
-      ctx.save();
-      ctx.beginPath();
-      drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, 0, visEnd);
-      ctx.strokeStyle = 'rgba(245,197,24,0.09)';
-      ctx.lineWidth   = 5;
-      ctx.stroke();
-      ctx.restore();
-    }
+    /* startT > 0 only during BURSTING: tail advances toward target, shrinking the visible segment */
+    const sT      = t.startT || 0;
 
     /* Reversed dashed overlay */
     if (isRev && (t.state === TentState.ACTIVE || t.state === TentState.ADVANCING)) {
       ctx.save();
       ctx.beginPath();
-      drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, 0.02, visEnd * 0.98);
+      drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, Math.max(sT, 0.02), visEnd * 0.98);
       ctx.strokeStyle = 'rgba(245,197,24,0.22)';
       ctx.lineWidth   = 3;
       ctx.setLineDash([3,6]);
@@ -105,7 +96,7 @@ export class TentRenderer {
 
     ctx.save();
     ctx.beginPath();
-    drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, 0, visEnd);
+    drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, sT, visEnd);
     ctx.strokeStyle  = col;
     ctx.lineWidth    = glowW;
     ctx.globalAlpha  = glowA;
@@ -138,7 +129,7 @@ export class TentRenderer {
     if (FR > 0.15 && t.state === TentState.ACTIVE) {
       ctx.save();
       ctx.beginPath();
-      drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, 0.02, visEnd * 0.98);
+      drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, Math.max(sT, 0.02), visEnd * 0.98);
       ctx.strokeStyle = 'rgba(255,255,255,' + (0.12 + FR * 0.28) + ')';
       ctx.lineWidth   = 1 + FR * 2.5;
       ctx.globalAlpha = 1;
@@ -159,7 +150,7 @@ export class TentRenderer {
     if (!atk || isRev) {
       /* Friendly / reversed: dashed bezier stroke — replaces expensive segment loop */
       ctx.beginPath();
-      drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, 0, visEnd);
+      drawBSeg(ctx, esx, esy, cp.x, cp.y, etx, ety, sT, visEnd);
       ctx.strokeStyle    = col;
       ctx.lineWidth      = wBase * 2;
       ctx.globalAlpha    = alpha;
@@ -169,15 +160,15 @@ export class TentRenderer {
       ctx.setLineDash([]);
       ctx.lineDashOffset = 0;
     } else {
-      drawTaperedPath(ctx, esx, esy, cp.x, cp.y, etx, ety, 0, visEnd, wBase, wTip);
+      drawTaperedPath(ctx, esx, esy, cp.x, cp.y, etx, ety, sT, visEnd, wBase, wTip);
       ctx.fillStyle   = col;
       ctx.globalAlpha = alpha;
       ctx.fill();
     }
     ctx.restore();
 
-    /* Non-active tip dot */
-    if (t.state !== TentState.ACTIVE) {
+    /* Non-active tip dot — not shown during BURSTING (tail rushing to target, no stationary tip) */
+    if (t.state !== TentState.ACTIVE && t.state !== TentState.BURSTING) {
       const tip   = bezPt(visEnd, esx, esy, cp.x, cp.y, etx, ety);
       const sz    = (isAdv ? 4.5 : 3.5) + lvl * 0.65;
       const pulse = 0.8 + Math.sin(Date.now() * 0.009) * 0.22;

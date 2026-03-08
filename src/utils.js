@@ -16,12 +16,8 @@ export const erad     = (e, maxE = 200) => 16 + (e / maxE) * 42;
 export const bldC     = d  => BUILD_B + d * BUILD_PX;
 export const maxRange = (e, dm) => Math.max(0, (e - BUILD_B) / (BUILD_PX + dm));
 
-/** Attack efficiency: scales with fill % of cell. High fill = high pressure. */
-export function efAtk(n) {
-  const pct = n.energy / n.maxE;
-  if (pct < 0.08) return 0.05 + pct * 0.50;
-  return Math.max(0.12, clamp((pct - 0.04) / 0.55, 0, 1));
-}
+/** Attack efficiency: always 1.0 — fill-percentage penalty removed (matches original Tentacle Wars). */
+export function efAtk(n) { return 1.0; }
 
 /** Damage multiplier per evolution level. Level 0=1.0, Level 5=2.1. */
 export const domR      = lvl => 1 + lvl * 0.22;
@@ -29,8 +25,8 @@ export const domR      = lvl => 1 + lvl * 0.22;
 /** Defense reduction per evolution level. Level 0=1.0, Level 5=1.6 (symmetric but milder). */
 export const defR      = lvl => 1 + lvl * 0.12;
 
-/** Wire efficiency: drops with distance (longer wire = more heat loss). */
-export const wireEff   = d   => Math.max(0.55, 1 - d * 0.00045);
+/** Wire efficiency: always 1.0 — heat loss removed (matches original Tentacle Wars). */
+export const wireEff   = d   => 1.0;
 
 /** Travel time (s): how long for energy to cross the tentacle. */
 export const travelT   = d   => Math.max(0.18, d / 160);

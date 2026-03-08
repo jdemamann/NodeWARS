@@ -114,6 +114,11 @@ function wireButtons() {
   });
   /* Explicit listener — bypasses the forEach so caching can't break it */
   $id('togHighGraphics')?.addEventListener('click', () => toggleSetting('highGraphics'));
+  $id('togTheme')?.addEventListener('click', () => {
+    STATE.settings.theme = STATE.settings.theme === 'LIGHT' ? 'DARK' : 'LIGHT';
+    STATE.saveSettings();
+    refreshSettingsUI();
+  });
   $id(IDS.BTN_RESET_PROG)?.addEventListener('click', () => {
     if (!confirm('Reset all progress?')) return;
     STATE.resetProgress();

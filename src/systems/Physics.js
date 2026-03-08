@@ -252,20 +252,18 @@ export class Physics {
       src.outCount++;
     }
 
-    /* tentFeedPerSec: soma-zero model (original Tentacle Wars).
-       Tier regen is DIVIDED equally among all active tentacles.
-       Under attack: no self-feed (energy reserved for defense).
-       Node stops self-regenerating in GNode.update while outCount > 0. */
+    /* tentFeedPerSec: Unified Pool model.
+       Tier regen is divided equally among active tentacles. Each tent drains this amount
+       from the source per second (in _updateNormal / _updateClash). GNode always adds the
+       full tier regen. Net flow = 0 when outCount matches the split. Tents drain MORE than
+       regen during clashes, drawing down stored energy — correct Tentacle Wars behavior.
+       Under attack: no outgoing feed (energy reserved for defense). */
     for (let i = 0; i < nodes.length; i++) {
       const n          = nodes[i];
       const isAttacked = n.underAttack > 0.5;
       const outSlots   = Math.max(1, n.outCount);
       const tierRegen  = TIER_REGEN[n.level] ?? TIER_REGEN[0];
-
-      // Tentacles carry (1 - SELF_REGEN_FRAC) of tier regen, split across outSlots.
-      // Combined with GNode self-regen (SELF_REGEN_FRAC), total = TIER_REGEN — zero-sum.
-      const tentFrac = 1.0 - GAME_BALANCE.SELF_REGEN_FRAC;
-      n.tentFeedPerSec = isAttacked ? 0 : (tierRegen * tentFrac / outSlots) * GAME_BALANCE.GLOBAL_REGEN_MULT;
+      n.tentFeedPerSec = isAttacked ? 0 : (tierRegen / outSlots) * GAME_BALANCE.GLOBAL_REGEN_MULT;
     }
   }
 }

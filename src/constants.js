@@ -19,6 +19,7 @@ export const TentState = Object.freeze({
   ACTIVE:     'active',
   ADVANCING:  'advancing',
   RETRACTING: 'retracting',
+  BURSTING:   'bursting',   // Kamikaze cut: tail rushes forward to deal burst damage
   DEAD:       'dead',
 });
 
@@ -55,14 +56,6 @@ export const GAME_BALANCE = {
   // Raise above 1.0 to speed up the whole game; lower to slow it down.
   GLOBAL_REGEN_MULT: 1.0,
 
-  // Fraction of tier regen the source node keeps for itself while it has active tentacles.
-  // The remainder (1 - SELF_REGEN_FRAC) is sent through tentacles, divided by outCount.
-  // Total energy generated per second = TIER_REGEN[level] (zero-sum preserved).
-  // 0.0 = pure soma-zero (source frozen while feeding, like original Tentacle Wars)
-  // 0.3 = source recovers slowly (30%) while tentacles carry 70% — recommended
-  // 1.0 = source self-regens fully and tentacles carry nothing (defeats the model)
-  SELF_REGEN_FRAC: 0.3,
-
   // Multiplier applied to capture contributions against neutral cells.
   // Default 4.0: a tier-0 node captures a neutral cell in ~6s instead of 24s.
   // This compensates for the small tier-0 regen (0.5 e/s) that would make
@@ -76,6 +69,16 @@ export const GAME_BALANCE = {
   // Tentacles can carry this fraction above the node's exact tier regen.
   // 1.1 = 10% tolerance, making the bandwidth cap a real but forgiving limit.
   TENTACLE_BANDWIDTH_TOLERANCE: 1.1,
+
+  // Tentacle travel speed in px/s (reserved for future explicit distance-speed tuning).
+  TENTACLE_SPEED: 250,
+
+  // Scales how fast the clash front moves per unit of force difference.
+  // Higher = more volatile clashes that resolve quickly.
+  CLASH_VOLATILITY: 0.20,
+
+  // Payload multiplier when a kamikaze burst (cutRatio > 0.7) reaches its target.
+  SLICE_BURST_MULT: 1.5,
 };
 
 // Convenience aliases — used throughout the codebase (avoid breaking imports).
@@ -94,8 +97,25 @@ export const ORB_IVB    = 0.55;  // base orb spawn interval (s)
 /* ── CELL PROGRESSION ── */
 export const MAX_SLOTS = [1, 2, 3, 4, 5, 5]; // outgoing tentacle slots per level (0-5)
 export const SIDES     = [0, 3, 4, 6, 8, 10]; // polygon sides per level
-export const CP = ['#00b8d9','#00ccb8','#00e5ff','#55faff','#ffffff','#ffffaa']; // player colours
-export const CE = ['#c01830','#ee1e3e','#ff3d5a','#ff7090','#ffb8c8','#ffddee']; // enemy colours
+export const CP  = ['#00b8d9','#00ccb8','#00e5ff','#55faff','#ffffff','#ffffaa']; // player colours
+export const CE  = ['#c01830','#ee1e3e','#ff3d5a','#ff7090','#ffb8c8','#ffddee']; // enemy (red) colours
+export const CE3 = ['#9020cc','#a030dd','#c040ff','#d060ff','#e090ff','#f0b8ff']; // enemy (purple) colours
+
+/* ── VISUAL THEMES ── */
+export const THEMES = {
+  DARK: {
+    bgW1: '#04070f',
+    bgW2: '#070415',
+    bgW3: '#080602',
+    grid: 'rgba(0,229,255,0.016)',
+  },
+  LIGHT: {
+    bgW1: '#e8ecef',
+    bgW2: '#e2dce8',
+    bgW3: '#e8e5dc',
+    grid: 'rgba(0,0,0,0.05)',
+  },
+};
 
 /* ── WORLDS ── */
 export const WORLDS = [
@@ -106,6 +126,19 @@ export const WORLDS = [
   { id:3, name:'NEXUS PRIME', col:'#f5c518', glow:'rgba(245,197,24,0.22)',
     desc:'Relay nodes amplify flow. Pulsars broadcast energy bursts — control them first.' },
 ];
+
+/* ── DIFFICULTY PRESETS ── */
+/*
+  Reusable spread objects for level config — apply with { ...DIFFICULTY.EASY, ...overrides }.
+  Tune aiMs (AI think interval in seconds) and dm (distance-cost multiplier per pixel).
+  Lower aiMs = faster AI decisions; higher dm = more expensive long-range tentacles.
+*/
+export const DIFFICULTY = {
+  EASY:   { aiMs: 9.0, dm: 0.04 },
+  NORMAL: { aiMs: 5.0, dm: 0.06 },
+  HARD:   { aiMs: 2.5, dm: 0.09 },
+  PURPLE: { aiMs: 1.8, dm: 0.10 },
+};
 
 /* ── LEVEL DATA ── */
 /*
@@ -123,9 +156,9 @@ export const LEVELS = [
   /* TUT W1 */
   { id:0,  w:0, ec:100, tutW:1, name:'TUTORIAL',         nodes:5,  ai:0, aiE:0,  pE:40, aiMs:99,  dm:0.05, nr:[20,45], par:999, tut:true },
   /* W1 — GENESIS ── Tier 1: The Pulse */
-  { id:1,  w:1, ec:80,  name:'FIRST LIGHT',   nodes:6,  ai:1, aiE:18, pE:32, aiMs:9.0, dm:0.04, nr:[14,34], par:55  },
-  { id:2,  w:1, ec:85,  name:'TWIN AXIS',     nodes:7,  ai:1, aiE:25, pE:28, aiMs:7.5, dm:0.05, nr:[14,40], par:72  },
-  { id:3,  w:1, ec:90,  name:'THE BRIDGE',    nodes:8,  ai:1, aiE:28, pE:28, aiMs:6.5, dm:0.05, nr:[16,45], par:90  },
+  { id:1,  w:1, ec:80,  name:'FIRST LIGHT',   nodes:6,  ai:1, aiE:18, pE:32, ...DIFFICULTY.EASY,                    nr:[14,34], par:55  },
+  { id:2,  w:1, ec:85,  name:'TWIN AXIS',     nodes:7,  ai:1, aiE:25, pE:28, ...DIFFICULTY.EASY, aiMs:7.5, dm:0.05, nr:[14,40], par:72  },
+  { id:3,  w:1, ec:90,  name:'THE BRIDGE',    nodes:8,  ai:1, aiE:28, pE:28, ...DIFFICULTY.EASY, aiMs:6.5, dm:0.05, nr:[16,45], par:90  },
   /* W1 ── Tier 2: The Struggle */
   { id:4,  w:1, ec:95,  name:'TRIANGLE WAR',  nodes:9,  ai:2, aiE:26, pE:30, aiMs:5.5, dm:0.06, nr:[18,52], par:110 },
   { id:5,  w:1, ec:100, name:'SIEGE RING',    nodes:10, ai:2, aiE:30, pE:30, aiMs:5.0, dm:0.07, nr:[20,55], par:128 },
@@ -150,8 +183,8 @@ export const LEVELS = [
   { id:18, w:2, ec:160, name:'MAELSTROM',     nodes:12, ai:3, aiE:48, pE:34, aiMs:3.0, dm:0.09, nr:[25,68], par:188, hz:5, mvhz:3, pchz:6 },
   { id:19, w:2, ec:165, name:'VORTEX RING',   nodes:13, ai:3, aiE:54, pE:36, aiMs:2.6, dm:0.09, nr:[28,72], par:215, hz:5, mvhz:5 },
   { id:20, w:2, ec:170, name:'ABYSS GATE',    nodes:14, ai:4, aiE:60, pE:38, aiMs:2.2, dm:0.10, nr:[28,78], par:244, hz:6, mvhz:6 },
-  /* W2 ── Boss: Heart of the Void — Super-Vortex */
-  { id:21, w:2, ec:175, name:'OBLIVION',      nodes:15, ai:4, aiE:65, pE:40, aiMs:1.6, dm:0.11, nr:[32,88], par:262, hz:6, mvhz:3, pchz:5, supervhz:true },
+  /* W2 ── Boss: Heart of the Void — Super-Vortex + Purple Incursion */
+  { id:21, w:2, ec:175, name:'OBLIVION',      nodes:15, ai:4, aiE:65, pE:40, aiMs:1.6, dm:0.11, nr:[32,88], par:262, hz:6, mvhz:3, pchz:5, supervhz:true, ai3:1, aiE3:50 },
   /* TUT W3 */
   { id:22, w:3, ec:175, tutW:3, name:'NEXUS TUTORIAL', nodes:5,  ai:1, aiE:20, pE:40, aiMs:8.0, dm:0.06, nr:[15,40], par:999, tut:true, rl:1, ps:1 },
   /* W3 — NEXUS PRIME ── Tier 1: Signal Acquisition */
@@ -162,12 +195,12 @@ export const LEVELS = [
   { id:26, w:3, ec:185, name:'BROADCAST',     nodes:11, ai:3, aiE:38, pE:32, aiMs:4.0, dm:0.07, nr:[22,60], par:146, rl:3, ps:2 },
   { id:27, w:3, ec:188, name:'OVERCLOCK',     nodes:12, ai:3, aiE:44, pE:32, aiMs:3.6, dm:0.08, nr:[25,65], par:165, rl:4, ps:2 },
   { id:28, w:3, ec:191, name:'FORTIFIED SIGNAL', nodes:12, ai:3, aiE:48, pE:34, aiMs:3.2, dm:0.08, nr:[25,68], par:184, rl:3, ps:3, bkrl:2 },
-  /* W3 ── Tier 3: Maximum Throughput — Signal Towers */
-  { id:29, w:3, ec:194, name:'CASCADE',       nodes:13, ai:4, aiE:52, pE:36, aiMs:2.8, dm:0.09, nr:[28,72], par:204, rl:5, ps:3 },
-  { id:30, w:3, ec:196, name:'SIGNAL LOCK',   nodes:14, ai:4, aiE:58, pE:38, aiMs:2.4, dm:0.09, nr:[30,78], par:230, rl:5, ps:3, sig:1 },
-  { id:31, w:3, ec:198, name:'APEX',          nodes:14, ai:5, aiE:65, pE:38, aiMs:2.0, dm:0.10, nr:[32,82], par:260, rl:6, ps:4, sig:1 },
-  /* W3 ── Boss: Nexus Core — Super-Pulsar + Relay Fortresses + Signal Tower */
-  { id:32, w:3, ec:200, name:'TRANSCENDENCE', nodes:15, ai:5, aiE:72, pE:42, aiMs:1.5, dm:0.11, nr:[35,90], par:288, rl:6, ps:4, sig:1, bkrl:3, superps:true },
+  /* W3 ── Tier 3: Maximum Throughput — Signal Towers + Purple Threat */
+  { id:29, w:3, ec:194, name:'CASCADE',       nodes:13, ai:4, aiE:52, pE:36, aiMs:2.8, dm:0.09, nr:[28,72], par:204, rl:5, ps:3, ai3:1, aiE3:42 },
+  { id:30, w:3, ec:196, name:'SIGNAL LOCK',   nodes:14, ai:4, aiE:58, pE:38, aiMs:2.4, dm:0.09, nr:[30,78], par:230, rl:5, ps:3, sig:1, ai3:1, aiE3:48 },
+  { id:31, w:3, ec:198, name:'APEX',          nodes:14, ai:5, aiE:65, pE:38, aiMs:2.0, dm:0.10, nr:[32,82], par:260, rl:6, ps:4, sig:1, ai3:1, aiE3:55 },
+  /* W3 ── Boss: Nexus Core — Super-Pulsar + Relay Fortresses + Signal Tower + Purple Dominance */
+  { id:32, w:3, ec:200, name:'TRANSCENDENCE', nodes:15, ai:5, aiE:72, pE:42, aiMs:1.5, dm:0.11, nr:[35,90], par:288, rl:6, ps:4, sig:1, bkrl:3, superps:true, ai3:2, aiE3:62 },
 ];
 
 /** Returns the world id for a given level id. Derived from LEVELS data — no more magic ranges. */

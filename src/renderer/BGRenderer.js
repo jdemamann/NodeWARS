@@ -9,13 +9,17 @@
    60 fps.
    ================================================================ */
 
+import { THEMES } from '../constants.js';
+import { STATE }  from '../GameState.js';
+
 export class BGRenderer {
   constructor() {
-    this._gridCanvas = null;
-    this._gridW = 0;
-    this._gridH = 0;
-    this._lastWorld = -1;
-    this._glowCache = new Map(); // nodeId → { img: OffscreenCanvas, r: radius }
+    this._gridCanvas    = null;
+    this._gridW         = 0;
+    this._gridH         = 0;
+    this._lastWorld     = -1;
+    this._lastGridColor = null;
+    this._glowCache     = new Map(); // nodeId → { img: OffscreenCanvas, r: radius }
   }
 
   /* Pre-render node ambient glow to an OffscreenCanvas — reuse across frames. */
@@ -40,13 +44,15 @@ export class BGRenderer {
     return oc;
   }
 
-  /* Lazily build (or rebuild) the static hex-dot grid texture. */
-  _buildGrid(W, H, world) {
+  /* Lazily build (or rebuild) the static hex-dot grid texture.
+     Invalidates when world, canvas size, or theme grid color changes. */
+  _buildGrid(W, H, world, gridColor) {
     if (
-      this._gridCanvas &&
-      this._gridW === W &&
-      this._gridH === H &&
-      this._lastWorld === world
+      this._gridCanvas     &&
+      this._gridW         === W    &&
+      this._gridH         === H    &&
+      this._lastWorld     === world &&
+      this._lastGridColor === gridColor
     ) return;
 
     const oc = typeof OffscreenCanvas !== 'undefined'
@@ -57,7 +63,7 @@ export class BGRenderer {
     const gc = oc.getContext('2d');
 
     const gs = 52;
-    gc.strokeStyle = 'rgba(0,229,255,0.016)';
+    gc.strokeStyle = gridColor;
     gc.lineWidth   = 1;
     for (let x = 0; x < W + gs; x += gs) {
       for (let y = 0; y < H + gs; y += gs) {
@@ -68,23 +74,26 @@ export class BGRenderer {
       }
     }
 
-    this._gridCanvas = oc;
-    this._gridW      = W;
-    this._gridH      = H;
-    this._lastWorld  = world;
+    this._gridCanvas    = oc;
+    this._gridW         = W;
+    this._gridH         = H;
+    this._lastWorld     = world;
+    this._lastGridColor = gridColor;
   }
 
   draw(ctx, game, W, H) {
     const world = game.cfg ? (game.cfg.w || 0) : 0;
     const t     = game.time;
 
-    /* World-specific background fill */
-    const bgColor = world === 2 ? '#070415' : world === 3 ? '#080602' : '#04070f';
-    ctx.fillStyle  = bgColor;
+    /* Resolve active theme — defaults to DARK if key is invalid */
+    const theme = THEMES[STATE.settings.theme] || THEMES.DARK;
+
+    /* World-specific background fill from theme */
+    ctx.fillStyle = world === 2 ? theme.bgW2 : world === 3 ? theme.bgW3 : theme.bgW1;
     ctx.fillRect(0, 0, W, H);
 
-    /* Static hex-dot grid */
-    this._buildGrid(W, H, world);
+    /* Static hex-dot grid — rebuilt only when theme or world changes */
+    this._buildGrid(W, H, world, theme.grid);
     ctx.drawImage(this._gridCanvas, 0, 0);
 
     /* Slow-drifting scanline — simple fillRect avoids gradient creation per frame */
