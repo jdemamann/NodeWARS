@@ -46,6 +46,8 @@ export function bindGameInputEvents(game) {
         game._extendSlice(event.offsetX, event.offsetY);
       }
     }
+    /* Drag-connect only extends on held primary-button motion once slicing has
+       not claimed the gesture. */
     if (!game.slicing && !game.paused && (event.buttons & 1) === 1) game._extendMouseDrag(event.offsetX, event.offsetY);
     if (!game.hoverPin && game.state === 'playing' && !game.paused) {
       const hoveredNode = game._findHoverNodeAtScreenPoint(event.offsetX, event.offsetY);
@@ -147,6 +149,8 @@ export function bindGameInputEvents(game) {
   canvas.addEventListener('touchcancel', () => game._clearTouchState());
 
   window.addEventListener('resize', () => game.resize());
+  /* Window-level cleanup guards prevent orphaned slice trails when the browser
+     ends the gesture outside the canvas or suppresses the expected release path. */
   window.addEventListener('mouseup', event => {
     if (event.button === 2 && game.slicing) game._endSlice();
     if (event.button === 0) {

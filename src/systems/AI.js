@@ -35,8 +35,8 @@ const PERSONALITIES = {
     energyThreshold:   22,
   },
   /* Purple cutthroat: maximum aggression, almost never retreats.
-     Its signature move is _checkStrategicCuts() — bursting pipe energy
-     directly into player nodes for instant captures. */
+     Its signature move is _checkStrategicCuts() — an opportunistic source-side
+     burst cut routed through the same canonical slice path as the player. */
   cutthroat: {
     expansionBonus:     8,
     attackBonus:       38,
@@ -69,6 +69,11 @@ export class AI {
 
   update(dt) {
     this._timer += dt;
+
+    /* Purple AI checks opportunistic burst cuts continuously so a charged lane
+       can convert into pressure immediately, independent of build-think pacing. */
+    if (this.owner === 3) this._checkStrategicCuts(this.game);
+
     if (this._timer < this._interval) return;
     this._timer = 0;
 
@@ -84,9 +89,6 @@ export class AI {
     const aiThinkIntervalSeconds = this.cfg.aiThinkIntervalSeconds;
     this._interval = aiThinkIntervalSeconds * speedMult *
       (AI_RULES.INTERVAL_JITTER_BASE + Math.random() * AI_RULES.INTERVAL_JITTER_RANGE);
-
-    /* Purple AI checks strategic cuts every tick (independent of _think timer) */
-    if (this.owner === 3) this._checkStrategicCuts(game);
 
     this._think();
   }
@@ -194,7 +196,18 @@ export class AI {
       const existingPressureBonus = this.game.tents.some(tentacle =>
         tentacle.alive && tentacle.source.owner === this.owner && tentacle.target === targetNode
       ) ? 18 : 0;
-      return (isDefensive ? 20 : 55) + energyAdvantage * 0.5 + proximityScore + existingPressureBonus + personality.attackBonus;
+      let score = (isDefensive ? 20 : 55) + energyAdvantage * 0.5 + proximityScore + existingPressureBonus + personality.attackBonus;
+
+      if (this.owner === 3) {
+        /* Purple AI should feel more like a kill-confirm faction than red AI:
+           prioritize already-weakened player nodes, existing pressure lanes,
+           and heavily contested player positions over passive macro play. */
+        if (targetNode.energy < targetNode.maxE * 0.35) score += 18;
+        if (targetNode.underAttack > 0.2) score += 10;
+        if (existingPressureBonus > 0) score += 12;
+      }
+
+      return score;
     }
 
     if (targetNode.owner === this.owner) {
@@ -224,6 +237,36 @@ export class AI {
     this.game.tents.push(tentacle);
   }
 
+  _canUseSourceNode(sourceNode, energyThreshold) {
+    if (sourceNode.owner !== this.owner) return false;
+    if (sourceNode.outCount >= PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[sourceNode.level]) return false;
+
+    if (!sourceNode.isRelay) {
+      return sourceNode.energy > energyThreshold;
+    }
+
+    const relayHasUsableBudget =
+      (sourceNode.relayFeedBudget || 0) > 0 ||
+      (sourceNode.tentFeedPerSec || 0) > 0;
+
+    return relayHasUsableBudget && sourceNode.energy > Math.max(8, energyThreshold * 0.35);
+  }
+
+  _scoreRelayOriginAdjustment(sourceNode, distance, totalBuildCost) {
+    if (!sourceNode.isRelay) return 0;
+
+    const remainingRelayEnergy = sourceNode.energy - totalBuildCost;
+    let adjustment = 0;
+
+    /* Relay launches should prefer short tactical follow-ups backed by real
+       buffered energy instead of turning every captured relay into long-range spam. */
+    if (distance > AI_RULES.RELAY_CONTEXT_RADIUS_PX * 0.45) adjustment -= 12;
+    if (distance > AI_RULES.RELAY_CONTEXT_RADIUS_PX * 0.7) adjustment -= 18;
+    if (remainingRelayEnergy < totalBuildCost * 0.35) adjustment -= 16;
+
+    return adjustment;
+  }
+
   _think() {
     const game = this.game;
     const distanceCostMultiplier = this.cfg.distanceCostMultiplier;
@@ -231,11 +274,10 @@ export class AI {
     const personality = personalityFor(this.cfg.id || 0, this.owner);
     const energyThreshold = isDefensive ? AI_RULES.DEFENSIVE_ENERGY_THRESHOLD : personality.energyThreshold;
 
-    /* Eligible sources: AI-owned, non-relay, enough energy, has free slots */
+    /* Eligible sources: AI-owned nodes with usable energy and free slots.
+       Owned relays are allowed when they actually hold buffered pass-through budget. */
     const sourceNodes = game.nodes.filter(node =>
-      node.owner === this.owner && !node.isRelay &&
-      node.energy > energyThreshold &&
-      node.outCount < PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[node.level]
+      this._canUseSourceNode(node, energyThreshold)
     );
     if (!sourceNodes.length) return;
 
@@ -254,7 +296,7 @@ export class AI {
         if (sourceNode.energy < totalBuildCost + 1) return;
 
         const proximityScore = 300 / (distance + 60);
-        const score = this._buildMoveScore(
+        let score = this._buildMoveScore(
           sourceNode,
           targetNode,
           proximityScore,
@@ -262,6 +304,8 @@ export class AI {
           personality,
           totalBuildCost,
         );
+
+        score += this._scoreRelayOriginAdjustment(sourceNode, distance, totalBuildCost);
 
         if (score > 0) moves.push({ sourceNode, targetNode, score, buildCost: totalBuildCost });
       });
@@ -285,8 +329,8 @@ export class AI {
    * Purple AI (owner 3) strategic cut mechanic.
    *
    * For each active purple tentacle targeting a player node, check whether
-   * the energy stored in the pipe (energyInPipe) is large enough to justify
-   * a decisive near-target cut. The actual damage / capture outcome is not
+   * the energy stored in the pipe is large enough to justify a decisive
+   * source-side burst cut. The actual damage / capture outcome is not
    * computed here: it must go through the canonical tent slice path.
    *
    * Trigger condition: pipe holds ≥ 65% of target's current energy.

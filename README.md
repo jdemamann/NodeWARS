@@ -100,6 +100,8 @@ The current implementation deliberately preserves these rules:
 - player and purple AI use the same shared slice / burst path
 - frenzy only counts cuts from one continuous slice gesture
 - owner `3` is supported in both gameplay and rendering
+- tutorials are optional in every world and do not block the first real phase
+- crossing into a new world can still naturally route the campaign into that world's tutorial
 - late high-pressure authored phases give the player extra structural opening support where needed
 - phase skip unlocks only after repeated defeats and remains blocked on tutorials, bosses, and the final phase
 
@@ -191,6 +193,8 @@ The game persists these locally:
 - font
 - text zoom
 - debug-related display preferences
+
+Campaign progression and tutorial completion now resolve through shared state helpers rather than ad hoc `curLvl + 1` flow.
 
 ## Documentation Map
 

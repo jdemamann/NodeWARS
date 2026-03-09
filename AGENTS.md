@@ -75,6 +75,7 @@ Do not break these:
 - player and purple AI use the same canonical slice path
 - frenzy only triggers from `3` active cuts inside the same continuous slice gesture
 - owner `3` is supported symmetrically in gameplay and rendering
+- tutorials are optional for unlocks in every world, but normal campaign progression can still flow into the next world's tutorial
 - fixed campaign layouts must match configured level metadata
 - late high-pressure authored phases keep structural player opening support
 - progress and settings persist locally and normalize invalid values
@@ -129,6 +130,7 @@ Planning / balance:
 - Prefer small, test-backed changes.
 - If changing gameplay rules, update at least one guardrail or explain why not.
 - If changing settings, tutorial, story, or persistence, verify all linked surfaces still agree.
+- If changing campaign progression, tutorial completion, or skip flow, keep `GameState` as the canonical source of next-level and unlock rules.
 - If changing campaign layouts, run both `smoke-checks` and `campaign-sanity`.
 - If changing world systems or simulation math, run `simulation-soak` too.
 

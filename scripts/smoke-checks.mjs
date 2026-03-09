@@ -56,7 +56,7 @@ async function testProgrammaticRetractRefundsPayload() {
   const beforeEnergy = source.energy;
   tent.kill();
 
-  assert.equal(source.energy, Math.min(source.maxE, beforeEnergy + 50), 'programmatic retract should refund build cost and in-transit payload');
+  assert.equal(source.energy, beforeEnergy + 50, 'programmatic retract should refund build cost and in-transit payload without clipping the refund');
   assert.equal(tent.state, TentState.RETRACTING, 'programmatic retract should remain a visual retract');
   assert.equal(tent.paidCost, 0, 'programmatic retract should clear refunded build payload from the tentacle');
   assert.equal(tent.energyInPipe, 0, 'programmatic retract should clear refunded in-transit energy from the tentacle');
@@ -151,21 +151,87 @@ async function testBuildCostTuningStaysPlayable() {
   assert.ok(computeBuildCost(260) < 11, 'base build cost at 260px should stay within a playable early-game range before level surcharges');
 }
 
+async function testGrowingTentacleRetractRefundsFullPaidCost() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+
+  const source = new GameNode(0, 0, 0, 99, 1);
+  const target = new GameNode(1, 120, 0, 20, 0);
+  source.maxE = 100;
+  target.maxE = 100;
+
+  const tent = new Tent(source, target, 40);
+  tent.state = TentState.GROWING;
+  tent.paidCost = 12;
+  tent.reachT = 0.3;
+
+  tent.kill();
+
+  assert.equal(source.energy, 111, 'cancelling a growing tentacle should refund the full paid construction cost to the root node');
+  assert.equal(tent.state, TentState.RETRACTING, 'cancelled growing tentacles should still visually retract');
+}
+
+async function testReversedRetractRefundsEffectiveSource() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+
+  const originalSource = new GameNode(0, 0, 0, 30, 1);
+  const originalTarget = new GameNode(1, 120, 0, 40, 1);
+  originalSource.maxE = 200;
+  originalTarget.maxE = 200;
+
+  const tent = new Tent(originalSource, originalTarget, 20);
+  tent.state = TentState.ACTIVE;
+  tent.reversed = true;
+  tent.paidCost = 15;
+  tent.energyInPipe = 5;
+
+  tent.kill();
+
+  assert.equal(originalSource.energy, 30, 'reversed retract should not refund the original source node');
+  assert.equal(originalTarget.energy, 60, 'reversed retract should refund the effective source node');
+}
+
+async function testMiddleCutConservesPayloadAcrossRefundAndImpact() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+
+  const source = new GameNode(0, 0, 0, 20, 1);
+  const target = new GameNode(1, 100, 0, 15, 2);
+  source.maxE = 200;
+  target.maxE = 200;
+
+  const tent = new Tent(source, target, 20);
+  tent.state = TentState.ACTIVE;
+  tent.paidCost = 20;
+  tent.energyInPipe = 10;
+
+  tent.kill(0.5);
+
+  assert.equal(source.energy, 35, 'middle cut should refund the exact source-side share');
+  assert.equal(target.energy, 0, 'middle cut should deliver the exact target-side share to the enemy node');
+}
+
 async function testImmediateActivationTracksPaidCostCorrectly() {
   const { GameNode } = await load('src/entities/GameNode.js');
   const { Tent } = await load('src/entities/Tent.js');
-  const { computeBuildCost, computeDistance } = await load('src/math/simulationMath.js');
+  const { computeDistance } = await load('src/math/simulationMath.js');
 
   const source = new GameNode(0, 0, 0, 80, 1);
   const target = new GameNode(1, 120, 0, 20, 2);
   const distance = computeDistance(source.x, source.y, target.x, target.y);
   const totalBuildCost = 40;
   const tent = new Tent(source, target, totalBuildCost);
+  const beforeEnergy = source.energy;
 
   tent.activateImmediate();
 
-  assert.equal(tent.paidCost, computeBuildCost(distance), 'instant clash activation should only track the base connection cost as paid');
-  assert.ok(tent.paidCost < totalBuildCost, 'instant clash activation should not pretend the full ranged build cost was paid');
+  assert.equal(tent.paidCost, totalBuildCost, 'instant clash activation should commit the full build cost');
+  assert.equal(beforeEnergy - source.energy, totalBuildCost, 'instant clash activation should debit the same total build cost shown by normal move validation');
+  assert.ok(tent.paidCost >= distance * 0, 'instant clash activation should keep a normal full-cost economic commitment');
 }
 
 async function testGrowingTentacleCannotAdvanceWithoutBudget() {
@@ -313,6 +379,27 @@ async function testAIRelayTargeting() {
   assert.ok(game.tents.some(t => t.target === relay), 'AI should be able to select a relay target');
 }
 
+async function testAIRelayOriginsCanBeUsedWhenBudgeted() {
+  const { NodeType } = await load('src/config/gameConfig.js');
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { AI } = await load('src/systems/AI.js');
+
+  const relay = new GameNode(0, 0, 0, 40, 2, NodeType.RELAY);
+  relay.relayFeedBudget = 12;
+  relay.tentFeedPerSec = 12;
+  relay.maxE = 120;
+
+  const target = new GameNode(1, 80, 0, 15, 0);
+  target.maxE = 120;
+
+  const game = { nodes: [relay, target], tents: [], aiDefensive: 0 };
+  const ai = new AI(game, { aiThinkIntervalSeconds: 1, distanceCostMultiplier: 0.01, id: 24 }, 2);
+
+  ai._think();
+
+  assert.ok(game.tents.some(t => t.source === relay && t.target === target), 'AI should be able to launch a tentacle from an owned relay with real buffered budget');
+}
+
 async function testSharedBurstEntryPoint() {
   const { TentState } = await load('src/config/gameConfig.js');
   const { AI } = await load('src/systems/AI.js');
@@ -333,15 +420,17 @@ async function testSharedBurstEntryPoint() {
   };
 
   ai._checkStrategicCuts({ tents: [fakeTent] });
-  assert.equal(cutRatio, 0.85, 'purple AI should invoke the canonical slice helper at the near-target cut ratio');
+  assert.equal(cutRatio, 0.15, 'purple AI should invoke the canonical slice helper at the source-side burst cut ratio');
 
   const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
   const sliceSource = await fs.readFile(path.join(ROOT, 'src/input/SliceCutting.js'), 'utf8');
   const sliceEffectsSource = await fs.readFile(path.join(ROOT, 'src/input/PlayerSliceEffects.js'), 'utf8');
+  const aiSource = await fs.readFile(path.join(ROOT, 'src/systems/AI.js'), 'utf8');
   assert.match(gameSource, /_applyPlayerSliceCut\(sliceCut\)/, 'player path should route slice hits through the canonical game-side slice applicator');
   assert.match(gameSource, /applyPlayerSliceCut\(sliceCut,\s*\{/, 'player game-side applicator should delegate to the shared slice-effects helper');
   assert.match(sliceEffectsSource, /sliceCut\.tentacle\.applySliceCut\(sliceCut\.effectiveCutRatio\)/, 'shared player slice-effects helper should call the canonical slice helper');
   assert.match(sliceSource, /scanPlayerSliceCuts/, 'slice scan helper should own slice hit detection');
+  assert.match(aiSource, /if \(this\.owner === 3\) this\._checkStrategicCuts\(this\.game\);/, 'purple AI should check strategic cuts outside the think-interval early return');
 }
 
 async function testOwnershipAndContestCanonicalization() {
@@ -604,6 +693,7 @@ async function testLevelZeroNodesStayRenderable() {
   assert.match(nodeRendererSource, /function drawNodeHull\(ctx, x, y, radius, sides, angle\)/, 'node renderer should keep a dedicated hull helper');
   assert.match(nodeRendererSource, /if \(!sides \|\| sides < 3\) \{[\s\S]*ctx\.arc\(x, y, radius, 0, Math\.PI \* 2\)/, 'level 0 nodes should fall back to circle rendering');
   assert.match(rendererSource, /import \{ STATE \}\s+from '\.\.\/core\/GameState\.js'/, 'renderer should import STATE before reading graphics mode in render stats');
+  assert.match(nodeRendererSource, /const highGraphics = STATE\.settings\.graphicsMode === 'high';/, 'special node overlays should define highGraphics in their own scope');
 }
 
 async function testFpsHudAndSkipGuardrailsStayPresent() {
@@ -626,10 +716,64 @@ async function testFpsHudAndSkipGuardrailsStayPresent() {
   assert.match(configSource, /id:32[\s\S]*isBoss:true/, 'TRANSCENDENCE should be marked as a boss phase');
 }
 
+async function testWorldUnlockAndPurpleBadgeGuardrailsStayPresent() {
+  const gameStateSource = await fs.readFile(path.join(ROOT, 'src/core/GameState.js'), 'utf8');
+  const screenControllerSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const levelSelectViewSource = await fs.readFile(path.join(ROOT, 'src/ui/levelSelectView.js'), 'utf8');
+  const { STATE } = await load('src/core/GameState.js');
+  const { LEVELS } = await load('src/config/gameConfig.js');
+
+  assert.match(gameStateSource, /_getWorldUnlockRequirement\(worldId\)/, 'world unlock should derive from level data, not hard-coded ranges');
+  assert.match(gameStateSource, /return this\.completed >= unlockRequirement;/, 'world unlock should be derived directly from progress');
+  assert.match(gameStateSource, /isLevelUnlocked\(levelConfig\)/, 'level unlock should be centralized in GameState');
+  assert.match(gameStateSource, /getNextLevelId\(levelId = this\.curLvl\)/, 'progression should expose a canonical next-level helper');
+  assert.match(gameStateSource, /recordTutorialCompletion\(tutorialWorldId, tutorialLevelId\)/, 'tutorial completion should be centralized in GameState');
+  assert.match(screenControllerSource, /STATE\.isWorldUnlocked\(2\)/, 'level select should use the canonical world unlock helper for World 2');
+  assert.match(screenControllerSource, /STATE\.isWorldUnlocked\(3\)/, 'level select should use the canonical world unlock helper for World 3');
+  assert.match(screenControllerSource, /const isUnlocked = STATE\.isLevelUnlocked\(levelConfig\);/, 'level select should use the canonical level unlock helper');
+  assert.match(levelSelectViewSource, /if \(!levelConfig\.purpleEnemyCount \|\| levelConfig\.purpleEnemyCount <= 0\) return '';/, 'purple enemy badge should stay hidden when no purple enemies are configured');
+
+  const originalCompleted = STATE.completed;
+  const originalSettings = structuredClone(STATE.settings);
+
+  STATE.completed = 0;
+  STATE._syncWorldUnlocksFromProgress();
+  const world1Tutorial = LEVELS.find(levelConfig => levelConfig.id === 0);
+  const world1FirstPhase = LEVELS.find(levelConfig => levelConfig.id === 1);
+  assert.equal(STATE.isWorldUnlocked(1), true, 'World 1 should always be unlocked');
+  assert.equal(STATE.isLevelUnlocked(world1Tutorial), true, 'World 1 tutorial should be available from a fresh campaign state');
+  assert.equal(STATE.isLevelUnlocked(world1FirstPhase), true, 'World 1 first playable phase should be available even if the tutorial is skipped');
+  assert.equal(STATE.getNextLevelId(10), 11, 'finishing World 1 should naturally flow to the World 2 tutorial');
+
+  STATE.completed = 10;
+  STATE._syncWorldUnlocksFromProgress();
+  const world2Tutorial = LEVELS.find(levelConfig => levelConfig.id === 11);
+  const world2FirstPhase = LEVELS.find(levelConfig => levelConfig.id === 12);
+  assert.equal(STATE.isWorldUnlocked(2), true, 'finishing World 1 should unlock World 2');
+  assert.equal(STATE.isLevelUnlocked(world2Tutorial), true, 'World 2 tutorial should be available as soon as World 2 opens');
+  assert.equal(STATE.isLevelUnlocked(world2FirstPhase), true, 'World 2 first playable phase should be available even if the tutorial is skipped');
+  assert.equal(STATE.getNextLevelId(11), 12, 'finishing the World 2 tutorial should flow to the first real World 2 phase');
+  assert.equal(STATE.getNextLevelId(21), 22, 'finishing World 2 should naturally flow to the World 3 tutorial');
+
+  STATE.completed = 21;
+  STATE._syncWorldUnlocksFromProgress();
+  const world3Tutorial = LEVELS.find(levelConfig => levelConfig.id === 22);
+  const world3FirstPhase = LEVELS.find(levelConfig => levelConfig.id === 23);
+  assert.equal(STATE.isWorldUnlocked(3), true, 'finishing World 2 should unlock World 3');
+  assert.equal(STATE.isLevelUnlocked(world3Tutorial), true, 'World 3 tutorial should be available as soon as World 3 opens');
+  assert.equal(STATE.isLevelUnlocked(world3FirstPhase), true, 'World 3 first playable phase should be available even if the tutorial is skipped');
+  assert.equal(STATE.getNextLevelId(22), 23, 'finishing the World 3 tutorial should flow to the first real World 3 phase');
+
+  STATE.completed = originalCompleted;
+  STATE.settings = originalSettings;
+  STATE._syncWorldUnlocksFromProgress();
+}
+
 async function testWorldOneTutorialTabAndFeedClashBudgetStayAligned() {
   const screenSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
   const energyBudgetSource = await fs.readFile(path.join(ROOT, 'src/systems/EnergyBudget.js'), 'utf8');
   const configSource = await fs.readFile(path.join(ROOT, 'src/config/gameConfig.js'), 'utf8');
+  const gameStateSource = await fs.readFile(path.join(ROOT, 'src/core/GameState.js'), 'utf8');
   const { GameNode } = await load('src/entities/GameNode.js');
   const {
     computeNodeTentacleFeedRate,
@@ -638,6 +782,8 @@ async function testWorldOneTutorialTabAndFeedClashBudgetStayAligned() {
 
   assert.match(screenSource, /\[1,2,3\]\.forEach\(w => \{/, 'level select should no longer create a standalone tutorial tab');
   assert.match(screenSource, /worldFilter === 1 && levelConfig\.tutorialWorldId === 1/, 'World 1 grid should include the World 1 tutorial directly');
+  assert.doesNotMatch(screenSource, /isTutorialEntry/, 'level grid should not keep dead tutorial-entry locals');
+  assert.match(gameStateSource, /including World 1/, 'world unlock comments should explicitly keep World 1 tutorial optional too');
   assert.match(configSource, /SELF_REGEN_FRACTION: 0\.30/, 'game balance should preserve a self-regen fraction while feeding');
   assert.match(energyBudgetSource, /export function computeTentacleClashFeedRate/, 'energy budget should expose a dedicated clash feed rate');
 
@@ -667,7 +813,8 @@ async function testTutorialExitAndMouseGestureGuardsStayPresent() {
   assert.match(gameSource, /if \(hoveredTargetNode && hoveredTargetNode !== this\.sel\)/, 'drag-connect should branch on a concrete hovered target while dragging');
   assert.match(gameSource, /this\._dragConnectTarget = hoveredTargetNode;/, 'drag-connect should keep an explicit drop target while dragging');
   assert.match(gameSource, /this\.hoverNode = this\._dragConnectTarget;/, 'drag-connect should keep the last valid target focused while dragging');
-  assert.match(gameSource, /const hitNode = dragTargetNode \|\| this\._findNodeAtScreenPoint\(screenX, screenY, INPUT_TUNING\.HOVER_HIT_PADDING_PX\)/, 'drag release should prefer the tracked hover target over a strict mouseup hit');
+  assert.match(gameSource, /const fallbackTargetNode = this\._findNodeAtScreenPoint\(screenX, screenY, INPUT_TUNING\.HOVER_HIT_PADDING_PX\)/, 'drag release should still use padded gameplay hit-testing as fallback');
+  assert.match(gameSource, /let hitNode = dragTargetNode \|\| fallbackTargetNode;/, 'drag release should prefer the tracked hover target over a strict mouseup hit');
   assert.match(gameSource, /_findSnapTargetNodeAtScreenPoint/, 'drag-connect should expose a snap-target helper for nearby nodes');
   assert.match(inputBindingSource, /window\.addEventListener\('mouseup'/, 'mouse gestures should reset even when the pointer is released outside the canvas');
   assert.match(tutorialSource, /this\.game\.paused = true;/, 'tutorial exit should pause the game before leaving to level select');
@@ -696,12 +843,88 @@ async function testFrenzyRequiresSameContinuousSliceGesture() {
   const playerSliceEffectsSource = await fs.readFile(path.join(ROOT, 'src/input/PlayerSliceEffects.js'), 'utf8');
   const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
   const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
+  const gameConfigSource = await fs.readFile(path.join(ROOT, 'src/config/gameConfig.js'), 'utf8');
+  const gameNodeSource = await fs.readFile(path.join(ROOT, 'src/entities/GameNode.js'), 'utf8');
 
   assert.match(playerSliceEffectsSource, /state\.sliceGestureCutTentacles\.add\(sliceCut\.tentacle\)/, 'frenzy should track distinct tentacles cut during the current slice gesture');
   assert.match(playerSliceEffectsSource, /state\.sliceGestureCutTentacles\.size >= 3/, 'frenzy should require three distinct tentacles in the same slice gesture');
   assert.doesNotMatch(playerSliceEffectsSource, /frenzyLog\.push\(now\)/, 'frenzy should no longer be based on a rolling time window');
   assert.match(gameSource, /this\._sliceGestureCutTentacles = new Set\(\)/, 'game should reset the per-slice frenzy tracker when slice gestures begin or end');
+  assert.match(gameSource, /showToast\('⚡ FRENZY! \+35% REGEN'\)/, 'frenzy toast should keep the documented regen bonus');
+  assert.match(gameConfigSource, /FRENZY_REGEN_MULT:\s*1\.35/, 'frenzy regen multiplier should stay aligned with the documented +35% bonus');
+  assert.match(gameNodeSource, /GAME_BALANCE\.FRENZY_REGEN_MULT/, 'GameNode regen should use the canonical frenzy multiplier constant');
   assert.match(i18nSource, /same continuous slice|mesmo gesto contínuo/, 'tutorial text should describe the same-gesture frenzy rule');
+}
+
+async function testFreshClashUsesApproachVisualFront() {
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const tentSource = await fs.readFile(path.join(ROOT, 'src/entities/Tent.js'), 'utf8');
+  const tentRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/TentRenderer.js'), 'utf8');
+  const configSource = await fs.readFile(path.join(ROOT, 'src/config/gameConfig.js'), 'utf8');
+
+  assert.match(gameSource, /initializeFreshClashVisual/, 'new clashes should initialize a visual approach front');
+  assert.match(tentSource, /clashVisualT/, 'tentacles should track a separate visual clash front');
+  assert.match(tentSource, /clashApproachActive/, 'tentacles should track whether a fresh clash is still approaching the midpoint');
+  assert.match(tentSource, /const midpoint = 0\.5;/, 'fresh clash approach should explicitly target the lane midpoint');
+  assert.match(tentSource, /const advanceFraction = \(GROW_PPS \/ Math\.max\(this\.distance, 1\)\) \* dt;/, 'fresh clash approach should advance at the same normalized speed as tentacle growth');
+  assert.match(tentSource, /if \(this\.clashApproachActive \|\| opposingTentacle\.clashApproachActive\)/, 'fresh clashes should finish the midpoint approach before normal force resolution begins');
+  assert.match(tentRendererSource, /const activeClashFront = t\.clashVisualT \?\? t\.clashT;/, 'renderer should prefer the visual clash front when present');
+  assert.match(configSource, /CLASH_VISUAL_APPROACH_SPEED/, 'config should expose a dedicated clash visual approach speed');
+}
+
+async function testPurpleAiDifferentiationAndFrameDrivenCoreVisuals() {
+  const aiSource = await fs.readFile(path.join(ROOT, 'src/systems/AI.js'), 'utf8');
+  const tentSource = await fs.readFile(path.join(ROOT, 'src/entities/Tent.js'), 'utf8');
+  const tentRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/TentRenderer.js'), 'utf8');
+  const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
+  const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+
+  assert.match(aiSource, /if \(this\.owner === 3\) \{[\s\S]*targetNode\.energy < targetNode\.maxE \* 0\.35[\s\S]*targetNode\.underAttack > 0\.2[\s\S]*existingPressureBonus > 0/s, 'purple AI should favor kill-confirm and existing pressure more strongly than red AI');
+  assert.doesNotMatch(tentSource, /Date\.now\(/, 'tent core visuals should no longer use wall-clock time directly');
+  assert.doesNotMatch(tentRendererSource, /Date\.now\(/, 'tent renderer should use frame-driven time for its core animations');
+  assert.doesNotMatch(nodeRendererSource, /Date\.now\(/, 'node renderer should use frame-driven time for frenzy tint animation');
+  assert.doesNotMatch(uiRendererSource, /Date\.now\(/, 'UI renderer should use game time for phase outcome and frenzy pulses');
+}
+
+async function testTutorialStepsStayRigidAndGated() {
+  const tutorialSource = await fs.readFile(path.join(ROOT, 'src/systems/Tutorial.js'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+
+  assert.match(tutorialSource, /isRigid\(\)/, 'tutorial should expose a rigid-step gate for gameplay actions');
+  assert.match(tutorialSource, /allowsClickIntent\(clickIntent\)/, 'tutorial should gate click intents by the current step');
+  assert.match(tutorialSource, /canStartDragConnect\(sourceNode\)/, 'tutorial should gate drag-connect starts by the current step');
+  assert.match(tutorialSource, /filterDragConnectTarget\(sourceNode, targetNode\)/, 'tutorial should restrict drag targets to the expected node');
+  assert.match(tutorialSource, /canStartSlice\(\)/, 'tutorial should gate slice start by the current step');
+  assert.match(tutorialSource, /filterSliceCuts\(sliceCuts\)/, 'tutorial should reject off-step slice cuts');
+  assert.match(gameSource, /if \(this\.cfg\?\.isTutorial && !this\.tut\.allowsClickIntent\(clickIntent\)\) return;/, 'game click path should reject tutorial-disallowed actions');
+  assert.match(gameSource, /if \(this\.cfg\?\.isTutorial\) \{\s*sliceCuts = this\.tut\.filterSliceCuts\(sliceCuts\);/s, 'slice scan should be filtered through the tutorial gate');
+  assert.match(gameSource, /if \(this\.cfg\?\.isTutorial && !this\.tut\.canStartSlice\(\)\) return;/, 'slice begin should be blocked outside the cut step');
+}
+
+async function testLoadLevelFinalizationAndInvalidActionUxStayAligned() {
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+  const screenControllerSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const tutorialSource = await fs.readFile(path.join(ROOT, 'src/systems/Tutorial.js'), 'utf8');
+  const resultViewSource = await fs.readFile(path.join(ROOT, 'src/ui/resultScreenView.js'), 'utf8');
+  const finalizeCallCount = (gameSource.match(/this\._finalizeLoadedLayout\(cfg\);/g) || []).length;
+
+  assert.equal(finalizeCallCount, 1, 'loadLevel should finalize the loaded layout exactly once');
+  assert.match(mainSource, /STATE\.getNextLevelId\(\)/, 'menu progression should use the canonical next-level helper');
+  assert.match(screenControllerSource, /const nextLevelConfig = STATE\.getNextLevelConfig\(\);/, 'result screen should resolve the next phase through GameState');
+  assert.match(tutorialSource, /STATE\.recordTutorialCompletion\(tw, this\.game\.cfg\?\.id\)/, 'tutorial completion should route through the canonical GameState helper');
+  assert.match(resultViewSource, /hostile starts/, 'result screen should not claim configured enemy starts were literally eliminated');
+  assert.doesNotMatch(gameSource, /console\.groupCollapsed\(\`\[ENERGY/, 'debug HUD should not still dump per-second energy logs to the console');
+  const toggleCaseMatch = gameSource.match(/case 'toggle_existing_tentacle':([\s\S]*?)case 'no_free_slots':/);
+  const slotsCaseMatch = gameSource.match(/case 'no_free_slots':([\s\S]*?)case 'insufficient_energy':/);
+  const energyCaseMatch = gameSource.match(/case 'insufficient_energy':([\s\S]*?)case 'build_tentacle':/);
+
+  assert.ok(toggleCaseMatch, 'toggle-existing-tentacle case should stay present');
+  assert.ok(slotsCaseMatch, 'no-free-slots case should stay present');
+  assert.ok(energyCaseMatch, 'insufficient-energy case should stay present');
+  assert.doesNotMatch(toggleCaseMatch[1], /this\.clearSel\(\);/, 'invalid reverse attempts should keep the current selection');
+  assert.doesNotMatch(slotsCaseMatch[1], /this\.clearSel\(\);/, 'slot-limit rejections should keep the current selection');
+  assert.doesNotMatch(energyCaseMatch[1], /this\.clearSel\(\);/, 'insufficient-energy rejections should keep the current selection');
 }
 
 async function main() {
@@ -712,6 +935,9 @@ async function main() {
     ['middle cut releases clash instead of destroying the partner', testMiddleCutReleasesClashInsteadOfDestroyingPartner],
     ['instant activation only tracks actually paid build cost', testImmediateActivationTracksPaidCostCorrectly],
     ['growing tentacles cannot advance without source budget', testGrowingTentacleCannotAdvanceWithoutBudget],
+    ['growing retract refunds full paid construction cost', testGrowingTentacleRetractRefundsFullPaidCost],
+    ['reversed retract refunds the effective source node', testReversedRetractRefundsEffectiveSource],
+    ['middle cut conserves payload across refund and impact', testMiddleCutConservesPayloadAcrossRefundAndImpact],
     ['build cost tuning stays playable', testBuildCostTuningStaysPlayable],
     ['neutral contest does not artificially stall', testNeutralContestDoesNotArtificiallyStall],
     ['nodes under attack keep reduced outgoing flow', testUnderAttackStillAllowsReducedOutput],
@@ -721,6 +947,7 @@ async function main() {
     ['fixed campaign layouts cover all configured levels', testFixedCampaignLayoutsCoverAllLevels],
     ['owner-3 palette selection is correct', testOwner3PaletteSelection],
     ['AI can evaluate relays as targets', testAIRelayTargeting],
+    ['AI can use relays as origins when they have real budget', testAIRelayOriginsCanBeUsedWhenBudgeted],
     ['shared burst mechanic is used by both player and AI paths', testSharedBurstEntryPoint],
     ['ownership and contest logic use canonical shared paths', testOwnershipAndContestCanonicalization],
     ['player relay interaction paths stay enabled', testRelayPlayerInteractionPaths],
@@ -738,10 +965,15 @@ async function main() {
     ['progress and settings persistence guardrails stay present', testProgressAndSettingsPersistenceGuardrailsStayPresent],
     ['level 0 nodes stay renderable', testLevelZeroNodesStayRenderable],
     ['FPS HUD and skip guardrails stay present', testFpsHudAndSkipGuardrailsStayPresent],
+    ['World unlock and purple badge guardrails stay present', testWorldUnlockAndPurpleBadgeGuardrailsStayPresent],
     ['World 1 tutorial tab and feed/clash budgets stay aligned', testWorldOneTutorialTabAndFeedClashBudgetStayAligned],
     ['Tutorial exit and mouse gesture guards stay present', testTutorialExitAndMouseGestureGuardsStayPresent],
     ['Primary-button slice uses distinct visual and drag targeting', testPrimaryButtonSliceUsesDistinctVisualAndDragTargeting],
     ['Frenzy requires the same continuous slice gesture', testFrenzyRequiresSameContinuousSliceGesture],
+    ['Fresh clashes use an approach visual front instead of popping to mid-lane', testFreshClashUsesApproachVisualFront],
+    ['Purple AI differentiation and frame-driven core visuals stay present', testPurpleAiDifferentiationAndFrameDrivenCoreVisuals],
+    ['Tutorial steps stay rigid and gated', testTutorialStepsStayRigidAndGated],
+    ['loadLevel finalization and invalid-action UX stay aligned', testLoadLevelFinalizationAndInvalidActionUxStayAligned],
   ];
 
   let passed = 0;

@@ -74,8 +74,8 @@ export function syncWorldTab() {
   if (!currentLevelConfig) return;
   const currentWorldId = currentLevelConfig.worldId || 1;
   _activeWorldTab = currentWorldId === 0 ? 1 : currentWorldId;
-  if (_activeWorldTab === 2 && !STATE.settings.w2 && !STATE.settings.debug) _activeWorldTab = 1;
-  if (_activeWorldTab === 3 && !STATE.settings.w3 && !STATE.settings.debug) _activeWorldTab = 1;
+  if (_activeWorldTab === 2 && !STATE.isWorldUnlocked(2)) _activeWorldTab = 1;
+  if (_activeWorldTab === 3 && !STATE.isWorldUnlocked(3)) _activeWorldTab = 1;
   STATE.setActiveWorldTab(_activeWorldTab);
 }
 
@@ -87,8 +87,8 @@ export function buildWorldTabs() {
   const lang = curLang();
   const worldMetaById = getLevelSelectWorldMeta(lang);
 
-  const w2ok = STATE.settings.w2 || STATE.settings.debug;
-  const w3ok = STATE.settings.w3 || STATE.settings.debug;
+  const w2ok = STATE.isWorldUnlocked(2);
+  const w3ok = STATE.isWorldUnlocked(3);
 
   tabs.innerHTML = '';
   [1,2,3].forEach(w => {
@@ -131,21 +131,17 @@ export function buildGrid(worldFilter = _activeWorldTab) {
     (worldFilter === 1 && levelConfig.tutorialWorldId === 1),
   );
   const worldAccent = getLevelGridWorldAccent(worldFilter);
-  const w2ok= STATE.settings.w2 || STATE.settings.debug;
-  const w3ok= STATE.settings.w3 || STATE.settings.debug;
+  const w2ok= STATE.isWorldUnlocked(2);
+  const w3ok= STATE.isWorldUnlocked(3);
 
   levelsForWorld.forEach(levelConfig => {
     const phaseNum   = levelConfig.id;
     const worldId    = levelConfig.worldId || 1;
     const isDone     = phaseNum <= STATE.completed;
-    const isTutorialEntry = !!levelConfig.isTutorial;
     const worldLocked= (worldId === 2 && !w2ok) || (worldId === 3 && !w3ok);
-    const isNext     = phaseNum === STATE.completed + 1 ||
-                       (isTutorialEntry && !worldLocked && !isDone && phaseNum > STATE.completed);
-    const isLocked   = STATE.settings.debug ? false
-                     : worldLocked          ? true
-                     : isTutorialEntry      ? false
-                     : phaseNum > STATE.completed + 1;
+    const isUnlocked = STATE.isLevelUnlocked(levelConfig);
+    const isNext     = isUnlocked && !isDone;
+    const isLocked   = !isUnlocked;
     const levelButton = _makeLvBtn(levelConfig, phaseNum, worldAccent.col, isLocked, isDone, isNext, worldLocked, levelConfig.isTutorial);
     levelGridElement.appendChild(levelButton);
   });
@@ -279,7 +275,6 @@ export function endLevel(win, game) {
 
   if (win && levelId >= 1) {
     STATE.recordLevelWin(levelId);
-    STATE.completed = Math.max(STATE.completed, levelId);
     if (score != null && (STATE.scores[levelId] === null || score > STATE.scores[levelId])) STATE.scores[levelId] = score;
     STATE.save();
     if ([10, 21, 32].includes(levelId)) setTimeout(() => SFX.worldUnlock(), 600);
@@ -295,10 +290,11 @@ export function endLevel(win, game) {
     rtitle.textContent = win ? T('phaseClear') : T('annihilated');
     rtitle.className   = 'rt ' + (win ? 'win' : 'lose');
 
-    const nextName = STATE.curLvl < LEVELS.length - 1 ? LEVELS[STATE.curLvl + 1].name : '';
+    const nextLevelConfig = STATE.getNextLevelConfig();
+    const nextName = nextLevelConfig?.name || '';
     $(DOM_IDS.RSUB).textContent = win
       ? levelConfig.name + ' — ' + T('phaseOf', levelConfig.id, LEVELS.length - 1) + ' ' +
-        (STATE.curLvl < LEVELS.length - 1 ? T('nextPhase', nextName) : T('allComplete'))
+        (nextLevelConfig ? T('nextPhase', nextName) : T('allComplete'))
       : levelConfig.name + ' — ' + T('eliminated', levelConfig.id, 30);
 
     /* Score display */
@@ -344,7 +340,7 @@ export function endLevel(win, game) {
     $(DOM_IDS.RINFO).innerHTML = buildResultInfoMarkup(levelConfig, game, T, LEVELS.length - 1);
 
     const btnRN = $(DOM_IDS.BTN_RN);
-    if (btnRN) btnRN.style.display = (win && STATE.curLvl < LEVELS.length - 1) ? '' : 'none';
+    if (btnRN) btnRN.style.display = (win && nextLevelConfig) ? '' : 'none';
 
     const tutbox = $(DOM_IDS.TUTBOX);
     if (tutbox) tutbox.style.display = 'none';
@@ -356,7 +352,7 @@ export function endLevel(win, game) {
 
     $(DOM_IDS.BTN_RL).textContent = T('phases');
     $(DOM_IDS.BTN_RR).textContent = T('retry');
-    if (win && STATE.curLvl < LEVELS.length - 1 && btnRN) btnRN.textContent = T('next');
+    if (win && nextLevelConfig && btnRN) btnRN.textContent = T('next');
   }, 500);
 }
 

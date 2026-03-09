@@ -97,6 +97,9 @@ Tentacles now use:
 - an outer membrane layer
 - a brighter internal spine
 - animated flow pulses during active transfer
+- a root bulb at the source connection
+- a grip ring at the target connection
+- a less uniform silhouette, with wider-root / narrower-mid / tapered-tip shaping
 
 This makes them read more like living pressurised tissue and less like simple bezier strokes.
 
@@ -108,6 +111,13 @@ Nodes now use:
 - a second inner energy arc for owned cells
 
 This gives each node more depth and a stronger sense of stored energy without obscuring core gameplay metrics.
+
+The later visual pass also improved structure identity:
+
+- relays gained a more crystalline inner core
+- owned signal towers gained a stronger technological frame
+- pulsars gained a more convincing corona in `HIGH`
+- clashes gained stronger local deformation and impact emphasis
 
 ### Tutorial ghost guidance
 

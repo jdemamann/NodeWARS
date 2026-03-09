@@ -5,6 +5,7 @@
    curLang, and SETTINGS.
    ================================================================ */
 
+import { LEVELS, getLevelConfig, getNextLevelId, getPreviousLevelId } from '../config/gameConfig.js';
 import { store } from './storage.js';
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -27,7 +28,7 @@ const VALID_FONTS = new Set(['orbitron', 'techno', 'rajdhani', 'exo2']);
 class GameState {
   constructor() {
     this.completed   = 0;      // highest campaign phase id beaten
-    this.curLvl      = 1;      // current level index into LEVELS[]
+    this.curLvl      = 1;      // current campaign level id
     this.scores      = Array(33).fill(null); // best score per level id (1-32)
     this.levelFailStreaks = Array(33).fill(0);
     this.curLang     = 'pt';
@@ -37,6 +38,7 @@ class GameState {
 
   save() {
     try {
+      this._syncWorldUnlocksFromProgress();
       store.set('nw_completed', this.completed);
       store.set('nw_curLvl',    this.curLvl);
       store.set('nw_scores',    JSON.stringify(this.scores));
@@ -72,6 +74,7 @@ class GameState {
 
       const st = JSON.parse(store.get('nw_settings') || '{}');
       this.settings = this._normalizeSettings(st);
+      this._syncWorldUnlocksFromProgress();
 
       const activeWorldTab = parseInt(store.get('nw_activeWorldTab'));
       if (activeWorldTab >= 0 && activeWorldTab <= 3) this._activeWorldTab = activeWorldTab;
@@ -80,6 +83,7 @@ class GameState {
 
   saveSettings() {
     this.settings = this._normalizeSettings(this.settings);
+    this._syncWorldUnlocksFromProgress();
     store.set('nw_settings', JSON.stringify(this.settings));
   }
 
@@ -87,6 +91,7 @@ class GameState {
     try {
       const st = JSON.parse(store.get('nw_settings') || '{}');
       this.settings = this._normalizeSettings(st);
+      this._syncWorldUnlocksFromProgress();
     } catch (e) {
       this.settings = { ...DEFAULT_SETTINGS };
     }
@@ -102,13 +107,28 @@ class GameState {
     this.curLvl = 1;
     this.scores = Array(33).fill(null);
     this.levelFailStreaks = Array(33).fill(0);
+    this.settings.w2 = false;
+    this.settings.w3 = false;
     this.save();
   }
 
   setCurrentLevel(levelId) {
-    if (Number.isInteger(levelId) && levelId >= 0 && levelId <= 32) {
+    if (Number.isInteger(levelId) && getLevelConfig(levelId)) {
       this.curLvl = levelId;
     }
+  }
+
+  getCurrentLevelConfig() {
+    return getLevelConfig(this.curLvl);
+  }
+
+  getNextLevelId(levelId = this.curLvl) {
+    return getNextLevelId(levelId);
+  }
+
+  getNextLevelConfig(levelId = this.curLvl) {
+    const nextLevelId = this.getNextLevelId(levelId);
+    return nextLevelId == null ? null : getLevelConfig(nextLevelId);
   }
 
   setActiveWorldTab(worldId) {
@@ -136,6 +156,17 @@ class GameState {
   recordLevelWin(levelId) {
     if (!Number.isInteger(levelId) || levelId < 0 || levelId > 32) return;
     this.levelFailStreaks[levelId] = 0;
+    this.completed = Math.max(this.completed, levelId);
+    this._syncWorldUnlocksFromProgress();
+    this.save();
+  }
+
+  recordTutorialCompletion(tutorialWorldId, tutorialLevelId) {
+    const tutorialProgressId = Number.isInteger(tutorialLevelId)
+      ? tutorialLevelId
+      : (tutorialWorldId === 1 ? 0 : tutorialWorldId === 2 ? 11 : 22);
+    this.completed = Math.max(this.completed, tutorialProgressId);
+    this._syncWorldUnlocksFromProgress();
     this.save();
   }
 
@@ -150,6 +181,53 @@ class GameState {
     if (levelConfig.isTutorial || levelConfig.isBoss) return false;
     if (levelConfig.id >= 32) return false;
     return this.getLevelFailStreak(levelConfig.id) >= 5;
+  }
+
+  isWorldUnlocked(worldId) {
+    if (this.settings.debug) return true;
+    if (worldId <= 1) return true;
+    const unlockRequirement = this._getWorldUnlockRequirement(worldId);
+    if (unlockRequirement == null) return false;
+    return this.completed >= unlockRequirement;
+  }
+
+  isLevelUnlocked(levelConfig) {
+    if (!levelConfig) return false;
+    if (this.settings.debug) return true;
+
+    const worldId = levelConfig.worldId || levelConfig.tutorialWorldId || 1;
+    if (!this.isWorldUnlocked(worldId)) return false;
+    if (levelConfig.isTutorial) return true;
+    if (levelConfig.id <= this.completed) return true;
+
+    /* Tutorial phases are optional for every world, including World 1. When a
+       world opens, both its tutorial and its first real phase must be playable
+       so the player can skip onboarding without blocking campaign progression. */
+    const firstPlayableWorldLevel = this._getFirstPlayableWorldLevelId(worldId);
+    if (levelConfig.id === firstPlayableWorldLevel) return true;
+
+    const previousLevelId = getPreviousLevelId(levelConfig.id);
+    return previousLevelId != null && previousLevelId <= this.completed;
+  }
+
+  _syncWorldUnlocksFromProgress() {
+    this.settings.w2 = this.completed >= (this._getWorldUnlockRequirement(2) ?? Infinity);
+    this.settings.w3 = this.completed >= (this._getWorldUnlockRequirement(3) ?? Infinity);
+  }
+
+  _getWorldUnlockRequirement(worldId) {
+    if (worldId <= 1) return 0;
+    const previousWorldId = worldId - 1;
+    const previousWorldLevels = LEVELS.filter(levelConfig => (levelConfig.worldId || 1) === previousWorldId);
+    if (!previousWorldLevels.length) return null;
+    return Math.max(...previousWorldLevels.map(levelConfig => levelConfig.id));
+  }
+
+  _getFirstPlayableWorldLevelId(worldId) {
+    const playableWorldLevels = LEVELS
+      .filter(levelConfig => (levelConfig.worldId || 1) === worldId && !levelConfig.isTutorial)
+      .sort((leftLevel, rightLevel) => leftLevel.id - rightLevel.id);
+    return playableWorldLevels[0]?.id ?? null;
   }
 
   _normalizeSettings(partialSettings = {}) {

@@ -144,8 +144,9 @@ function wireButtons() {
   $id(DOM_IDS.BTN_RL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
   $id(DOM_IDS.BTN_RR)?.addEventListener('click', () => fadeGo(() => { showScr(null); game.loadLevel(STATE.curLvl); }));
   $id(DOM_IDS.BTN_RN)?.addEventListener('click', () => {
-    if (STATE.curLvl < LEVELS.length - 1) {
-      STATE.setCurrentLevel(STATE.curLvl + 1);
+    const nextLevelId = STATE.getNextLevelId();
+    if (nextLevelId != null) {
+      STATE.setCurrentLevel(nextLevelId);
       STATE.save();
       fadeGo(() => { showScr(null); game.loadLevel(STATE.curLvl); });
     }
@@ -163,17 +164,18 @@ function wireButtons() {
   $id(DOM_IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
   $id(DOM_IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); }));
   $id(DOM_IDS.BTN_PSKIP)?.addEventListener('click', () => {
-    if (STATE.canSkipLevel(game.cfg) && STATE.curLvl < LEVELS.length - 1) {
+    const nextLevelId = STATE.getNextLevelId();
+    if (STATE.canSkipLevel(game.cfg) && nextLevelId != null) {
       STATE.completed = Math.max(STATE.completed, STATE.curLvl);
       STATE.consumeLevelSkip(STATE.curLvl);
-      STATE.setCurrentLevel(STATE.curLvl + 1);
+      STATE.setCurrentLevel(nextLevelId);
       STATE.save();
       fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); });
     } else {
       showToast(
         game.cfg?.isBoss
           ? T('skipLockedBoss')
-          : STATE.curLvl >= LEVELS.length - 1
+          : nextLevelId == null
             ? T('alreadyFinal')
             : T('skipLockedProgress', Math.max(0, 5 - STATE.getLevelFailStreak(STATE.curLvl))),
       );

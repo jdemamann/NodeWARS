@@ -24,7 +24,7 @@ export class GameNode {
     this.owner  = owner;
     this.type   = type;
 
-    this.regen  = 0; // deprecated — regen is now tier-based via TIER_REGEN[level]
+    this.regen  = 0; // legacy field retained for compatibility; live regen is tier-based
 
     /* Visual state (read by NodeRenderer) */
     this.pulse      = Math.random() * Math.PI * 2;
@@ -46,7 +46,7 @@ export class GameNode {
     /* Tentacle counts — maintained incrementally by Game.updateOutCounts() */
     this.outCount   = 0;
 
-    /* Cascade: energy available to push into tentacles this frame */
+    /* Per-frame flow bookkeeping */
     this.availPower = 0;
     this.inFlow     = 0;
     this.relayFeedBudget = 0;
@@ -84,15 +84,16 @@ export class GameNode {
       return;
     }
 
-    /* Energy regen — Unified Pool model:
-       GameNode ALWAYS regenerates its full tier regen, regardless of outCount.
-       Tent._updateNormal / _updateClash explicitly drain feed * dt from the source each frame.
-       Net result: if regen == feed, energy stays flat (zero-sum). If feed > regen (clash),
-       stored energy drains. No conditional branching needed — physics handles the balance. */
+    /* Energy regen:
+       Nodes regenerate by tier first.
+       Tentacles then drain their share explicitly, so feeder nodes can stay flat,
+       grow slowly, or drain depending on outgoing commitment and clash pressure. */
     if (this.owner !== 0) {
       const tierRegen = TIER_REGEN[this.level] ?? TIER_REGEN[0];
-      const boost     = (frenzyActive && this.owner === 1) ? 1.10 : 1.0;
-      this.energy     = Math.min(this.maxE, this.energy + tierRegen * boost * GAME_BALANCE.GLOBAL_REGEN_MULT * dt);
+      const boost     = (frenzyActive && this.owner === 1) ? GAME_BALANCE.FRENZY_REGEN_MULT : 1.0;
+      if (this.energy < this.maxE) {
+        this.energy = Math.min(this.maxE, this.energy + tierRegen * boost * GAME_BALANCE.GLOBAL_REGEN_MULT * dt);
+      }
     }
 
     /* Decay visual flashes */

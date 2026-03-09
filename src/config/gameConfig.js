@@ -33,10 +33,11 @@ export const LVL_STEP = 50;   // energy threshold per level (0→250 in 5 steps)
  * All pacing parameters live here. Tweak these to speed up or slow down
  * the game without hunting through physics code.
  *
- * Zero-Sum model (matches original Tentacle Wars):
- *   A node's tier regen is the total energy budget it can output.
- *   That budget is split among active tentacles — the node does NOT
- *   self-regenerate while tentacles are draining it.
+ * Unified budget model:
+ *   A node always regenerates by tier.
+ *   Active tentacles then drain against that budget explicitly.
+ *   Normal support flow reserves a small self-regen share so feeder nodes
+ *   can still level slowly while sustaining allied links.
  */
 export const GAME_BALANCE = {
 
@@ -75,12 +76,21 @@ export const GAME_BALANCE = {
   // the source node's growth completely.
   SELF_REGEN_FRACTION: 0.30,
 
+  // Temporary self-regen boost granted by player frenzy.
+  // 1.35 matches the user-facing "+35% regen" tutorial and toast copy.
+  FRENZY_REGEN_MULT: 1.35,
+
   // Tentacle travel speed in px/s (reserved for future explicit distance-speed tuning).
   TENTACLE_SPEED: 250,
 
   // Scales how fast the clash front moves per unit of force difference.
   // Higher = more volatile clashes that resolve quickly.
   CLASH_VOLATILITY: 0.20,
+
+  // Visual-only speed used when a fresh ACTIVE↔ACTIVE clash is formed.
+  // The real clash front still resolves from force balance; this just animates
+  // the lane from the incumbent side toward the middle instead of popping there.
+  CLASH_VISUAL_APPROACH_SPEED: 2.8,
 
   // Clashes should cost more commitment than ordinary support/attack flow.
   // This multiplier is applied to the per-tentacle output share when two
@@ -143,7 +153,9 @@ export const AI_RULES = {
   INTERVAL_JITTER_RANGE: 0.48,
   DEFENSIVE_ENERGY_THRESHOLD: 32,
   RELAY_CONTEXT_RADIUS_PX: 320,
-  STRATEGIC_CUT_RATIO: 0.85,
+  // Purple AI must cut inside the source-side burst zone so its strategic
+  // cuts still create pressure under the canonical slice rules.
+  STRATEGIC_CUT_RATIO: 0.15,
   STRATEGIC_CUT_PIPE_TARGET_RATIO: 0.65,
 };
 
@@ -179,6 +191,16 @@ export const RENDER_RULES = {
     CLASH_LABEL_Y_OFFSET_PX: 18,
     FLOW_PULSE_COUNT: 3,
     FLOW_PULSE_SPAN: 0.1,
+    ROOT_BULB_SCALE: 1.45,
+    ROOT_COLLAR_SCALE: 1.9,
+    MID_TAPER_SCALE: 0.72,
+    TIP_TAPER_SCALE: 0.2,
+    ORGANIC_WOBBLE_PX: 1.6,
+    CLASH_DISTORTION_PX: 3.2,
+    TARGET_IMPACT_RING_SCALE: 1.35,
+    ALLY_FEED_PULSE_ALPHA: 0.16,
+    ATTACK_IMPACT_ALPHA: 0.28,
+    RELAY_SURGE_ALPHA: 0.22,
   },
   UI: {
     HOVER_RING_OFFSET_PX: 8,
@@ -339,11 +361,30 @@ const RAW_LEVELS = [
 ];
 
 export const LEVELS = RAW_LEVELS;
+const SORTED_LEVEL_IDS = LEVELS
+  .map(levelConfig => levelConfig.id)
+  .sort((leftLevelId, rightLevelId) => leftLevelId - rightLevelId);
 
 /** Returns the world id for a given level id. Derived from LEVELS data — no more magic ranges. */
 export function worldOf(id) {
-  const lv = LEVELS.find(l => l.id === id);
-  return lv ? (lv.worldId || 1) : 1;
+  const levelConfig = LEVELS.find(candidateLevel => candidateLevel.id === id);
+  return levelConfig ? (levelConfig.worldId || 1) : 1;
+}
+
+export function getLevelConfig(levelId) {
+  return LEVELS.find(levelConfig => levelConfig.id === levelId) || null;
+}
+
+export function getNextLevelId(levelId) {
+  const currentLevelIndex = SORTED_LEVEL_IDS.indexOf(levelId);
+  if (currentLevelIndex === -1) return null;
+  return SORTED_LEVEL_IDS[currentLevelIndex + 1] ?? null;
+}
+
+export function getPreviousLevelId(levelId) {
+  const currentLevelIndex = SORTED_LEVEL_IDS.indexOf(levelId);
+  if (currentLevelIndex <= 0) return null;
+  return SORTED_LEVEL_IDS[currentLevelIndex - 1] ?? null;
 }
 
 export function starsFor(sc) {

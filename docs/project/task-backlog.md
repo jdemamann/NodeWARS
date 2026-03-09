@@ -13,6 +13,46 @@ The tasks below are intentionally small enough to implement, review, and validat
 - Prefer finishing one canonical rule path at a time.
 - Every task touching gameplay must update smoke checks or explain why it does not need one.
 
+## Post-Stabilization Follow-Up Tasks
+
+### TASK-023 Campaign Progression Canonicalization
+
+- Owner: `meta-owner`
+- Priority: `high`
+- Status: `completed`
+
+Problem:
+
+- some menu/result/tutorial flows still derived the next phase from `curLvl + 1`, which was fragile and obscured the intended tutorial rule
+
+Goal:
+
+- centralize next-phase resolution in `GameState`
+- keep tutorials optional for unlock while preserving the natural world-to-world transition into the next tutorial
+
+Validation:
+
+- smoke checks protect World 1, 2, and 3 optional tutorial unlocks
+- finishing a world still naturally routes to the next world's tutorial
+
+### TASK-024 Result Summary Truthfulness Pass
+
+- Owner: `ui-owner`
+- Priority: `medium`
+- Status: `completed`
+
+Problem:
+
+- result copy implied that configured enemy starts were literally eliminated during the match
+
+Goal:
+
+- make the summary wording truthful without requiring a full combat telemetry system
+
+Validation:
+
+- result screen copy no longer claims literal eliminations from static config counts
+
 ## Wave 1: Critical Gameplay Hardening
 
 ### TASK-001 Ownership Transition Canonicalization
@@ -179,7 +219,7 @@ Done criteria:
 
 - Owner: `simulation-owner`
 - Priority: `high`
-- Status: `partially completed`
+- Status: `completed`
 - Depends on:
   - `TASK-005`
 
@@ -408,8 +448,17 @@ Completed:
 2. `TASK-002 Player Relay Interaction Consistency`
 3. `TASK-003 Contest Logic Generalization for All Owners`
 4. `TASK-005 Energy Budget Resolver Extraction`
-5. `TASK-010 Input Threshold Parameterization`
-6. `TASK-015 Backlog and Documentation Reconciliation`
+5. `TASK-006 Tentacle Lifecycle Split`
+6. `TASK-010 Input Threshold Parameterization`
+7. `TASK-014 Final Tentacle Decomposition`
+8. `TASK-015 Backlog and Documentation Reconciliation`
+9. `TASK-016 Render Palette Canonicalization Final Pass`
+10. `TASK-017 Screen Composition Split`
+11. `TASK-018 World Systems Decomposition Final Pass`
+12. `TASK-019 Long-Run Simulation Soak Checks`
+13. `TASK-020 Render Performance Instrumentation`
+14. `TASK-021 Campaign Balance Execution Wave A`
+15. `TASK-022 Audio Event Density Audit`
 
 Largely completed:
 
@@ -422,9 +471,7 @@ Largely completed:
 7. `TASK-013 World Mechanics Boundary Isolation`
 
 Partially completed:
-
-1. `TASK-006 Tentacle Lifecycle Split`
-2. `TASK-014 Final Tentacle Decomposition`
+- none in the original stabilization backlog
 
 ## Remaining High-Value Stabilization Tasks
 

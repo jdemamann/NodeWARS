@@ -2,10 +2,12 @@
    NODE WARS v3 — UI Renderer
 
    Canvas-drawn UI elements that overlay the game world:
+     • transient world-space feedback events
      • Info panel (hover tooltip for enemy/neutral cells)
      • Frenzy bar
      • Slicer line
      • Preview line (selection → cursor)
+     • phase-outcome overlay
    ================================================================ */
 
 import { GAMEPLAY_RULES, MAX_SLOTS, TIER_REGEN } from '../config/gameConfig.js';
@@ -74,7 +76,7 @@ export class UIRenderer {
   static drawPhaseOutcome(ctx, game, W, H) {
     if (!game.phaseOutcome) return;
 
-    const pulse = 0.55 + Math.sin(Date.now() * 0.008) * 0.15;
+    const pulse = 0.55 + Math.sin((game.time || 0) * 8) * 0.15;
     const win = game.phaseOutcome === 'win';
     const label = win ? 'DOMINATED' : 'OVERRUN';
     const color = win ? '#00ff9d' : '#ff4d74';
@@ -93,6 +95,8 @@ export class UIRenderer {
     ctx.restore();
   }
 
+  /* Retained as an optional compact phase brief, but intentionally not wired
+     into the live render path after the always-on version proved too noisy. */
   static drawPhaseStatus(ctx, game, W, H) {
     if (!game.cfg || game.state !== 'playing') return;
 
@@ -444,7 +448,7 @@ export class UIRenderer {
   static drawFrenzy(ctx, game, W, H) {
     if (game.frenzyTimer <= 0) return;
     const t     = game.frenzyTimer / 4.0;
-    const pulse = 0.7 + Math.sin(Date.now() * 0.012) * 0.3;
+    const pulse = 0.7 + Math.sin((game.time || 0) * 12) * 0.3;
     ctx.save();
     ctx.fillStyle = 'rgba(245,197,24,0.12)';
     ctx.fillRect(0, H + 50 - 6, W * t, 5);

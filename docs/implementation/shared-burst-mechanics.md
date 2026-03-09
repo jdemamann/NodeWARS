@@ -12,6 +12,8 @@ That helper is the canonical gameplay path for:
 - refund / retract / burst branching
 - burst travel and final target impact
 
+Refund branches must preserve the full paid payload, including partially built tentacles that are cancelled before reaching the target, and reversed tentacles must refund the effective source end.
+
 ## Flow
 
 1. A caller decides the cut ratio.
@@ -22,7 +24,7 @@ That helper is the canonical gameplay path for:
 
 ## Intent
 
-Purple AI still performs decisive near-target cuts, but it no longer owns a separate damage formula. This keeps burst timing and balance aligned with the player mechanic and avoids future drift.
+Purple AI still performs decisive strategic cuts, but it no longer owns a separate damage formula. Under the current slice rules that means a source-side burst cut, not a stale near-target shortcut. This keeps burst timing and balance aligned with the player mechanic and avoids future drift.
 
 ## Frenzy Coupling
 

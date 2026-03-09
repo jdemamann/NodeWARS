@@ -46,6 +46,8 @@ export class Tent {
 
     /* Clash state */
     this.clashT       = null;
+    this.clashVisualT = null;
+    this.clashApproachActive = false;
     this.clashPartner = null;
     this.clashSpark   = 0;
 
@@ -81,9 +83,9 @@ export class Tent {
   get alive()   { return this.state !== TentState.DEAD; }
   get removed() { return this.state === TentState.DEAD; }
 
-  /** Descriptive alias kept alongside es for readability in critical paths. */
+  /** Descriptive alias for the currently active source after reversals. */
   get effectiveSourceNode() { return this.reversed ? this.target : this.source; }
-  /** Descriptive alias kept alongside et for readability in critical paths. */
+  /** Descriptive alias for the currently active target after reversals. */
   get effectiveTargetNode() { return this.reversed ? this.source : this.target; }
   /** Descriptive alias for the tentacle travel duration. */
   get travelDuration() { return this.travelDurationValue; }
@@ -114,6 +116,13 @@ export class Tent {
   _clearPipeState() {
     this.energyInPipe = 0;
     this.pipeAge = 0;
+  }
+
+  _refundToSourceNode(sourceNode, amount) {
+    /* Retract / refund rules must restore the full invested payload.
+       Do not clamp here, or partially-built tentacles can silently lose
+       refunded energy when the source is already near its nominal cap. */
+    sourceNode.energy += amount;
   }
 
   _applyNeutralContestContribution(targetNode, owner, amount) {
@@ -213,7 +222,11 @@ export class Tent {
 
     const opposingTentacle = this.clashPartner;
     this.clashPartner = null;
+    this.clashVisualT = null;
+    this.clashApproachActive = false;
     opposingTentacle.clashPartner = null;
+    opposingTentacle.clashVisualT = null;
+    opposingTentacle.clashApproachActive = false;
 
     if (isBurstStyleCut) {
       opposingTentacle.kill();
@@ -234,7 +247,7 @@ export class Tent {
    *   undefined / no param  → normal programmatic kill (retract, refund to source)
    *   < 0.3  (near source)  → kamikaze burst: payload rushes to target as a BURSTING wave
    *   > 0.7  (near target)  → defensive refund: payload returned to source immediately
-   *   0.3–0.7 (middle)      → normal cut: retract, energy lost
+   *   0.3–0.7 (middle)      → split cut: source share refunds, target share lands immediately
    *
    * Clash partner is handled before state changes:
    *   kamikaze → partner is also killed (defence destroyed)
@@ -246,6 +259,8 @@ export class Tent {
         this.state === TentState.BURSTING) return;
 
     this.clashT = null;
+    this.clashVisualT = null;
+    this.clashApproachActive = false;
 
     /* Calculate total energy in the pipe (Paid build cost + Energy in transit) */
     const payload = this.paidCost + (this.energyInPipe || 0);
@@ -272,7 +287,7 @@ export class Tent {
     } else if (isProgrammaticRetract) {
       /* Retracting a tentacle returns the invested payload to the source node. */
       const sourceNode = this.effectiveSourceNode;
-      sourceNode.energy = Math.min(sourceNode.maxE, sourceNode.energy + payload);
+      this._refundToSourceNode(sourceNode, payload);
       this._clearEconomicPayload();
       this.state = TentState.RETRACTING;
 
@@ -283,7 +298,7 @@ export class Tent {
         this.reachT = cutRatio;
       }
       const sourceNode = this.effectiveSourceNode;
-      sourceNode.energy = Math.min(sourceNode.maxE, sourceNode.energy + payload);
+      this._refundToSourceNode(sourceNode, payload);
       this._clearEconomicPayload();
 
     } else if (isMiddle) {
@@ -295,7 +310,7 @@ export class Tent {
       const targetNode = this.effectiveTargetNode;
 
       /* 1. Source gets its share back immediately */
-      sourceNode.energy = Math.min(sourceNode.maxE, sourceNode.energy + srcShare);
+      this._refundToSourceNode(sourceNode, srcShare);
 
       /* 2. Target receives its share instantly (as damage or healing/capture) */
       this._applyImmediateTargetEffect(targetNode, sourceNode, tgtShare);
@@ -324,20 +339,27 @@ export class Tent {
    * against an already-active opposing tentacle (instant "tug of war" start).
    */
   activateImmediate() {
-    /* Instant clash: tentacle never physically grew, so only charge the base build
-       cost (bldC), NOT the full range surcharge (d * dm). Charging the full buildCost
-       here causes an abrupt single-frame energy drop that is not communicated to the
-       player. The clash itself will drain the source via tentFeedPerSec during combat. */
-    const baseCost = computeBuildCost(this.distance);
-    if (baseCost > 0 && this.source) {
-      this.source.energy = Math.max(0, this.source.energy - baseCost);
+    /* Instant clash skips only the visible growth phase.
+       The economic commitment stays identical to a normal tentacle build so
+       preview, validation, AI scoring, and actual debit all use one rule. */
+    if (this.buildCost > 0 && this.source) {
+      this.source.energy = Math.max(0, this.source.energy - this.buildCost);
     }
-    /* Only the base connection cost is actually paid in this fast-path. */
-    this.paidCost = baseCost;
+    this.paidCost = this.buildCost;
     this.state    = TentState.ACTIVE;
     this.reachT   = 1;
     this.pipeAge  = this.travelDuration; // pipe immediately full for instant counter-attacks
     bus.emit('tent:connect', this);
+  }
+
+  initializeFreshClashVisual(sharedVisualFront) {
+    /* ACTIVE↔ACTIVE clashes should not pop into the midpoint.
+       Start from the incumbent side and linearly push the visible and logical
+       clash front to the exact lane midpoint before normal tug-of-war begins. */
+    this.clashT = sharedVisualFront;
+    this.clashVisualT = sharedVisualFront;
+    this.clashApproachActive = true;
+    this.clashSpark = Math.max(this.clashSpark || 0, 0.55);
   }
 
   /* ── Bezier control point (animated wave) — cached per game frame ── */
@@ -359,7 +381,8 @@ export class Tent {
     const deltaX = higherIdNode.x - lowerIdNode.x;
     const deltaY = higherIdNode.y - lowerIdNode.y;
     const segmentLength = Math.hypot(deltaX, deltaY) || 1;
-    const waveOffset = Math.sin(Date.now() * 0.0019 + lowerIdNode.id * 1.9) * segmentLength * 0.12;
+    const simulationTime = this.game?.time || 0;
+    const waveOffset = Math.sin(simulationTime * 1.9 + lowerIdNode.id * 1.9) * segmentLength * 0.12;
     this._controlPointCacheValue = {
       x: midpointX + (-deltaY / segmentLength) * waveOffset,
       y: midpointY + (deltaX / segmentLength) * waveOffset,
@@ -405,10 +428,10 @@ export class Tent {
     if (this.clashPartner?.alive && this.clashPartner.state !== TentState.RETRACTING) {
       this._updateClashState(dt);
     } else if (this.clashT !== null) {
-      this.clashT = null; this.clashPartner = null;
+      this.clashT = null; this.clashVisualT = null; this.clashApproachActive = false; this.clashPartner = null;
       this.state = TentState.ADVANCING;
     } else {
-      this.clashT = null; this.clashPartner = null;
+      this.clashT = null; this.clashVisualT = null; this.clashApproachActive = false; this.clashPartner = null;
       this._updateActiveFlowState(dt);
     }
   }
@@ -471,7 +494,7 @@ export class Tent {
        output always drains stored relay energy and can never create free feed. */
     sourceNode.energy = Math.max(0, sourceNode.energy - feedRate * dt);
 
-    /* Pipe delay: energy is in transit for tt seconds after the tentacle becomes ACTIVE.
+    /* Pipe delay: energy is in transit for the tentacle travel duration after it becomes ACTIVE.
        During filling: energyInPipe accumulates; target receives nothing yet.
        After filling: energyInPipe holds the steady-state in-transit amount; target receives energy. */
     this.pipeAge = Math.min(this.pipeAge + dt, this.travelDuration * 4);
@@ -512,13 +535,47 @@ export class Tent {
   _prepareClashState(feedRate, dt) {
     this.pipeAge = Math.min(this.pipeAge + dt, this.travelDuration * 4);
     this.energyInPipe = Math.min(this.pipeCapacity, feedRate * this.travelDuration);
-    this.clashSpark = 0.7 + Math.sin(Date.now() * 0.012) * 0.3;
+    const simulationTime = this.game?.time || 0;
+    this.clashSpark = 0.7 + Math.sin(simulationTime * 12) * 0.3;
 
     /* Init clashT from where this tent physically reached.
        Mid-air collisions: reachT is the actual collision point (0 < reachT < 1).
        ACTIVE→ACTIVE clashes (counter-attacks, resolveClashes): reachT = 1.0 for both
        sides, so use 0.5 as the neutral midpoint — never let clashT start at 1.0. */
     if (this.clashT === null) this.clashT = this.reachT < 1.0 ? this.reachT : 0.5;
+    if (this.clashVisualT === null) this.clashVisualT = this.clashT;
+  }
+
+  _updateClashApproach(opposingTentacle, dt) {
+    const midpoint = 0.5;
+    const advanceFraction = (GROW_PPS / Math.max(this.distance, 1)) * dt;
+    const approachStep = Math.max(0.001, advanceFraction);
+    const approachedFront =
+      this.clashT < midpoint
+        ? Math.min(midpoint, this.clashT + approachStep)
+        : Math.max(midpoint, this.clashT - approachStep);
+
+    this.clashT = approachedFront;
+    this.clashVisualT = approachedFront;
+    opposingTentacle.clashT = 1 - approachedFront;
+    opposingTentacle.clashVisualT = 1 - approachedFront;
+
+    const reachedMidpoint = Math.abs(approachedFront - midpoint) <= 0.0001;
+    if (reachedMidpoint) {
+      this.clashT = midpoint;
+      this.clashVisualT = midpoint;
+      this.clashApproachActive = false;
+      opposingTentacle.clashT = midpoint;
+      opposingTentacle.clashVisualT = midpoint;
+      opposingTentacle.clashApproachActive = false;
+    }
+  }
+
+  _updateClashVisualFront(opposingTentacle, dt) {
+    const actualVisualFront = this.clashT;
+    const approachRate = GAME_BALANCE.CLASH_VISUAL_APPROACH_SPEED;
+    this.clashVisualT += (actualVisualFront - this.clashVisualT) * Math.min(1, approachRate * dt);
+    opposingTentacle.clashVisualT = 1 - this.clashVisualT;
   }
 
   _drainClashSourceBudget(sourceNode, dt) {
@@ -549,7 +606,11 @@ export class Tent {
     /* Resolve: first past 1.0 or 0.0 wins */
     if (this.clashT >= 1.0) {
       this.clashPartner = null;
+      this.clashVisualT = null;
+      this.clashApproachActive = false;
       opposingTentacle.clashPartner = null;
+      opposingTentacle.clashVisualT = null;
+      opposingTentacle.clashApproachActive = false;
       opposingTentacle.kill(); // opponent retracts
       this.state = TentState.ADVANCING;
       this.clashT = null;
@@ -558,7 +619,11 @@ export class Tent {
 
     if (this.clashT <= 0.0) {
       this.clashPartner = null;
+      this.clashVisualT = null;
+      this.clashApproachActive = false;
       opposingTentacle.clashPartner = null;
+      opposingTentacle.clashVisualT = null;
+      opposingTentacle.clashApproachActive = false;
       this.kill(); // we retract
       opposingTentacle.state = TentState.ADVANCING;
       opposingTentacle.clashT = null;
@@ -568,7 +633,7 @@ export class Tent {
   _updateClashState(dt) {
     const sourceNode = this.effectiveSourceNode;
     const opposingTentacle = this.clashPartner;
-    if (!opposingTentacle?.alive) { this.clashPartner = null; return; }
+    if (!opposingTentacle?.alive) { this.clashPartner = null; this.clashVisualT = null; this.clashApproachActive = false; return; }
 
     const feedRate = this._drainClashSourceBudget(sourceNode, dt);
     this._prepareClashState(feedRate, dt);
@@ -577,7 +642,13 @@ export class Tent {
        The other tent mirrors, preventing double-movement per frame. */
     if (!this._isCanonicalClashDriver()) return;
 
+    if (this.clashApproachActive || opposingTentacle.clashApproachActive) {
+      this._updateClashApproach(opposingTentacle, dt);
+      return;
+    }
+
     this._updateClashFront(opposingTentacle, feedRate, dt);
+    this._updateClashVisualFront(opposingTentacle, dt);
     this._resolveClashOutcome(opposingTentacle);
   }
 

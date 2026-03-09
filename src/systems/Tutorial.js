@@ -42,6 +42,125 @@ export class Tutorial {
     this.had_retract = false; this.had_cut = false; this.needsCut = false;
   }
 
+  isRigid() {
+    return !!this.game.cfg?.isTutorial && !this.done;
+  }
+
+  _getPrimaryPlayerNode() {
+    return this.game.nodes.find(node => node.owner === 1 && !node.isRelay) || null;
+  }
+
+  _getExpectedNeutralTarget() {
+    const primaryPlayerNode = this._getPrimaryPlayerNode();
+    if (!primaryPlayerNode) return null;
+
+    const neutralNodes = this.game.nodes.filter(node => node.owner === 0 && !node.isRelay);
+    return neutralNodes.reduce((bestNode, node) => {
+      if (!bestNode) return node;
+      const bestDistance = Math.hypot(bestNode.x - primaryPlayerNode.x, bestNode.y - primaryPlayerNode.y);
+      const nodeDistance = Math.hypot(node.x - primaryPlayerNode.x, node.y - primaryPlayerNode.y);
+      return nodeDistance < bestDistance ? node : bestNode;
+    }, null);
+  }
+
+  _getExpectedRelayTarget() {
+    return this.game.nodes.find(node => node.isRelay && node.owner !== 1) || null;
+  }
+
+  _hasTutorialPlayerTentacle() {
+    return this.game.tents.some(
+      tentacle => tentacle.alive &&
+        (tentacle.state === TentState.ACTIVE || tentacle.state === TentState.GROWING) &&
+        tentacle.source?.owner === 1
+    );
+  }
+
+  allowsClickIntent(clickIntent) {
+    if (!this.isRigid()) return true;
+
+    const currentAction = this.cur?.action;
+    const primaryPlayerNode = this._getPrimaryPlayerNode();
+    const expectedNeutralTarget = this._getExpectedNeutralTarget();
+    const expectedRelayTarget = this._getExpectedRelayTarget();
+
+    switch (currentAction) {
+      case 'read':
+      case 'done':
+        return false;
+      case 'select':
+        return clickIntent.type === 'select_player_node' && clickIntent.node === primaryPlayerNode;
+      case 'tentacle':
+      case 'capture':
+        if (clickIntent.type === 'select_player_node') return clickIntent.node === primaryPlayerNode;
+        if (clickIntent.type === 'build_tentacle') {
+          return clickIntent.sourceNode === primaryPlayerNode && clickIntent.targetNode === expectedNeutralTarget;
+        }
+        return false;
+      case 'capture_relay':
+        if (clickIntent.type === 'select_player_node') return clickIntent.node === primaryPlayerNode;
+        if (clickIntent.type === 'build_tentacle') {
+          return clickIntent.sourceNode === primaryPlayerNode && clickIntent.targetNode === expectedRelayTarget;
+        }
+        return false;
+      case 'retract':
+        if (clickIntent.type === 'select_player_node') return clickIntent.node === primaryPlayerNode;
+        return clickIntent.type === 'retract_node_tentacles';
+      case 'cut':
+        if (!this._hasTutorialPlayerTentacle()) {
+          if (clickIntent.type === 'select_player_node') return clickIntent.node === primaryPlayerNode;
+          if (clickIntent.type === 'build_tentacle') {
+            return clickIntent.sourceNode === primaryPlayerNode && clickIntent.targetNode === expectedNeutralTarget;
+          }
+        }
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  canStartDragConnect(sourceNode) {
+    if (!this.isRigid()) return true;
+
+    const currentAction = this.cur?.action;
+    const primaryPlayerNode = this._getPrimaryPlayerNode();
+    return (currentAction === 'tentacle' || currentAction === 'capture' || currentAction === 'capture_relay' ||
+      (currentAction === 'cut' && !this._hasTutorialPlayerTentacle())) &&
+      sourceNode === primaryPlayerNode;
+  }
+
+  filterDragConnectTarget(sourceNode, targetNode) {
+    if (!this.isRigid()) return targetNode;
+    if (!sourceNode || !targetNode) return null;
+
+    const currentAction = this.cur?.action;
+    if (currentAction === 'tentacle' || currentAction === 'capture' || currentAction === 'cut') {
+      return targetNode === this._getExpectedNeutralTarget() ? targetNode : null;
+    }
+    if (currentAction === 'capture_relay') {
+      return targetNode === this._getExpectedRelayTarget() ? targetNode : null;
+    }
+    return null;
+  }
+
+  canStartSlice() {
+    if (!this.isRigid()) return true;
+    return this.cur?.action === 'cut' && this._hasTutorialPlayerTentacle();
+  }
+
+  filterSliceCuts(sliceCuts) {
+    if (!this.isRigid()) return sliceCuts;
+    if (this.cur?.action !== 'cut') return [];
+
+    const playerTentacle = this.game.tents.find(
+      tentacle => tentacle.alive &&
+        (tentacle.state === TentState.ACTIVE || tentacle.state === TentState.GROWING) &&
+        tentacle.source?.owner === 1
+    );
+
+    if (!playerTentacle) return [];
+    return sliceCuts.filter(sliceCut => sliceCut.tentacle === playerTentacle);
+  }
+
   /* ── Called each frame by Game.update ── */
   tick(game) {
     this.ghostAnim = (this.ghostAnim + 0.02) % 1;
@@ -143,10 +262,12 @@ export class Tutorial {
       const box = document.getElementById(DOM_IDS.TUTBOX);
       if (box) box.style.display = 'none';
       this.done = true;
+      const nextLvl = STATE.getNextLevelId(this.game.cfg?.id) ?? 1;
+      /* Tutorials are optional onboarding. Completing one should route the
+         player into the first real phase of that world without making the
+         tutorial itself a required campaign gate. */
       const tw      = this.game.cfg?.tutorialWorldId || 1;
-      const nextLvl = { 1:1, 2:12, 3:23 }[tw] || 1;
-      /* Mark tutorial completed and unlock the corresponding world */
-      STATE.completed = Math.max(STATE.completed, tw === 1 ? 0 : tw === 2 ? 11 : 22);
+      STATE.recordTutorialCompletion(tw, this.game.cfg?.id);
       STATE.setCurrentLevel(nextLvl);
       STATE.save();
       fadeGo(() => { showScr(null); this.game.loadLevel(nextLvl); });

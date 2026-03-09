@@ -6,7 +6,7 @@ Track what has already been stabilized in the current game, what is partially co
 
 ## Current Status Summary
 
-Overall stabilization state: `late-stage`
+Overall stabilization state: `completed for architecture / ongoing for balance`
 
 Current documentation reconciliation state: `completed`
 
@@ -18,7 +18,7 @@ The codebase is materially more organized than the original baseline in five are
 - naming clarity in critical systems
 - grouped configuration surfaces
 
-The repository is no longer in the high-risk drift phase for core gameplay. Remaining work is concentrated in final decomposition, long-run confidence, and campaign tuning.
+The repository is no longer in the high-risk drift phase for core gameplay. Structural decomposition, long-run confidence checks, and instrumentation are in place. Remaining work is concentrated in playtest-driven balance, product polish, and selective cleanup.
 
 ## Progress Matrix
 
@@ -32,6 +32,10 @@ The repository is no longer in the high-risk drift phase for core gameplay. Rema
 - audio event density audit with cooldown-based de-duplication for high-chaos SFX
 - final render palette canonicalization through shared owner-palette helpers
 - screen composition split for world metadata, level-select badges, and result summaries
+- tentacle lifecycle split and final tentacle decomposition
+- purple AI strategic-cut scheduling outside the build-think interval
+- immediate clash creation now commits full tentacle build cost
+- core simulation-adjacent visuals moved off `Date.now()` onto frame-driven `game.time`
 - primary documentation for relay, burst, ownership, AI relay targeting, energy, tentacle lifecycle, input flow, config taxonomy, and naming
 - roadmap/backlog/workstream reconciliation
 
@@ -42,12 +46,14 @@ The repository is no longer in the high-risk drift phase for core gameplay. Rema
 - high-impact naming cleanup in `Tent.js`, `AI.js`, and input helpers
 - world-mechanics boundary extraction into dedicated setup and runtime modules
 - world-layer runtime split into dedicated `src/systems/world/*` modules under `WorldSystems`
+- owner 3 faction differentiation, with stronger kill-confirm and pressure-follow scoring
 
 ### Remaining
 
 - heavy structural decomposition work is complete; remaining work is mostly playtest, balance, and selective polish
-- finish the remaining palette/screen cleanup
-- extend confidence further with playtest-driven balance iteration
+- continue campaign wave-by-wave tuning with real fail-case observation
+- optionally reduce remaining wall-clock timing in non-critical UX/audio paths
+- keep docs and `AGENTS.md` aligned after each balance wave
 
 ## Completed or Largely Completed
 
@@ -128,7 +134,7 @@ Compatibility aliases are still present for older modules.
 
 ### Tentacle Cleanup
 
-`src/entities/Tent.js` is much more readable than before, but it still remains a dense gameplay-critical file.
+`src/entities/Tent.js` is much more readable than before, but it still remains the densest gameplay-critical file.
 
 What is already improved:
 
@@ -139,9 +145,8 @@ What is already improved:
 
 What is still incomplete:
 
-- full separation of clash behavior into its own module
-- full migration away from older compatibility aliases like `es`, `et`, `tt`, `d`
-- remaining visual / lifecycle responsibilities are still mixed in one file
+- additional decomposition would now be optional polish, not required stabilization work
+- some lifecycle and rendering adjacency still live in the same file by design
 
 ### Config Migration
 
@@ -164,29 +169,29 @@ Still incomplete:
 
 ## Remaining High-Value Work
 
-### 1. World Mechanics Boundary
+### 1. Campaign Balance and Playtest Execution
 
 Still needed:
 
-- make the boundary between core gameplay and world-specific mechanics more explicit
-- isolate hazard / pulsar / signal / fog tuning and ownership from the core loop as much as possible
+- execute the next balance waves on late authored phases and tutorial pacing
+- collect real fail reasons, not just config guesses
 
 Reason:
 
-- this is the cleanest bridge toward a future Tentacle Wars-faithful mode
+- this is now the highest-value product work after the stabilization pass
 
-### 2. Final Tentacle Decomposition
+### 2. Selective Product Polish
 
 Still needed:
 
-- decide whether clash and burst behavior should move into dedicated helper modules
-- reduce remaining mixed concerns in `Tent.js`
+- refine the remaining UX seams found in playtest
+- adjust audio/visual noise and pacing only where evidence warrants it
 
 Reason:
 
-- `Tent.js` is still the single densest gameplay file
+- the architecture is stable enough that polish should now be evidence-driven
 
-### 3. Backlog and Roadmap Reconciliation
+### 3. Documentation and Agent Handoff Maintenance
 
 Status:
 
@@ -194,24 +199,24 @@ Status:
 
 Reason:
 
-- this work is done, but it will need one more pass before the fidelity phase starts
+- this work only needs maintenance after future balance waves
 
-### 4. Expanded Confidence Layer
+### 4. Optional Additional Confidence Layer
 
 Still needed:
 
-- add performance-oriented checks and instrumentation on top of the current smoke + soak suite
+- add more campaign- and balance-oriented checks only if they catch real regressions seen in playtest
 
 Reason:
 
-- invariant and soak coverage now exist, but performance confidence is still mostly observational
+- invariant, soak, campaign sanity, and render instrumentation already exist; further automation should stay lightweight
 
 ## Recommended Next Step
 
 The highest-value next move is:
 
-1. finish the last concentrated structural seams
-2. add long-run/performance guardrails
-3. run the first concrete balance wave on priority phases
+1. execute the next concrete balance wave on priority phases
+2. run focused playtests on tutorials, World 2 pressure, and late multi-front phases
+3. only then decide whether any remaining structural cleanup is justified by evidence
 
-That ordering closes stabilization with evidence before any larger fidelity push.
+That ordering keeps the project moving on product value instead of architecture churn.

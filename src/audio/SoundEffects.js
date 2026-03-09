@@ -24,7 +24,7 @@ const SOUND_EVENT_COOLDOWNS_MS = {
   pulsarCharge: 450,
 };
 
-function getCtx() {
+function getAudioContext() {
   if (!STATE.settings.sound) return null;
   if (!_ctx) {
     try { _ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
@@ -33,7 +33,7 @@ function getCtx() {
 }
 
 function play(freq, type, dur, vol = 0.18, detune = 0) {
-  const audioContext = getCtx();
+  const audioContext = getAudioContext();
   if (!audioContext) return;
   try {
     const oscillator = audioContext.createOscillator();
@@ -51,7 +51,7 @@ function play(freq, type, dur, vol = 0.18, detune = 0) {
 }
 
 function noise(dur, vol = 0.1, filterFreq = 300) {
-  const audioContext = getCtx();
+  const audioContext = getAudioContext();
   if (!audioContext) return;
   try {
     const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate * dur, audioContext.sampleRate);
@@ -76,6 +76,8 @@ function noise(dur, vol = 0.1, filterFreq = 300) {
 }
 
 function playWithCooldown(eventKey, playback) {
+  /* Collapse near-duplicate bursts into one perceptual event so clashes,
+     hazard drains, and infrastructure triggers do not spam the mix. */
   const nowMs = (typeof performance !== 'undefined' && typeof performance.now === 'function')
     ? performance.now()
     : Date.now();

@@ -32,6 +32,20 @@ Inside `src/entities/Tent.js`, the lifecycle is organized through these state ha
 - ownership transitions: shared ownership helper
 - energy budget usage: shared energy-budget helper
 
+## Refund Notes
+
+- programmatic retract refunds the full invested payload to the effective source
+- cancelling a tentacle during `GROWING` must refund the full construction cost already paid
+- reversed tentacles also refund the effective source, not the historical source endpoint
+- refund paths intentionally do not silently discard energy just because the source was already near its nominal cap
+- immediate clash links skip the visible growth phase only; they still commit the full build cost
+
+## Clash Notes
+
+- the clash outcome still resolves from the canonical shared clash front
+- fresh `ACTIVE`↔`ACTIVE` clashes now advance toward the exact lane midpoint at normal tentacle growth speed before the tug-of-war starts resolving
+- mid-air collisions during `GROWING` still start from their real collision point
+
 ## Intent
 
 The lifecycle should stay readable as a state machine, not as a single monolithic method with mixed concerns.

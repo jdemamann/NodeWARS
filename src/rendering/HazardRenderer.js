@@ -198,6 +198,16 @@ export class HazardRenderer {
     }
     ctx.fill();
 
+    if (highGraphics) {
+      ctx.beginPath();
+      ctx.arc(x, y, 30 + Math.sin(ph * 1.2) * 2, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,190,80,${0.12 + charge * 0.16})`;
+      ctx.lineWidth = 1.2;
+      sg(ctx, '#ffb347', 12);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
     /* Rotating arms */
     for (let i = 0; i < (highGraphics ? 4 : 2); i++) {
       const a  = ph + (i / 4) * Math.PI * 2;

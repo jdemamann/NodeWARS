@@ -17,6 +17,12 @@ This keeps the current personality model intact while making World 3 relay play 
 
 The AI still does not plan multi-step relay networks. It only uses a local positional score, so behavior stays readable and lightweight.
 
+Owned relays can now also be used as launch origins when they hold real buffered budget. The relay-origin path is intentionally conservative:
+
+- it requires usable pass-through budget
+- it prefers short tactical follow-up links
+- it penalizes low-budget relay spam
+
 ## Code Anchor
 
 - Relay eligibility and scoring: `src/systems/AI.js`

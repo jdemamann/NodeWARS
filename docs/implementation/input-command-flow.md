@@ -83,6 +83,15 @@ Owns raw DOM input binding for gameplay:
 - delegation from DOM events into `Game` methods and input helpers
 - redundant release/cancel guards for slice cleanup (`mouseup`, `pointerup`, `pointercancel`, `contextmenu`, `blur`, `visibilitychange`)
 
+### `src/systems/Tutorial.js`
+
+Owns rigid tutorial-step gating on top of the normal player interaction flow:
+
+- whitelists click intents per tutorial step
+- whitelists drag-connect starts and targets per tutorial step
+- only allows slice gestures during the explicit cut step
+- only allows slice hits against the currently demonstrated tentacle
+
 ### `src/input/SliceCutting.js`
 
 Owns slice-segment scanning at the input/gameplay boundary:
@@ -107,6 +116,15 @@ Owns player-facing slice side effects after a cut is detected:
 - left-drag can still become a slice if it does **not** start from a player-owned node
 - drag-connect uses sticky snap targeting so a valid target remains selected even if the final frame hit test is imperfect
 - frenzy is evaluated per continuous slice gesture, not across multiple disconnected cuts
+- tutorial phases override the normal freedom of the input model and only accept the action required by the active step
+
+## Tutorial Guardrail
+
+Tutorial phases are intentionally rigid.
+
+- off-step actions are ignored instead of mutating gameplay state
+- the `cut` step is two-phase: first create the demonstration tentacle, then allow the slice
+- this prevents players from soft-locking the tutorial by clearing the map or consuming the wrong target out of order
 
 ## Design Rule
 
@@ -119,6 +137,16 @@ It may:
 - apply the returned intent
 
 It should not accumulate more embedded gameplay decision logic over time.
+
+## Invalid Action UX
+
+For invalid player actions such as:
+
+- no free slots
+- insufficient energy
+- blocked reverse flow
+
+the current UX intentionally keeps the selected source node active so the player can retry immediately without reselecting it.
 
 ## Next Extraction Targets
 

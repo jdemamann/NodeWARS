@@ -263,7 +263,7 @@ export class NodeRenderer {
     /* Frenzy tint */
     if (frenzyActive && n.owner === 1) {
       ctx.save();
-      ctx.globalAlpha = 0.5 * (0.3 + Math.sin(Date.now() * 0.015) * 0.15);
+      ctx.globalAlpha = 0.5 * (0.3 + Math.sin(time * 15) * 0.15);
       sg(ctx, '#f5c518', 30);
       drawNodeHull(ctx, n.x, n.y, r * 1.8, sides, ang);
       ctx.fillStyle   = '#f5c518';
@@ -523,6 +523,7 @@ export class NodeRenderer {
   static _drawRelay(ctx, n, r, ang, time, fogAlpha) {
     const rc = ownerColor(n.owner, Math.max(n.level, 2), '#40ffbb');
     const rb = n.owner !== 0;
+    const highGraphics = STATE.settings.graphicsMode === 'high';
     ctx.save();
     ctx.globalAlpha = fogAlpha;
 
@@ -548,6 +549,25 @@ export class NodeRenderer {
     ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
     ctx.fillStyle = rg2;
     ctx.fill();
+
+    if (highGraphics) {
+      ctx.save();
+      ctx.translate(n.x, n.y);
+      ctx.rotate(time * 0.55);
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const rr = r * 0.48;
+        i === 0 ? ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr) : ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      ctx.fillStyle = colorWithAlpha(rc, 0.18);
+      ctx.fill();
+      ctx.strokeStyle = colorWithAlpha('#ffffff', 0.18);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
 
     if (!rb) {
       ctx.beginPath();
@@ -631,6 +651,7 @@ export class NodeRenderer {
   static _drawSpecial(ctx, n, t) {
     const x = n.x, y = n.y;
     const fl = n.spFlash || 0;
+    const highGraphics = STATE.settings.graphicsMode === 'high';
 
     /* ── Signal Tower ── */
     if (n.type === NodeType.SIGNAL) {
@@ -684,6 +705,17 @@ export class NodeRenderer {
         sg(ctx, sigCol, 6);
         ctx.stroke();
         ctx.shadowBlur  = 0;
+      }
+      if (n.owner !== 0) {
+        ctx.beginPath();
+        ctx.moveTo(x - 12, y);
+        ctx.lineTo(x, y - 12);
+        ctx.lineTo(x + 12, y);
+        ctx.lineTo(x, y + 12);
+        ctx.closePath();
+        ctx.strokeStyle = colorWithAlpha(sigCol, 0.28);
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
       }
       /* Label */
       ctx.font          = 'bold 7px "Orbitron",sans-serif';

@@ -14,10 +14,11 @@ This replaces the previous ambiguous `highGraphics ON/OFF` presentation.
 The setting should communicate a tradeoff, not just a switch.
 
 - `HIGH` prioritises richer rendering:
-  - more layered tentacle rendering
+  - more layered and more organic tentacle rendering
   - extra node depth
   - heavier glow / blur usage
   - more decorative motion
+  - stronger special-structure identity
 - `LOW` prioritises responsiveness and lower GPU cost:
   - fewer render layers
   - reduced expensive gradients
@@ -50,7 +51,15 @@ In [TentRenderer.js](/home/jonis/.claude/projects/nodewars-v2-codex/src/renderin
 - reduces bezier segment count for tapered attack bodies
 - skips the outer membrane layer
 - skips the animated internal flow pulses
+- skips the organic silhouette wobble, root bulb, and target grip treatment
 - keeps the main body, direction, clash, and gameplay-critical readability
+
+In `HIGH`, tentacles now also gain:
+
+- a wider organic root bulb where they emerge from the source node
+- a more creature-like silhouette with taper variation instead of a uniform strip
+- a target grip ring so the attachment reads as impact instead of a line endpoint
+- extra clash distortion and body banding so direct lane fights feel more physical
 
 ### Nodes
 
@@ -62,6 +71,12 @@ In [NodeRenderer.js](/home/jonis/.claude/projects/nodewars-v2-codex/src/renderin
 - skips the secondary inner energy arc
 
 The silhouette, energy ring, ownership color, selection state, and attack warnings remain readable.
+
+In `HIGH`, special structures now also separate more clearly:
+
+- relays gain a crystalline rotating inner core
+- owned signals gain a stronger technological diamond frame
+- pulsars gain an extra corona layer and richer broadcast presence
 
 ### Background / hazards / particles
 
@@ -89,6 +104,12 @@ Defaulting to `LOW` is reasonable for browser play because:
 - it is safer across mid-range laptops and integrated GPUs
 - it avoids the player needing to diagnose performance issues manually
 - `HIGH` remains available as an upgrade path for players who want richer presentation
+
+For desktop play, `HIGH` is now much more visibly worth enabling because the gain is no longer just blur and glow. The main difference is body language:
+
+- tentacles feel less like links and more like living appendages
+- relays and signals read faster as special infrastructure
+- clash and pulse events look more intentional
 
 ## Validation
 

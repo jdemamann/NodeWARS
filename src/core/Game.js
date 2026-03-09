@@ -290,7 +290,6 @@ export class Game {
     if (fixedLayout) {
       populateFixedNodes(this, fixedLayout);
       applyFixedWorldFeatures(this, fixedLayout);
-      this._finalizeLoadedLayout(cfg);
     } else if (cfg.isTutorial) {
       this._loadTutLayout(cfg, W, H);
     } else {
@@ -539,33 +538,6 @@ export class Game {
           `Player flow out: ${totalFlow}/s`;
       }
 
-      /* Console energy-flow validation (read: temporarily enabled during testing) */
-      if (this.nodes.some(n => n.owner !== 0)) {
-        console.groupCollapsed(`[ENERGY t=${this.time.toFixed(0)}s]`);
-        this.nodes.filter(n => n.owner !== 0 && !n.isRelay).forEach(n => {
-          const regen   = TIER_REGEN[n.level] ?? TIER_REGEN[0];
-          const outFlow = this.tents
-            .filter(t => t.alive && t.effectiveSourceNode === n)
-            .reduce((s, t) => s + (t.flowRate || 0), 0);
-          const label   = n.owner === 1 ? 'PLAYER' : 'AI';
-          console.log(
-            `NODE${n.id}[${label}] E=${n.energy.toFixed(1)}/${n.maxE}` +
-            ` regen=${regen.toFixed(2)}/s avail=${(n.availPower || 0).toFixed(2)}/s` +
-            ` inFlow=${(n._prevInFlow || 0).toFixed(2)}/s outFlow=${outFlow.toFixed(2)}/s` +
-            ` slots=${n.outCount}/${n.maxSlots}`
-          );
-        });
-        this.tents.filter(t => t.alive && t.state === TentState.ACTIVE).forEach(t => {
-          const ttype =
-            t.effectiveTargetNode.owner === t.effectiveSourceNode.owner ? 'FRIENDLY' :
-            t.effectiveTargetNode.owner === 0 ? 'CAPTURE' : 'ATTACK';
-          console.log(
-            `  TENT[${ttype}] ${t.effectiveSourceNode.id}→${t.effectiveTargetNode.id}` +
-            ` flow=${t.flowRate.toFixed(2)}/s pipe=${t.energyInPipe.toFixed(1)} eff=${t.eff.toFixed(2)}`
-          );
-        });
-        console.groupEnd();
-      }
     }
 
     /* Tutorial */
@@ -626,6 +598,7 @@ export class Game {
     this.tents.forEach(t => {
       if (t.alive && t.state === TentState.ACTIVE) {
         t.clashPartner = null;
+        t.clashVisualT = null;
         byRoute.set(`${t.effectiveSourceNode.id}-${t.effectiveTargetNode.id}`, t);
       }
     });
@@ -635,6 +608,16 @@ export class Game {
       const opp = byRoute.get(`${t.effectiveTargetNode.id}-${t.effectiveSourceNode.id}`);
       if (opp && !opp.clashPartner && opp.effectiveSourceNode.owner !== t.effectiveSourceNode.owner) {
         t.clashPartner = opp; opp.clashPartner = t;
+        if (prevPartner.get(t) !== opp) {
+          /* Fresh ACTIVE↔ACTIVE clashes keep the canonical mid-lane mechanics,
+             but the visual front should travel in from the incumbent side so
+             the lane does not appear to "snap" to the midpoint. */
+          const canonicalTentacle = t.source.id < t.target.id ? t : opp;
+          const opposingTentacle = canonicalTentacle === t ? opp : t;
+          const canonicalStartsDominant = canonicalTentacle.age >= opposingTentacle.age;
+          canonicalTentacle.initializeFreshClashVisual(canonicalStartsDominant ? 1 : 0);
+          opposingTentacle.initializeFreshClashVisual(canonicalStartsDominant ? 0 : 1);
+        }
         if (prevPartner.get(t) !== opp) SFX.clash(); /* only new clashes */
       }
     });
@@ -660,6 +643,8 @@ export class Game {
       liveOut: node => this._utils.liveOut(node),
       distanceCostMultiplier: this.cfg.distanceCostMultiplier,
     });
+
+    if (this.cfg?.isTutorial && !this.tut.allowsClickIntent(clickIntent)) return;
 
     this._applyPlayerClickIntent(clickIntent);
   }
@@ -699,7 +684,6 @@ export class Game {
         } else {
           showToast(T('cantReverse'));
         }
-        this.clearSel();
         return;
       case 'no_free_slots':
         showToast(
@@ -708,7 +692,6 @@ export class Game {
             clickIntent.tentacleSlotUsage.activeOutgoingTentacles + '/' + clickIntent.tentacleSlotUsage.maxTentacleSlots
           )
         );
-        this.clearSel();
         return;
       case 'insufficient_energy':
         clickIntent.hitNode.rFlash = 1;
@@ -721,7 +704,6 @@ export class Game {
             Math.floor(this.sel.energy)
           )
         );
-        this.clearSel();
         return;
       case 'build_tentacle':
         this._createPlayerTentacle(clickIntent.sourceNode, clickIntent.targetNode, clickIntent.buildCost.totalBuildCost);
@@ -751,7 +733,10 @@ export class Game {
 
   checkSlice() {
     const sliceSegment = getLatestSliceSegment(this.slicePath);
-    const sliceCuts = scanPlayerSliceCuts(this.tents, sliceSegment);
+    let sliceCuts = scanPlayerSliceCuts(this.tents, sliceSegment);
+    if (this.cfg?.isTutorial) {
+      sliceCuts = this.tut.filterSliceCuts(sliceCuts);
+    }
 
     sliceCuts.forEach(sliceCut => this._applyPlayerSliceCut(sliceCut));
   }
@@ -842,6 +827,7 @@ export class Game {
   }
 
   _beginSlice(screenX, screenY, button = 2) {
+    if (this.cfg?.isTutorial && !this.tut.canStartSlice()) return;
     this.slicing = true;
     this._slicePointerButton = button;
     this._sliceGestureCutTentacles = new Set();
@@ -852,7 +838,10 @@ export class Game {
   _beginMouseDragCandidate(screenX, screenY) {
     this._mouseDownStart = { x: screenX, y: screenY };
     const pressedNode = this._findNodeAtScreenPoint(screenX, screenY);
-    this._dragConnectSource = pressedNode?.owner === 1 ? pressedNode : null;
+    const dragSourceNode = pressedNode?.owner === 1 ? pressedNode : null;
+    this._dragConnectSource = this.cfg?.isTutorial
+      ? (this.tut.canStartDragConnect(dragSourceNode) ? dragSourceNode : null)
+      : dragSourceNode;
     this._dragConnectActive = false;
     this._dragConnectTarget = null;
     this._leftSlicePending = this._dragConnectSource ? null : { x: screenX, y: screenY };
@@ -884,9 +873,12 @@ export class Game {
       this._dragConnectActive = true;
     }
 
-    const hoveredTargetNode =
+    let hoveredTargetNode =
       this._findNodeAtScreenPoint(screenX, screenY, INPUT_TUNING.HOVER_HIT_PADDING_PX) ||
       this._findSnapTargetNodeAtScreenPoint(screenX, screenY, this.sel);
+    if (this.cfg?.isTutorial) {
+      hoveredTargetNode = this.tut.filterDragConnectTarget(this.sel, hoveredTargetNode);
+    }
     if (hoveredTargetNode && hoveredTargetNode !== this.sel) {
       this._dragConnectTarget = hoveredTargetNode;
       this.hoverNode = hoveredTargetNode;
@@ -911,7 +903,11 @@ export class Game {
 
     if (!wasDragConnectActive || !dragSourceNode) return false;
 
-    const hitNode = dragTargetNode || this._findNodeAtScreenPoint(screenX, screenY, INPUT_TUNING.HOVER_HIT_PADDING_PX);
+    const fallbackTargetNode = this._findNodeAtScreenPoint(screenX, screenY, INPUT_TUNING.HOVER_HIT_PADDING_PX);
+    let hitNode = dragTargetNode || fallbackTargetNode;
+    if (this.cfg?.isTutorial) {
+      hitNode = this.tut.filterDragConnectTarget(dragSourceNode, hitNode);
+    }
     const clickIntent = resolvePlayerClickIntent({
       selectedNode: dragSourceNode,
       hitNode,
@@ -919,6 +915,7 @@ export class Game {
       liveOut: node => this._utils.liveOut(node),
       distanceCostMultiplier: this.cfg.distanceCostMultiplier,
     });
+    if (this.cfg?.isTutorial && !this.tut.allowsClickIntent(clickIntent)) return false;
     this._applyPlayerClickIntent(clickIntent);
     return true;
   }

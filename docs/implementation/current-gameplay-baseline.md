@@ -25,8 +25,11 @@ See also:
 - tentacles are created by selecting a player-owned cell and targeting another cell
 - the same connect action can be done by click-click or drag-and-release
 - tentacles grow over time before becoming active
+- cancelling a tentacle during growth refunds the full construction energy already paid
+- retract and refund paths always give the payload back to the effective source end, including reversed links
 - active tentacles transport energy through a pipe model
 - opposing tentacles can clash and push against each other
+- fresh active-vs-active clashes visually travel toward the midpoint instead of appearing there instantly
 
 ### Capture and Attack
 
@@ -56,10 +59,21 @@ See also:
 
 - AI remains heuristic-based
 - owner 3 uses the same shared burst path as the player
-- AI can evaluate relay targets
+- owner 3 checks strategic burst cuts every update tick
+- owner 3 is more biased toward kill-confirm pressure on weak player cells
+- AI can evaluate relay targets and can launch from relays when real pass-through budget exists
+
+### Timing and Visual Motion
+
+- core simulation-adjacent tentacle and node motion now follows `game.time`, not wall-clock timing
+- this keeps clash approach, pulse motion, and related visual state deterministic with the simulation step
 
 ### Campaign / Meta Rules
 
+- world tutorials are optional onboarding content
+- when a new world unlocks, both its tutorial and its first real phase become available immediately
+- normal campaign progression can still flow into the next world's tutorial when crossing world boundaries
+- tutorial completion and next-phase resolution now go through canonical campaign-state helpers
 - late high-pressure authored phases can give the player more than one starting node
 - phase skip only unlocks after repeated defeats and stays blocked on tutorial, boss, and final phases
 

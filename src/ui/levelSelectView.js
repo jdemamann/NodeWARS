@@ -30,6 +30,6 @@ export function buildLevelMechanicBadge(levelConfig) {
 }
 
 export function buildPurpleEnemyBadge(levelConfig) {
-  if (levelConfig.purpleEnemyCount <= 0) return '';
+  if (!levelConfig.purpleEnemyCount || levelConfig.purpleEnemyCount <= 0) return '';
   return '<div class="lb-meta lb-meta-purple">⚔ CUTTHROAT×' + levelConfig.purpleEnemyCount + '</div>';
 }
