@@ -516,8 +516,8 @@ export class Tent {
       deliveredAmount = this._applyFriendlyFlow(targetNode, feedRate, relayFlowMultiplier, dt);
 
     } else if (targetNode.owner === 0) {
-      /* CAPTURE_SPEED_MULT compensates for the small tier-0 regen so early captures
-         feel responsive while late-game pacing stays correct. */
+      /* CAPTURE_SPEED_MULT keeps early neutral captures responsive after the
+         tier-0 regen increase without making late-game captures explode. */
       deliveredAmount = this._applyNeutralCaptureFlow(targetNode, sourceNode, feedRate, relayFlowMultiplier, dt);
 
     } else {

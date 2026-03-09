@@ -188,7 +188,13 @@ class GameState {
     if (worldId <= 1) return true;
     const unlockRequirement = this._getWorldUnlockRequirement(worldId);
     if (unlockRequirement == null) return false;
-    return this.completed >= unlockRequirement;
+    const unlockedByProgress = this.completed >= unlockRequirement;
+    const unlockedManually = worldId === 2
+      ? !!this.settings.w2
+      : worldId === 3
+        ? !!this.settings.w3
+        : false;
+    return unlockedByProgress || unlockedManually;
   }
 
   isLevelUnlocked(levelConfig) {
@@ -211,8 +217,8 @@ class GameState {
   }
 
   _syncWorldUnlocksFromProgress() {
-    this.settings.w2 = this.completed >= (this._getWorldUnlockRequirement(2) ?? Infinity);
-    this.settings.w3 = this.completed >= (this._getWorldUnlockRequirement(3) ?? Infinity);
+    this.settings.w2 = this.settings.w2 || this.completed >= (this._getWorldUnlockRequirement(2) ?? Infinity);
+    this.settings.w3 = this.settings.w3 || this.completed >= (this._getWorldUnlockRequirement(3) ?? Infinity);
   }
 
   _getWorldUnlockRequirement(worldId) {

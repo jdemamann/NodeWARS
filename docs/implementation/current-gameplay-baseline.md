@@ -16,6 +16,7 @@ See also:
 ### Cells
 
 - owned non-relay cells regenerate energy by tier
+- level-0 cells now start at `1.0 e/s`
 - growth level is derived from current energy
 - higher levels increase slots and offensive throughput
 - cells retain a reduced fraction of self-regeneration while feeding allies
@@ -35,6 +36,7 @@ See also:
 
 - allied targets receive energy
 - neutral targets accumulate contest progress until captured
+- neutral capture pacing is kept close to the prior opening tempo by a lower `CAPTURE_SPEED_MULT` after the tier-0 regen increase
 - enemy targets lose energy until ownership flips
 - ownership changes retract invalid opposing links
 

@@ -724,7 +724,9 @@ async function testWorldUnlockAndPurpleBadgeGuardrailsStayPresent() {
   const { LEVELS } = await load('src/config/gameConfig.js');
 
   assert.match(gameStateSource, /_getWorldUnlockRequirement\(worldId\)/, 'world unlock should derive from level data, not hard-coded ranges');
-  assert.match(gameStateSource, /return this\.completed >= unlockRequirement;/, 'world unlock should be derived directly from progress');
+  assert.match(gameStateSource, /const unlockedByProgress = this\.completed >= unlockRequirement;/, 'world unlock should derive from canonical progress thresholds');
+  assert.match(gameStateSource, /const unlockedManually = worldId === 2/, 'world unlock should also respect manual settings toggles for later worlds');
+  assert.match(gameStateSource, /return unlockedByProgress \|\| unlockedManually;/, 'world unlock should accept either progression or manual enable');
   assert.match(gameStateSource, /isLevelUnlocked\(levelConfig\)/, 'level unlock should be centralized in GameState');
   assert.match(gameStateSource, /getNextLevelId\(levelId = this\.curLvl\)/, 'progression should expose a canonical next-level helper');
   assert.match(gameStateSource, /recordTutorialCompletion\(tutorialWorldId, tutorialLevelId\)/, 'tutorial completion should be centralized in GameState');
@@ -744,6 +746,10 @@ async function testWorldUnlockAndPurpleBadgeGuardrailsStayPresent() {
   assert.equal(STATE.isLevelUnlocked(world1Tutorial), true, 'World 1 tutorial should be available from a fresh campaign state');
   assert.equal(STATE.isLevelUnlocked(world1FirstPhase), true, 'World 1 first playable phase should be available even if the tutorial is skipped');
   assert.equal(STATE.getNextLevelId(10), 11, 'finishing World 1 should naturally flow to the World 2 tutorial');
+  assert.equal(STATE.isWorldUnlocked(2), false, 'World 2 should stay locked in a fresh campaign without manual enable');
+  STATE.settings.w2 = true;
+  assert.equal(STATE.isWorldUnlocked(2), true, 'manual World 2 enable should unlock the world even before campaign progress reaches it');
+  STATE.settings.w2 = false;
 
   STATE.completed = 10;
   STATE._syncWorldUnlocksFromProgress();
@@ -784,7 +790,10 @@ async function testWorldOneTutorialTabAndFeedClashBudgetStayAligned() {
   assert.match(screenSource, /worldFilter === 1 && levelConfig\.tutorialWorldId === 1/, 'World 1 grid should include the World 1 tutorial directly');
   assert.doesNotMatch(screenSource, /isTutorialEntry/, 'level grid should not keep dead tutorial-entry locals');
   assert.match(gameStateSource, /including World 1/, 'world unlock comments should explicitly keep World 1 tutorial optional too');
+  assert.match(configSource, /TIER_REGEN:\s*\[1\.0, 1\.5, 2\.0, 2\.5, 4\.5, 8\.5\]/, 'tier regen should use the updated 1.0-based progression');
+  assert.match(configSource, /CAPTURE_SPEED_MULT:\s*2\.0/, 'capture speed multiplier should be rebalanced for the higher base regen');
   assert.match(configSource, /SELF_REGEN_FRACTION: 0\.30/, 'game balance should preserve a self-regen fraction while feeding');
+  assert.match(energyBudgetSource, /export function computeNodeDisplayRegenRate/, 'energy budget should expose a canonical displayed regen helper');
   assert.match(energyBudgetSource, /export function computeTentacleClashFeedRate/, 'energy budget should expose a dedicated clash feed rate');
 
   const sourceNode = new GameNode(0, 0, 0, 40, 1);
@@ -809,6 +818,9 @@ async function testTutorialExitAndMouseGestureGuardsStayPresent() {
   assert.match(indexSource, /id="tutExit"/, 'tutorial overlay should expose a dedicated exit button');
   assert.match(gameSource, /_slicePointerButton = null/, 'game should track which pointer button owns the active slice');
   assert.match(gameSource, /_clearMouseGestureState\(\)/, 'game should expose a shared mouse gesture reset helper');
+  assert.match(gameSource, /_clickCandidateNode = null/, 'game should track and clear a sticky click candidate node');
+  assert.match(gameSource, /_clickCandidateStart = null/, 'game should track and clear a sticky click candidate start point');
+  assert.match(gameSource, /INPUT_TUNING\.HOVER_HIT_PADDING_PX/, 'touch tap fallback should use padded node hit-testing');
   assert.match(gameSource, /_leftSlicePending/, 'left-button slice promotion should keep explicit pending state');
   assert.match(gameSource, /if \(hoveredTargetNode && hoveredTargetNode !== this\.sel\)/, 'drag-connect should branch on a concrete hovered target while dragging');
   assert.match(gameSource, /this\._dragConnectTarget = hoveredTargetNode;/, 'drag-connect should keep an explicit drop target while dragging');
@@ -816,7 +828,7 @@ async function testTutorialExitAndMouseGestureGuardsStayPresent() {
   assert.match(gameSource, /const fallbackTargetNode = this\._findNodeAtScreenPoint\(screenX, screenY, INPUT_TUNING\.HOVER_HIT_PADDING_PX\)/, 'drag release should still use padded gameplay hit-testing as fallback');
   assert.match(gameSource, /let hitNode = dragTargetNode \|\| fallbackTargetNode;/, 'drag release should prefer the tracked hover target over a strict mouseup hit');
   assert.match(gameSource, /_findSnapTargetNodeAtScreenPoint/, 'drag-connect should expose a snap-target helper for nearby nodes');
-  assert.match(inputBindingSource, /window\.addEventListener\('mouseup'/, 'mouse gestures should reset even when the pointer is released outside the canvas');
+  assert.match(inputBindingSource, /on\(window, 'mouseup', handleWindowMouseUp\)/, 'mouse gestures should reset even when the pointer is released outside the canvas');
   assert.match(tutorialSource, /this\.game\.paused = true;/, 'tutorial exit should pause the game before leaving to level select');
   assert.match(tutorialSource, /showScr\('levels'\)/, 'tutorial exit should return directly to phase select');
 }
@@ -835,8 +847,10 @@ async function testPrimaryButtonSliceUsesDistinctVisualAndDragTargeting() {
   assert.match(hudSource, /pauseButton\.style\.display = 'inline-flex'/, 'pause button should stay visible even in tutorials');
   assert.doesNotMatch(inputBindingSource, /!game\.cfg\.isTutorial/, 'Escape pause binding should no longer exclude tutorial levels');
   assert.match(inputBindingSource, /function isSliceButtonStillPressed\(buttons, slicePointerButton\)/, 'input binding should explicitly track whether the active slice button is still pressed');
-  assert.match(inputBindingSource, /window\.addEventListener\('pointerup'/, 'slice should reset on pointerup as an extra guard');
-  assert.match(inputBindingSource, /window\.addEventListener\('contextmenu'/, 'slice should reset on contextmenu as an extra right-click guard');
+  assert.match(inputBindingSource, /on\(window, 'pointerup', handleWindowPointerUp\)/, 'slice should reset on pointerup as an extra guard');
+  assert.match(inputBindingSource, /on\(window, 'contextmenu', handleWindowContextMenu\)/, 'slice should reset on contextmenu as an extra right-click guard');
+  assert.match(inputBindingSource, /game\._clickCandidateStart = null;/, 'touch slice promotion should clear the sticky tap candidate start');
+  assert.match(inputBindingSource, /game\._clickCandidateNode = null;/, 'touch slice promotion should clear the sticky tap candidate node');
 }
 
 async function testFrenzyRequiresSameContinuousSliceGesture() {
@@ -852,7 +866,7 @@ async function testFrenzyRequiresSameContinuousSliceGesture() {
   assert.match(gameSource, /this\._sliceGestureCutTentacles = new Set\(\)/, 'game should reset the per-slice frenzy tracker when slice gestures begin or end');
   assert.match(gameSource, /showToast\('⚡ FRENZY! \+35% REGEN'\)/, 'frenzy toast should keep the documented regen bonus');
   assert.match(gameConfigSource, /FRENZY_REGEN_MULT:\s*1\.35/, 'frenzy regen multiplier should stay aligned with the documented +35% bonus');
-  assert.match(gameNodeSource, /GAME_BALANCE\.FRENZY_REGEN_MULT/, 'GameNode regen should use the canonical frenzy multiplier constant');
+  assert.match(gameNodeSource, /computeNodeDisplayRegenRate\(this, frenzyActive\)/, 'GameNode regen should route through the canonical displayed regen helper');
   assert.match(i18nSource, /same continuous slice|mesmo gesto contínuo/, 'tutorial text should describe the same-gesture frenzy rule');
 }
 
@@ -915,6 +929,7 @@ async function testLoadLevelFinalizationAndInvalidActionUxStayAligned() {
   assert.match(tutorialSource, /STATE\.recordTutorialCompletion\(tw, this\.game\.cfg\?\.id\)/, 'tutorial completion should route through the canonical GameState helper');
   assert.match(resultViewSource, /hostile starts/, 'result screen should not claim configured enemy starts were literally eliminated');
   assert.doesNotMatch(gameSource, /console\.groupCollapsed\(\`\[ENERGY/, 'debug HUD should not still dump per-second energy logs to the console');
+  assert.match(gameSource, /if \(!hit && this\._clickCandidateNode && this\._clickCandidateStart\)/, 'click resolution should fall back to the pressed node when the release stays near it');
   const toggleCaseMatch = gameSource.match(/case 'toggle_existing_tentacle':([\s\S]*?)case 'no_free_slots':/);
   const slotsCaseMatch = gameSource.match(/case 'no_free_slots':([\s\S]*?)case 'insufficient_energy':/);
   const energyCaseMatch = gameSource.match(/case 'insufficient_energy':([\s\S]*?)case 'build_tentacle':/);
@@ -925,6 +940,41 @@ async function testLoadLevelFinalizationAndInvalidActionUxStayAligned() {
   assert.doesNotMatch(toggleCaseMatch[1], /this\.clearSel\(\);/, 'invalid reverse attempts should keep the current selection');
   assert.doesNotMatch(slotsCaseMatch[1], /this\.clearSel\(\);/, 'slot-limit rejections should keep the current selection');
   assert.doesNotMatch(energyCaseMatch[1], /this\.clearSel\(\);/, 'insufficient-energy rejections should keep the current selection');
+}
+
+async function testInputWaveV2GuardrailsStayPresent() {
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const inputBindingSource = await fs.readFile(path.join(ROOT, 'src/input/GameInputBinding.js'), 'utf8');
+  const inputStateSource = await fs.readFile(path.join(ROOT, 'src/input/InputState.js'), 'utf8');
+  const packageJson = JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8'));
+
+  assert.match(inputBindingSource, /game\._beginSlice\(game\._tapStart\.x, game\._tapStart\.y, 2\)/, 'touch-promoted slice should use the canonical slice initializer');
+  assert.doesNotMatch(inputBindingSource, /game\.slicePath = createSlicePathStart\(game\._tapStart\.x, game\._tapStart\.y\)/, 'touch-promoted slice should not manually recreate slice state');
+  assert.match(inputStateSource, /export function getMonotonicInputTimestamp\(\)/, 'input state should expose a monotonic input timestamp helper');
+  assert.doesNotMatch(gameSource, /Date\.now\(/, 'Game input flow should not use wall-clock time for tap timing');
+  assert.doesNotMatch(inputBindingSource, /Date\.now\(/, 'touch binding should not use wall-clock time for tap timing');
+  assert.match(inputStateSource, /slicePath\.push\(\{ x: screenX, y: screenY \}\)/, 'slice-path append should mutate in place instead of reallocating');
+  assert.match(gameSource, /_scheduleTutorialDefeatReload\(\)/, 'tutorial defeat should route through a guarded delayed reload helper');
+  assert.match(gameSource, /this\._disposeInputBindings = bindGameInputEvents\(this\)/, 'game should keep a disposable handle for global input bindings');
+  assert.match(inputBindingSource, /return function disposeGameInputEvents\(\)/, 'input binding should expose a dispose function');
+  assert.equal(packageJson.scripts.smoke, 'node scripts/smoke-checks.mjs', 'package.json should expose the smoke script');
+  assert.equal(packageJson.scripts['campaign-sanity'], 'node scripts/campaign-sanity.mjs', 'package.json should expose the campaign sanity script');
+  assert.equal(packageJson.scripts.soak, 'node scripts/simulation-soak.mjs', 'package.json should expose the soak script');
+  assert.equal(packageJson.scripts.check, 'npm run smoke && npm run campaign-sanity && npm run soak', 'package.json should expose an aggregate check script');
+}
+
+async function testRegenDisplayAndFlowTooltipStayCanonical() {
+  const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const buildPreviewSource = await fs.readFile(path.join(ROOT, 'src/input/BuildPreview.js'), 'utf8');
+  const energyBudgetSource = await fs.readFile(path.join(ROOT, 'src/systems/EnergyBudget.js'), 'utf8');
+
+  assert.match(uiRendererSource, /computeNodeDisplayRegenRate\(n, frenzyActive\)/, 'node info panel should use the canonical displayed regen helper');
+  assert.doesNotMatch(uiRendererSource, /TIER_REGEN\[n\.level\]/, 'node info panel should not bypass the canonical regen helper');
+  assert.match(buildPreviewSource, /displayFlowRate/, 'build preview should expose a display flow rate field for existing tentacles');
+  assert.match(gameSource, /previewModel\.displayFlowRate > 0/, 'the quick tooltip should keep flow visible even for low non-zero rates');
+  assert.match(gameSource, /toFixed\(1\) \+ 'e\/s'/, 'the quick tooltip should show flow with one decimal place');
+  assert.match(energyBudgetSource, /FRENZY_REGEN_MULT/, 'displayed regen helper should stay aligned with frenzy regen rules');
 }
 
 async function main() {
@@ -974,6 +1024,8 @@ async function main() {
     ['Purple AI differentiation and frame-driven core visuals stay present', testPurpleAiDifferentiationAndFrameDrivenCoreVisuals],
     ['Tutorial steps stay rigid and gated', testTutorialStepsStayRigidAndGated],
     ['loadLevel finalization and invalid-action UX stay aligned', testLoadLevelFinalizationAndInvalidActionUxStayAligned],
+    ['Input wave V2 guardrails stay present', testInputWaveV2GuardrailsStayPresent],
+    ['Regen display and flow tooltip stay canonical', testRegenDisplayAndFlowTooltipStayCanonical],
   ];
 
   let passed = 0;

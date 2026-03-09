@@ -10,9 +10,10 @@
      • phase-outcome overlay
    ================================================================ */
 
-import { GAMEPLAY_RULES, MAX_SLOTS, TIER_REGEN } from '../config/gameConfig.js';
+import { GAMEPLAY_RULES, MAX_SLOTS } from '../config/gameConfig.js';
 import { ownerColor, ownerPanelTheme } from '../theme/ownerPalette.js';
 import { computeBuildCost, maxRange } from '../math/simulationMath.js';
+import { computeNodeDisplayRegenRate } from '../systems/EnergyBudget.js';
 import { drawRoundedRect } from './canvasPrimitives.js';
 
 const { input: INPUT_TUNING, progression: PROGRESSION_RULES, render: RENDER_RULES } = GAMEPLAY_RULES;
@@ -268,8 +269,8 @@ export class UIRenderer {
       flow_in:'FLOW IN', flow_out:'FLOW OUT', under_attack:'UNDER ATTACK',
     };
 
-    const baseRegenRate= isNeutral || isRelay ? 0 : +(TIER_REGEN[n.level] ?? TIER_REGEN[0]);
-    const regen        = isNeutral ? 0 : +baseRegenRate.toFixed(1);
+    const frenzyActive = game.frenzyTimer > 0 && n.owner === 1;
+    const regen        = isNeutral ? 0 : +computeNodeDisplayRegenRate(n, frenzyActive).toFixed(1);
     const totalSlots = PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[
       Math.min(lvl, PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL.length - 1)
     ];

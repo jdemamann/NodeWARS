@@ -35,10 +35,22 @@ Current coverage:
 - tutorial exit and mouse-gesture cleanup guards stay present
 - primary-button slice keeps its distinct visual and drag targeting behavior
 - frenzy only triggers from the same continuous slice gesture
+- touch-promoted slice stays on the canonical slice init path
+- input timing stays monotonic instead of relying on `Date.now()`
+- slice-path append stays in-place instead of reallocating each move
+- tutorial defeat delayed reload stays guarded against stale callbacks
+- package.json exposes the validation scripts directly
+- gameplay input bindings remain disposable/unbindable
 
 ## Run
 
 From the repository root:
+
+```bash
+npm run smoke
+```
+
+or:
 
 ```bash
 node scripts/smoke-checks.mjs
@@ -47,13 +59,31 @@ node scripts/smoke-checks.mjs
 For campaign-data integrity, also run:
 
 ```bash
+npm run campaign-sanity
+```
+
+or:
+
+```bash
 node scripts/campaign-sanity.mjs
 ```
 
 For a lightweight long-run confidence pass, also run:
 
 ```bash
+npm run soak
+```
+
+or:
+
+```bash
 node scripts/simulation-soak.mjs
+```
+
+For the standard full local validation pass:
+
+```bash
+npm run check
 ```
 
 ## Notes

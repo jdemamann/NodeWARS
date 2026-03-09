@@ -34,6 +34,7 @@ import {
   appendSlicePoint,
   createSlicePathStart,
   createTapCandidate,
+  getMonotonicInputTimestamp,
 } from '../input/InputState.js';
 import { getLatestSliceSegment, scanPlayerSliceCuts } from '../input/SliceCutting.js';
 import {
@@ -120,11 +121,17 @@ export class Game {
     this.my         = 0;
     this.lastT      = 0;
     this._mouseDownStart = null;
+    this._clickCandidateStart = null;
+    this._clickCandidateNode = null;
     this._dragConnectSource = null;
     this._dragConnectActive = false;
     this._dragConnectTarget = null;
     this._leftSlicePending = null;
     this._slicePointerButton = null;
+    this._pendingTutorialReloadTimeout = null;
+    this._levelLoadGeneration = 0;
+    this._disposeInputBindings = null;
+    this._uiEventsBound = false;
 
     this._utils     = makeUtils(this);
     this._lang      = STATE.curLang;
@@ -268,6 +275,8 @@ export class Game {
   loadLevel(idx) {
     const cfg = LEVELS.find(l => l.id === idx) || LEVELS[idx];
     if (!cfg) { console.error('Level not found:', idx); return; }
+    this._clearPendingTutorialReload();
+    this._levelLoadGeneration += 1;
     this.cfg = cfg;
     STATE.setCurrentLevel(idx);
 
@@ -546,7 +555,7 @@ export class Game {
       if (!this.done && !this.nodes.some(n => n.owner === 1 && !n.isRelay)) {
         this.done = true;
         this.phaseOutcome = 'lose';
-        setTimeout(() => { SFX.lose(); this.loadLevel(STATE.curLvl); }, 1500);
+        this._scheduleTutorialDefeatReload();
       }
     } else if (!this.done) {
       this.checkWin();
@@ -570,6 +579,12 @@ export class Game {
       this.phaseOutcome = 'lose';
       endLevel(false, this);
     }
+  }
+
+  dispose() {
+    this._clearPendingTutorialReload();
+    this._disposeInputBindings?.();
+    this._disposeInputBindings = null;
   }
 
   calcScore() {
@@ -625,7 +640,18 @@ export class Game {
 
   /* ─────────────────────────────── INPUT ── */
   click(x, y) {
-    const hit = this._findNodeAtScreenPoint(x, y);
+    let hit = this._findNodeAtScreenPoint(x, y);
+    if (!hit && this._clickCandidateNode && this._clickCandidateStart) {
+      const clickCandidateDistance = Math.hypot(
+        x - this._clickCandidateStart.x,
+        y - this._clickCandidateStart.y,
+      );
+      if (clickCandidateDistance <= INPUT_TUNING.DRAG_CONNECT_THRESHOLD_PX) {
+        hit = this._clickCandidateNode;
+      }
+    }
+    this._clickCandidateStart = null;
+    this._clickCandidateNode = null;
 
     if (!hit) {
       this.clearSel();
@@ -804,7 +830,7 @@ export class Game {
       el.style.top  = (this.my + 58) + 'px';
       if (previewModel?.type === 'toggle_existing_tentacle') {
         el.textContent = 'CLICK → ' + (previewModel.isFlowReversed ? T('flowRest') : T('flowRev')) +
-          (previewModel.roundedFlowRate > 1 ? ' | FLOW:' + previewModel.roundedFlowRate + 'e/s' : '');
+          (previewModel.displayFlowRate > 0 ? ' | FLOW:' + previewModel.displayFlowRate.toFixed(1) + 'e/s' : '');
         el.style.color        = '#f5c518';
         el.style.borderColor  = 'rgba(245,197,24,0.3)';
       } else if (previewModel?.type === 'build_new_tentacle') {
@@ -838,6 +864,8 @@ export class Game {
   _beginMouseDragCandidate(screenX, screenY) {
     this._mouseDownStart = { x: screenX, y: screenY };
     const pressedNode = this._findNodeAtScreenPoint(screenX, screenY);
+    this._clickCandidateStart = { x: screenX, y: screenY };
+    this._clickCandidateNode = pressedNode;
     const dragSourceNode = pressedNode?.owner === 1 ? pressedNode : null;
     this._dragConnectSource = this.cfg?.isTutorial
       ? (this.tut.canStartDragConnect(dragSourceNode) ? dragSourceNode : null)
@@ -938,6 +966,8 @@ export class Game {
 
   _clearMouseGestureState() {
     this._mouseDownStart = null;
+    this._clickCandidateStart = null;
+    this._clickCandidateNode = null;
     this._dragConnectSource = null;
     this._dragConnectActive = false;
     this._dragConnectTarget = null;
@@ -953,14 +983,47 @@ export class Game {
   }
 
   _beginTapCandidate(screenX, screenY) {
-    this._tapStart = createTapCandidate(screenX, screenY, Date.now());
+    this._tapStart = createTapCandidate(screenX, screenY, getMonotonicInputTimestamp());
+    /* Touch taps are less precise than mouse clicks, so keep a sticky node
+       candidate from touchstart and let click() resolve against it on touchend
+       if the finger stays within the tap tolerance. */
+    this._clickCandidateStart = { x: screenX, y: screenY };
+    this._clickCandidateNode = this._findNodeAtScreenPoint(
+      screenX,
+      screenY,
+      INPUT_TUNING.HOVER_HIT_PADDING_PX,
+    );
     this.mx = screenX;
     this.my = screenY;
+  }
+
+  _clearPendingTutorialReload() {
+    if (this._pendingTutorialReloadTimeout !== null) {
+      clearTimeout(this._pendingTutorialReloadTimeout);
+      this._pendingTutorialReloadTimeout = null;
+    }
+  }
+
+  _scheduleTutorialDefeatReload() {
+    if (this._pendingTutorialReloadTimeout !== null) return;
+
+    const scheduledLevelId = this.cfg?.id;
+    const scheduledGeneration = this._levelLoadGeneration;
+    this._pendingTutorialReloadTimeout = setTimeout(() => {
+      this._pendingTutorialReloadTimeout = null;
+      if (this._levelLoadGeneration !== scheduledGeneration) return;
+      if (!this.cfg?.isTutorial || this.cfg.id !== scheduledLevelId) return;
+      if (this.state !== 'playing') return;
+      SFX.lose();
+      this.loadLevel(scheduledLevelId);
+    }, 1500);
   }
 
   _clearTouchState() {
     clearTimeout(this._longPressTimer);
     this._tapStart = null;
+    this._clickCandidateStart = null;
+    this._clickCandidateNode = null;
     this._endSlice();
   }
 
@@ -997,7 +1060,10 @@ export class Game {
 
   /* ─────────────────────────────── EVENTS ── */
   bindEvents() {
-    bindGameInputEvents(this);
+    this._disposeInputBindings?.();
+    this._disposeInputBindings = bindGameInputEvents(this);
+    if (this._uiEventsBound) return;
+    this._uiEventsBound = true;
 
     const hpause = $id(DOM_IDS.HPAUSE);
     if (hpause) hpause.addEventListener('click', () => this.togglePause());

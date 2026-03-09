@@ -15,10 +15,11 @@ export function buildPlayerTentaclePreview({
   const toggleableTentacle = findToggleableTentacle(tents, selectedNode, hoveredNode);
 
   if (toggleableTentacle) {
+    const displayFlowRate = +(toggleableTentacle.tentacle.flowRate || 0).toFixed(1);
     return {
       type: 'toggle_existing_tentacle',
       isFlowReversed: toggleableTentacle.isFlowReversed,
-      roundedFlowRate: Math.round(toggleableTentacle.tentacle.flowRate || 0),
+      displayFlowRate,
     };
   }
 

@@ -96,6 +96,7 @@ The current implementation deliberately preserves these rules:
 
 - programmatic retract refunds `paidCost + energyInPipe`
 - support cells keep a fraction of their own regeneration while feeding allies
+- level-0 cells now start at `1.0 e/s`, with higher levels preserving the same step pattern as the previous tuning
 - relay nodes act as pass-through infrastructure, not energy sources
 - player and purple AI use the same shared slice / burst path
 - frenzy only counts cuts from one continuous slice gesture

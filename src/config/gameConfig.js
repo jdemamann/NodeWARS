@@ -41,9 +41,10 @@ export const LVL_STEP = 50;   // energy threshold per level (0→250 in 5 steps)
  */
 export const GAME_BALANCE = {
 
-  // Energy generated per second at each level (0–5). Exponential scale.
-  // Level 0 = Spore (0.5 e/s) → Level 5 = Dominator (8.0 e/s). 16× range.
-  TIER_REGEN: [0.5, 1.0, 1.5, 2.0, 4.0, 8.0],
+  // Energy generated per second at each level (0–5).
+  // Level 0 now starts at 1.0 e/s to make the opening less sluggish while
+  // preserving the same absolute step increases as the prior tuning.
+  TIER_REGEN: [1.0, 1.5, 2.0, 2.5, 4.5, 8.5],
 
   // Energy threshold to capture a neutral cell. Lower = faster captures.
   // Original Tentacle Wars used a small threshold (~10). Was 20 before.
@@ -58,10 +59,9 @@ export const GAME_BALANCE = {
   GLOBAL_REGEN_MULT: 1.0,
 
   // Multiplier applied to capture contributions against neutral cells.
-  // Default 4.0: a tier-0 node captures a neutral cell in ~6s instead of 24s.
-  // This compensates for the small tier-0 regen (0.5 e/s) that would make
-  // early captures painfully slow while keeping late-game pacing correct.
-  CAPTURE_SPEED_MULT: 4.0,
+  // Default 2.0 keeps early neutral captures close to the prior pacing even
+  // after raising tier-0 regen from 0.5 e/s to 1.0 e/s.
+  CAPTURE_SPEED_MULT: 2.0,
 
   // Multiplier applied to damage dealt to enemy nodes.
   // Raise to create more aggressive combat; lower for defensive games.

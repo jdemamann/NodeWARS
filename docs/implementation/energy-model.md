@@ -7,10 +7,12 @@ Outgoing tentacle feed is resolved through the shared budget helpers in `src/sys
 ## Current Model
 
 - owned non-relay cells generate source budget from tier regeneration
+- level-0 cells now start at `1.0 e/s`, and higher levels keep the same absolute step increases as the prior tuning
 - relay nodes generate no independent source budget
 - relays may only forward buffered upstream flow
 - outgoing feed is split across active outgoing tentacles
 - active tentacles still drain their source when they move energy
+- displayed regen in the UI now comes from the same shared helper used by the runtime budget model
 
 ## Why
 

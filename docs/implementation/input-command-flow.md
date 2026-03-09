@@ -66,6 +66,7 @@ Owns pure input-state transitions and gesture helpers:
 
 - client-to-canvas coordinate conversion
 - slice path start and extension state
+- monotonic gesture timestamp sourcing for tap/slice recognition
 - tap candidate creation
 - tap-to-slice promotion rule
 - tap activation rule
@@ -78,10 +79,12 @@ Owns raw DOM input binding for gameplay:
 
 - canvas mouse event wiring
 - canvas touch event wiring
+- canonical promotion of touch drag into the same slice initializer used by mouse slicing
 - long-press timer orchestration
 - window resize / escape key wiring
 - delegation from DOM events into `Game` methods and input helpers
 - redundant release/cancel guards for slice cleanup (`mouseup`, `pointerup`, `pointercancel`, `contextmenu`, `blur`, `visibilitychange`)
+- explicit dispose/unbind support for all listeners it registers
 
 ### `src/systems/Tutorial.js`
 
@@ -114,6 +117,7 @@ Owns player-facing slice side effects after a cut is detected:
 
 - `drag-and-release` only claims the gesture if it starts from a player-owned node
 - left-drag can still become a slice if it does **not** start from a player-owned node
+- touch-promoted slice now enters through the same `_beginSlice(...)` path as mouse slice
 - drag-connect uses sticky snap targeting so a valid target remains selected even if the final frame hit test is imperfect
 - frenzy is evaluated per continuous slice gesture, not across multiple disconnected cuts
 - tutorial phases override the normal freedom of the input model and only accept the action required by the active step

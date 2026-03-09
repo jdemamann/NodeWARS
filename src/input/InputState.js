@@ -11,7 +11,12 @@ export function createSlicePathStart(screenX, screenY) {
 }
 
 export function appendSlicePoint(slicePath, screenX, screenY) {
-  return [...slicePath, { x: screenX, y: screenY }];
+  slicePath.push({ x: screenX, y: screenY });
+  return slicePath;
+}
+
+export function getMonotonicInputTimestamp() {
+  return performance.now();
 }
 
 export function createTapCandidate(screenX, screenY, startedAtMs) {

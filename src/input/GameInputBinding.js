@@ -1,6 +1,6 @@
 import { GAMEPLAY_RULES } from '../config/gameConfig.js';
 import {
-  createSlicePathStart,
+  getMonotonicInputTimestamp,
   getCanvasPointFromClient,
   resolveHoverTrackingState,
   shouldPromoteTapToSlice,
@@ -17,13 +17,19 @@ function isSliceButtonStillPressed(buttons, slicePointerButton) {
 
 export function bindGameInputEvents(game) {
   const canvas = game.canvas;
+  const removeListeners = [];
+  const on = (target, eventName, handler, options) => {
+    target.addEventListener(eventName, handler, options);
+    removeListeners.push(() => target.removeEventListener(eventName, handler, options));
+  };
 
-  canvas.addEventListener('contextmenu', event => {
+  const handleCanvasContextMenu = event => {
     event.preventDefault();
     if (game.slicing && game._slicePointerButton === 2) game._endSlice();
-  });
+  };
+  on(canvas, 'contextmenu', handleCanvasContextMenu);
 
-  canvas.addEventListener('mousedown', event => {
+  const handleCanvasMouseDown = event => {
     if (game.state !== 'playing' || game.paused) return;
     if (event.button === 2) {
       event.preventDefault();
@@ -33,9 +39,10 @@ export function bindGameInputEvents(game) {
     if (event.button === 0) {
       game._beginMouseDragCandidate(event.offsetX, event.offsetY);
     }
-  });
+  };
+  on(canvas, 'mousedown', handleCanvasMouseDown);
 
-  canvas.addEventListener('mousemove', event => {
+  const handleCanvasMouseMove = event => {
     game.mx = event.offsetX;
     game.my = event.offsetY;
 
@@ -58,9 +65,10 @@ export function bindGameInputEvents(game) {
       });
       game.hoverNode = nextHoverState.hoverNode;
     }
-  });
+  };
+  on(canvas, 'mousemove', handleCanvasMouseMove);
 
-  canvas.addEventListener('mouseup', event => {
+  const handleCanvasMouseUp = event => {
     if (event.button === 2) {
       game._endSlice();
       return;
@@ -73,15 +81,17 @@ export function bindGameInputEvents(game) {
       const consumedByDrag = game._endMouseDrag(event.offsetX, event.offsetY);
       if (!consumedByDrag) game.click(event.offsetX, event.offsetY);
     }
-  });
+  };
+  on(canvas, 'mouseup', handleCanvasMouseUp);
 
-  canvas.addEventListener('mouseleave', () => {
+  const handleCanvasMouseLeave = () => {
     if (!game.hoverPin) game.hoverNode = null;
     if (game.slicing) game._endSlice();
     game._clearMouseGestureState();
-  });
+  };
+  on(canvas, 'mouseleave', handleCanvasMouseLeave);
 
-  canvas.addEventListener('touchstart', event => {
+  const handleCanvasTouchStart = event => {
     event.preventDefault();
     if (game.state !== 'playing' || game.paused) return;
 
@@ -98,9 +108,10 @@ export function bindGameInputEvents(game) {
       if (!game._tapStart) return;
       game._pinHoverNodeAtScreenPoint(touchPoint.x, touchPoint.y);
     }, INPUT_TUNING.LONG_PRESS_DURATION_MS);
-  }, { passive: false });
+  };
+  on(canvas, 'touchstart', handleCanvasTouchStart, { passive: false });
 
-  canvas.addEventListener('touchmove', event => {
+  const handleCanvasTouchMove = event => {
     event.preventDefault();
     const touchPoint = getCanvasPointFromClient(canvas, event.touches[0].clientX, event.touches[0].clientY);
     const touchX = touchPoint.x;
@@ -115,15 +126,17 @@ export function bindGameInputEvents(game) {
 
     if (game._tapStart && !game.paused) {
       if (shouldPromoteTapToSlice(game._tapStart, touchX, touchY, INPUT_TUNING.TOUCH_SLICE_DRAG_THRESHOLD_PX)) {
-        game.slicing = true;
-        game.slicePath = createSlicePathStart(game._tapStart.x, game._tapStart.y);
+        game._beginSlice(game._tapStart.x, game._tapStart.y, 2);
         game._extendSlice(touchX, touchY);
         game._tapStart = null;
+        game._clickCandidateStart = null;
+        game._clickCandidateNode = null;
       }
     }
-  }, { passive: false });
+  };
+  on(canvas, 'touchmove', handleCanvasTouchMove, { passive: false });
 
-  canvas.addEventListener('touchend', event => {
+  const handleCanvasTouchEnd = event => {
     event.preventDefault();
     clearTimeout(game._longPressTimer);
 
@@ -133,7 +146,7 @@ export function bindGameInputEvents(game) {
       const touchPoint = getCanvasPointFromClient(canvas, event.changedTouches[0].clientX, event.changedTouches[0].clientY);
       if (shouldTriggerTapAction(
         game._tapStart,
-        Date.now(),
+        getMonotonicInputTimestamp(),
         touchPoint.x,
         touchPoint.y,
         INPUT_TUNING.TAP_MAX_DURATION_MS,
@@ -144,40 +157,57 @@ export function bindGameInputEvents(game) {
     }
 
     game._clearTouchState();
-  }, { passive: false });
+  };
+  on(canvas, 'touchend', handleCanvasTouchEnd, { passive: false });
 
-  canvas.addEventListener('touchcancel', () => game._clearTouchState());
+  const handleCanvasTouchCancel = () => game._clearTouchState();
+  on(canvas, 'touchcancel', handleCanvasTouchCancel);
 
-  window.addEventListener('resize', () => game.resize());
+  const handleWindowResize = () => game.resize();
+  on(window, 'resize', handleWindowResize);
   /* Window-level cleanup guards prevent orphaned slice trails when the browser
      ends the gesture outside the canvas or suppresses the expected release path. */
-  window.addEventListener('mouseup', event => {
+  const handleWindowMouseUp = event => {
     if (event.button === 2 && game.slicing) game._endSlice();
     if (event.button === 0) {
       if (game.slicing && game._slicePointerButton === 0) game._endSlice();
       game._clearMouseGestureState();
     }
-  });
-  window.addEventListener('pointerup', () => {
+  };
+  on(window, 'mouseup', handleWindowMouseUp);
+  const handleWindowPointerUp = () => {
     if (game.slicing) game._endSlice();
     game._clearMouseGestureState();
-  });
-  window.addEventListener('pointercancel', () => {
+  };
+  on(window, 'pointerup', handleWindowPointerUp);
+  const handleWindowPointerCancel = () => {
     if (game.slicing) game._endSlice();
     game._clearMouseGestureState();
-  });
-  window.addEventListener('contextmenu', event => {
+  };
+  on(window, 'pointercancel', handleWindowPointerCancel);
+  const handleWindowContextMenu = event => {
     if (game.slicing) game._endSlice();
     event.preventDefault();
-  });
-  window.addEventListener('blur', () => {
+  };
+  on(window, 'contextmenu', handleWindowContextMenu);
+  const handleWindowBlur = () => {
     if (game.slicing) game._endSlice();
     game._clearMouseGestureState();
-  });
-  document.addEventListener('visibilitychange', () => {
+  };
+  on(window, 'blur', handleWindowBlur);
+  const handleDocumentVisibilityChange = () => {
     if (document.hidden && game.slicing) game._endSlice();
-  });
-  window.addEventListener('keydown', event => {
+  };
+  on(document, 'visibilitychange', handleDocumentVisibilityChange);
+  const handleWindowKeyDown = event => {
     if (event.key === 'Escape' && game.state === 'playing' && game.cfg) game.togglePause();
-  });
+  };
+  on(window, 'keydown', handleWindowKeyDown);
+
+  return function disposeGameInputEvents() {
+    clearTimeout(game._longPressTimer);
+    game._clearMouseGestureState();
+    game._clearTouchState();
+    removeListeners.splice(0).reverse().forEach(removeListener => removeListener());
+  };
 }

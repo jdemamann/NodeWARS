@@ -278,6 +278,7 @@ export class Tutorial {
   }
 
   exit() {
+    this.game._clearPendingTutorialReload();
     this.game.paused = true;
     const tutorialBox = document.getElementById(DOM_IDS.TUTBOX);
     if (tutorialBox) tutorialBox.style.display = 'none';

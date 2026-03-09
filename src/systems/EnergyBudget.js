@@ -4,10 +4,16 @@ export function captureRelayFeedBudget(node) {
   return node.isRelay ? (node.inFlow || 0) : 0;
 }
 
+export function computeNodeDisplayRegenRate(node, frenzyActive = false) {
+  if (!node || node.isRelay || node.owner === 0) return 0;
+  const tierRegen = TIER_REGEN[node.level] ?? TIER_REGEN[0];
+  const boost = frenzyActive && node.owner === 1 ? GAME_BALANCE.FRENZY_REGEN_MULT : 1.0;
+  return tierRegen * GAME_BALANCE.GLOBAL_REGEN_MULT * boost;
+}
+
 export function computeNodeSourceBudget(node) {
   if (node.isRelay) return node.relayFeedBudget || 0;
-  const tierRegen = TIER_REGEN[node.level] ?? TIER_REGEN[0];
-  return tierRegen * GAME_BALANCE.GLOBAL_REGEN_MULT;
+  return computeNodeDisplayRegenRate(node, false);
 }
 
 export function computeNodeTentacleFeedRate(node) {

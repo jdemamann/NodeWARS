@@ -1,3 +1,9 @@
 {
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "smoke": "node scripts/smoke-checks.mjs",
+    "campaign-sanity": "node scripts/campaign-sanity.mjs",
+    "soak": "node scripts/simulation-soak.mjs",
+    "check": "npm run smoke && npm run campaign-sanity && npm run soak"
+  }
 }

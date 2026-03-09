@@ -8,11 +8,12 @@
    'r' (RELAY) now handles both roles — isRelay is a computed getter.
    ================================================================ */
 
-import { NodeType, LVL_STEP, TIER_REGEN, GAMEPLAY_RULES } from '../config/gameConfig.js';
+import { NodeType, LVL_STEP, GAMEPLAY_RULES } from '../config/gameConfig.js';
 import { computeEnergyLevel, computeNodeRadius } from '../math/simulationMath.js';
 import { bus } from '../core/EventBus.js';
+import { computeNodeDisplayRegenRate } from '../systems/EnergyBudget.js';
 
-const { energy: GAME_BALANCE, progression: PROGRESSION_RULES, world: WORLD_RULES } = GAMEPLAY_RULES;
+const { progression: PROGRESSION_RULES, world: WORLD_RULES } = GAMEPLAY_RULES;
 
 export class GameNode {
   constructor(id, x, y, energy, owner, type = NodeType.NORMAL) {
@@ -89,10 +90,8 @@ export class GameNode {
        Tentacles then drain their share explicitly, so feeder nodes can stay flat,
        grow slowly, or drain depending on outgoing commitment and clash pressure. */
     if (this.owner !== 0) {
-      const tierRegen = TIER_REGEN[this.level] ?? TIER_REGEN[0];
-      const boost     = (frenzyActive && this.owner === 1) ? GAME_BALANCE.FRENZY_REGEN_MULT : 1.0;
       if (this.energy < this.maxE) {
-        this.energy = Math.min(this.maxE, this.energy + tierRegen * boost * GAME_BALANCE.GLOBAL_REGEN_MULT * dt);
+        this.energy = Math.min(this.maxE, this.energy + computeNodeDisplayRegenRate(this, frenzyActive) * dt);
       }
     }
 
