@@ -1,300 +1,253 @@
-# NODE WARS
+# <div align="center">NODE WARS</div>
 
-> *The network is alive. Energy flows. Nodes evolve. Dominate the grid — or be consumed by it.*
+<div align="center">
 
-A browser-based real-time strategy game built entirely with **Vanilla JS ES Modules** and **HTML5 Canvas**. No framework. No bundler. No dependencies. Open `index.html` and play.
+**A fast, browser-based RTS about energy flow, living tentacles, infrastructure control, and surgical cuts.**
+
+<br />
+
+![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-ES_Modules-f7df1e?style=for-the-badge&logo=javascript&logoColor=111)
+![Canvas](https://img.shields.io/badge/HTML5-Canvas-e34f26?style=for-the-badge&logo=html5&logoColor=white)
+![No Build Step](https://img.shields.io/badge/Build-Step_Free-0f172a?style=for-the-badge)
+![Campaign](https://img.shields.io/badge/Campaign-33_Levels-0ea5e9?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
+
+</div>
 
 ---
 
-## Gameplay
+## Overview
 
-You control a network of **nodes** connected by **tentacles** that carry energy. Capture neutral nodes, evolve your cells, and crush the enemy before they overwhelm you.
+**NODE WARS** is a real-time strategy game built with **Vanilla JavaScript ES Modules**, **HTML5 Canvas**, and **Web Audio API**.
 
-### Core Mechanics
+You grow nodes, draw living tentacles, capture infrastructure, fight over relays and signals, route around hazards, and cut enemy links at the right moment.
 
-| Action | How |
+The current project state is:
+
+- fixed authored campaign
+- stabilized core mechanics
+- persistent local progress and settings
+- explicit `HIGH` / `LOW` graphics profiles
+- lightweight validation scripts for mechanics, campaign integrity, and long-run stability
+
+## Core Experience
+
+### What you do
+
+- expand from your starting cells
+- connect nodes with tentacles
+- drain, heal, capture, and pressure through those links
+- cut tentacles as a core tactic
+- control relays, pulsars, and signal towers
+- survive increasingly complex late-game maps
+
+### Input
+
+| Action | Control |
 |---|---|
-| **Select a node** | Click one of your nodes |
-| **Send tentacle** | Click a target (neutral or enemy) |
-| **Retract all** | Click your selected node again |
-| **Reverse flow** | Click a node already receiving your tentacle |
-| **Cut links** | Right-click drag across tentacles |
+| Select a node | `Left click` one of your nodes |
+| Connect / attack | `Click-click` or `drag-and-release` from your node to a target |
+| Retract outgoing tentacles | `Click` your selected node again |
+| Slice tentacles | `Right-click drag` across tentacles |
+| Mobile interaction | touch input is supported through the same gameplay paths |
 
-**Energy** flows through tentacles using a **zero-sum model**: a node's total energy budget is split among its active tentacles — the node does *not* self-regenerate while it is draining. Nodes evolve through 5 tiers as they accumulate energy, unlocking more outgoing tentacle slots and increasing damage output. A freshly captured node starts at tier 0 with minimum energy — protect it fast.
+### Slice Rules
 
-### Scoring
+Tentacle cuts depend on **where** the slice lands along the effective source-to-target path:
 
-Stars are awarded based on score at the moment of victory:
-
-| Stars | Score threshold |
+| Slice zone | Result |
 |---|---|
-| ⭐⭐⭐ | ≥ 700 |
-| ⭐⭐ | ≥ 430 |
-| ⭐ | ≥ 200 |
+| Near source | forward burst / kamikaze burst |
+| Middle | split cut |
+| Near target | defensive refund |
 
-Par time is shown per level. Beat it to maximize your score.
+This is the canonical rule used by both the player and the purple AI.
 
----
+## World Mechanics
 
-## Energy Physics — Zero-Sum Flow
+### World 1: Genesis
 
-NODE WARS uses the same **zero-sum energy model** as the original *Tentacle Wars*.
+- expansion fundamentals
+- growth and capture pressure
+- bunker-style neutral resistance
 
-### Tier Regeneration
+### World 2: The Void
 
-Each node regenerates at a fixed rate determined by its evolution tier. There is no randomness — tier is everything:
+- vortex hazards drain tentacles in their area
+- moving and pulsing hazards force route timing
+- the boss phase stacks hazard pressure and purple threat
 
-| Tier | Name       | Regen    | Tentacle slots | Polygon |
-|------|------------|----------|----------------|---------|
-| 0    | Spore      | 0.5 e/s  | 1              | circle  |
-| 1    | Embryo     | 1.0 e/s  | 2              | triangle|
-| 2    | Pulsar     | 1.5 e/s  | 3              | square  |
-| 3    | Gamma      | 2.0 e/s  | 4              | hexagon |
-| 4    | Solar      | 4.0 e/s  | 5              | octagon |
-| 5    | Dominator  | 8.0 e/s  | 5              | decagon |
+### World 3: Nexus Prime
 
-Tier 0 to Tier 5 is a **16× regen increase**. Evolving a node is the core strategic imperative.
+- **relays** amplify and forward flow, but do **not** create free energy
+- **pulsars** energize nearby **owned non-relay nodes**
+- **signal towers** temporarily reveal the map
+- late-game phases mix infrastructure, pressure, and purple aggression
 
-### Zero-Sum Rule
+## Current Gameplay Rules
 
-A node's tier regen is its **total energy budget** per second. That budget is redirected entirely into its active tentacles — the node stops self-regenerating while tentacles are draining it. With 2 tentacles active, each receives half the budget. With 3, each receives a third.
+The current implementation deliberately preserves these rules:
 
-This means:
-- Sending many tentacles from a weak node dilutes each one — spread too thin and nothing gets done.
-- Evolving a node before expanding is almost always the better play.
-- Cutting an enemy's tentacles restores their self-regen and slows their evolution.
-
-### Split Budget (Self vs. Tentacle)
-
-While a node has active tentacles, its tier regen is split between self-growth and tentacle feed. The split is controlled by `SELF_REGEN_FRAC` (default `0.3`):
-
-```
-Tier 0 node (0.5 e/s), 1 active tentacle, SELF_REGEN_FRAC = 0.3:
-  Node self-regen:  0.5 × 0.30 = 0.15 e/s  (source still grows, slowly)
-  Tentacle carries: 0.5 × 0.70 = 0.35 e/s  (sent to ally/neutral)
-  Total generated:  0.50 e/s  ← zero-sum preserved, no energy duplication
-```
-
-When idle (no active tentacles), the node keeps 100% of its regen.
-
-With `SELF_REGEN_FRAC = 0.0` the model is pure soma-zero — source frozen while feeding, exactly like original Tentacle Wars. The default `0.3` prevents low-tier nodes from stalling permanently after paying the build cost of a tentacle.
-
-### Bandwidth Cap
-
-Each tentacle has a hard bandwidth ceiling of `tier_regen × 1.1`. This cap is real and tight — a tier-0 tentacle can carry at most **0.55 e/s**, not the 10–35 e/s the game previously allowed. Higher-tier tentacles carry proportionally more.
-
----
-
-## Balancing (GAME_BALANCE)
-
-All physics pacing lives in a single object in `src/constants.js`:
-
-```js
-export const GAME_BALANCE = {
-  TIER_REGEN: [0.5, 1.0, 1.5, 2.0, 4.0, 8.0], // e/s per tier
-  EMBRYO_COST: 10,           // energy to capture a neutral cell
-
-  GLOBAL_REGEN_MULT:  1.0,   // scales ALL regeneration — raise to speed the whole game up
-  CAPTURE_SPEED_MULT: 4.0,   // how fast neutral cells are captured (4.0 ≈ 6s at tier 0)
-  ATTACK_DAMAGE_MULT: 1.0,   // scales combat damage — raise for more aggressive combat
-  TENTACLE_BANDWIDTH_TOLERANCE: 1.1, // tentacles can carry 10% above tier regen
-
-  SELF_REGEN_FRAC: 0.3,      // fraction of tier regen kept by source while feeding
-                             // 0.0 = pure soma-zero (source frozen), 0.3 = recommended
-};
-```
-
-To speed up the early game, raise `GLOBAL_REGEN_MULT`. To make captures feel snappier, raise `CAPTURE_SPEED_MULT`. To create a more defensive meta, lower `ATTACK_DAMAGE_MULT`. No other file needs touching.
-
----
-
-## Worlds
-
-The campaign spans **3 worlds** across **32 levels** (plus 3 tutorials).
-
-### World 1 — GENESIS
-*The origin cluster. Master flow, cuts, and node evolution.*
-
-10 levels of pure strategy. Learn to route energy, siege fortified bunker nodes, and survive the mirror boss **ECHO** — a symmetric layout where every move you make, the AI mirrors.
-
-### World 2 — THE VOID
-*Hazard vortexes drain tentacles that cross their shadow. Route wisely.*
-
-Purple vortex hazards bleed energy from any tentacle passing through their radius. Later levels feature **pulsing vortexes** (dormant then suddenly active) and **moving vortexes** that drift sinusoidally across the map. The boss, **OBLIVION**, fields a Super-Vortex with double radius and triple drain.
-
-### World 3 — NEXUS PRIME
-*Relay nodes amplify flow. Pulsars broadcast energy bursts — control them first.*
-
-**Relay nodes** act as amplifiers: capturing one boosts the flow rate of every tentacle passing through it. **Pulsar beacons** periodically broadcast energy bursts to all nearby player-owned nodes. **Signal Towers** grant 8 seconds of full-map fog-of-war reveal when captured. The final boss, **TRANSCENDENCE**, combines all three mechanics plus a map-wide Nexus Core pulsar.
-
-Worlds 2 and 3 are unlocked in **Settings**.
-
----
+- programmatic retract refunds `paidCost + energyInPipe`
+- relay nodes act as pass-through infrastructure, not energy sources
+- player and purple AI use the same shared slice / burst path
+- owner `3` is supported in both gameplay and rendering
+- late high-pressure authored phases give the player extra structural opening support where needed
 
 ## Features
 
-- **Zero dependencies** — pure ES Modules, no build step, runs from `file://`
-- **Procedural audio** — fully synthesized music and SFX via Web Audio API; no audio files
-- **4 adaptive soundtracks** — menu theme + one per world, each with distinct BPM and chord progression
-- **Fog of War** — enemy territory is hidden; Signal Towers reveal the full map temporarily
-- **AI personalities** — AI shifts between `expand`, `siege`, and `aggressive` strategies based on level progression
-- **Object pooling** — orbs and free-orbs reuse pooled objects to eliminate GC pressure
-- **High Graphics mode** — shadow and glow effects toggle for performance tuning
-- **Bilingual** — full Portuguese and English support, switchable at runtime
-- **Persistent progress** — completed levels, scores, and settings saved to `localStorage`
-- **4 UI fonts** — Orbitron, Share Tech Mono, Rajdhani, Exo 2, plus a text zoom slider
-
----
+- **No dependencies**
+  - pure browser-side ES modules
+- **Fixed campaign layouts**
+  - authored layouts for all shipped levels
+- **Persistent local save**
+  - progress and settings stored in `localStorage`
+- **Procedural audio**
+  - music and SFX generated with Web Audio
+- **Graphics profiles**
+  - `HIGH` and `LOW`
+- **Theme system**
+  - multiple UI themes that affect the whole presentation
+- **PT / EN localization**
+  - tutorial, menus, story, and gameplay text
+- **Built-in debug tooling**
+  - runtime state, render metrics, snapshot helpers
 
 ## Project Structure
 
-```
-nodewars-v2/
-├── index.html              # Entry point — all static DOM, zero JS inline
-├── styles/
-│   └── main.css            # All styling: HUD, screens, buttons, animations
-└── src/
-    ├── main.js             # Bootstrap: load state, wire DOM listeners, init game
-    ├── Game.js             # Game loop, input handling, level loading, update pipeline
-    ├── GameState.js        # Singleton STATE — persistent cross-cutting state
-    ├── EventBus.js         # Pub/sub bus for decoupled audio/UI event wiring
-    ├── constants.js        # Enums, GAME_BALANCE (pacing config), world data, all 32 level configs
-    ├── utils.js            # Pure math helpers (distance, bezier, build cost, etc.)
-    ├── storage.js          # Safe localStorage wrapper (falls back to in-memory)
-    ├── i18n.js             # PT/EN translation strings + applyLang()
-    │
-    ├── entities/
-    │   ├── GNode.js        # Grid node: owner, energy, level, type, fog state
-    │   ├── Tent.js         # Tentacle: state machine (growing→active→clashing→dead)
-    │   └── Orb.js          # Energy orb particles + OrbPool + FreeOrbPool
-    │
-    ├── systems/
-    │   ├── Physics.js      # Zero-sum energy flow, clash resolution, vortex/pulsar, fog, camera
-    │   ├── AI.js           # Enemy AI with personality-driven scoring weights
-    │   └── Tutorial.js     # Step-by-step tutorial overlay system
-    │
-    ├── renderer/
-    │   ├── Renderer.js     # Main render pass: clears, camera transform, delegates to sub-renderers
-    │   ├── NodeRenderer.js # Draws nodes (polygon, glow, energy bar, level pip)
-    │   ├── TentRenderer.js # Draws tentacles (bezier curves, clash fronts, flow orbs)
-    │   ├── HazardRenderer.js # Draws vortexes (W2) and pulsars (W3)
-    │   ├── BGRenderer.js   # Draws the animated background grid
-    │   └── UIRenderer.js   # Draws in-canvas UI (fog overlay, world banner)
-    │
-    ├── audio/
-    │   ├── Music.js        # Procedural music engine — 4 synthesized tracks
-    │   └── Audio.js        # SFX engine — procedural sound effects for every game event
-    │
-    └── ui/
-        ├── Screens.js      # Screen manager: showScr, fadeGo, buildWorldTabs, endLevel
-        ├── HUD.js          # In-game HUD updater (score counters, level label, hints)
-        └── IDS.js          # Central registry of all DOM element IDs
+```text
+src/
+  core/           runtime orchestration, state, persistence, event bus
+  config/         grouped gameplay config and campaign data
+  entities/       GameNode, Tent, TentCombat, Orb
+  input/          click, drag, slice, hover, preview helpers
+  systems/        AI, Physics, Tutorial, world orchestration
+  systems/world/  vortex, pulsar, visibility, auto-retract, camera
+  rendering/      canvas render pipeline and specialized renderers
+  ui/             HUD, screen controllers, screen composition helpers
+  audio/          procedural music and sound effects
+  math/           simulation math and geometry helpers
+  theme/          owner palette and UI theme color helpers
+  localization/   language strings and tutorial/story copy
+  levels/         fixed campaign layouts
 ```
 
-### Architecture at a Glance
+For a current architecture map, read [source-structure.md](docs/project/source-structure.md).
 
-```
-main.js
-  └── Game (game loop owner)
-        ├── Physics     (simulation — no rendering)
-        ├── AI          (reads game state, emits Tent actions)
-        ├── Tutorial    (reads game state, drives overlay)
-        ├── Renderer    (render pass delegator)
-        │     ├── NodeRenderer
-        │     ├── TentRenderer
-        │     ├── HazardRenderer
-        │     ├── BGRenderer
-        │     └── UIRenderer
-        └── EventBus    (audio wiring: game events → SFX/Music calls)
-```
+## Run Locally
 
-State lives in the `STATE` singleton (`GameState.js`). Everything imports it directly — no prop drilling, no context, no store library.
+### Option A
 
----
+Open `index.html` directly in a modern browser.
 
-## Running Locally
+### Option B
 
-No installation required.
+Serve the repository locally:
 
 ```bash
-# Option A — open directly (Chromium-based browsers support ES modules from file://)
-open index.html
-
-# Option B — local server (recommended for Firefox)
-npx serve .
-# or
 python3 -m http.server 8080
 ```
 
----
+Then open `http://localhost:8080`.
 
-## Level Configuration
+## Validation
 
-Every level is a plain object in `constants.js → LEVELS[]`. To design a level, add an entry:
+Run these after gameplay, campaign, UI/settings, persistence, or render changes:
 
-```js
-{
-  id:   33,          // unique id (continue from 32)
-  w:    3,           // world (1, 2, or 3)
-  name: 'MY LEVEL',  // display name
-
-  ec:    150,        // energy cap for all nodes in this level (80–200 across worlds)
-  nodes: 10,         // total node count (player + enemy + neutral)
-  ai:    2,          // number of AI-controlled enemy factions
-  aiE:   32,         // starting energy for each AI node
-  pE:    30,         // starting energy for the player node
-  aiMs:  4.5,        // AI action interval (seconds) — lower = faster AI
-  dm:    0.07,       // damage multiplier per node level
-  nr:    [20, 55],   // node radius range [min, max] in pixels
-  par:   120,        // par score for 3-star rating
-
-  // Optional flags:
-  hz:       2,       // number of vortex hazards (W2)
-  rl:       3,       // number of relay nodes (W3)
-  ps:       1,       // number of pulsar beacons (W3)
-  sig:      1,       // number of signal towers (W3)
-  bk:       2,       // N neutral nodes start as level-2 bunkers
-  bkrl:     1,       // N relay nodes start as fortresses
-  mvhz:     2,       // first N vortexes drift (sinusoidal movement)
-  pchz:     6,       // vortexes pulse on/off every N seconds
-  supervhz: true,    // last vortex is a super-vortex (2× radius, 3× drain)
-  superps:  true,    // first pulsar is the Nexus Core (map-wide broadcast)
-  sym:      true,    // symmetric mirrored layout (boss pattern)
-  tut:      true,    // marks this as a tutorial level
-}
+```bash
+node scripts/smoke-checks.mjs
+node scripts/campaign-sanity.mjs
+node scripts/simulation-soak.mjs
 ```
 
----
+What they cover:
+
+- core gameplay invariants
+- campaign integrity
+- long-run numeric stability
 
 ## Settings
 
-| Setting | Description |
-|---|---|
-| **World 2: The Void** | Unlocks W2 levels in the campaign |
-| **World 3: Nexus Prime** | Unlocks W3 levels in the campaign |
-| **Sound Effects** | Procedural audio feedback on game events |
-| **Music** | Adaptive procedural soundtrack |
-| **High Graphics** | Shadow and glow effects — disable on low-end devices |
-| **UI Font** | Cycle between Orbitron, Share Tech Mono, Rajdhani, Exo 2 |
-| **Text Size** | Scale the UI from 50% to 200% |
-| **Language** | Portuguese or English |
-| **Debug Mode** | Unlocks all levels, shows internal state panel |
+The game persists these locally:
 
----
+- progress
+- current level
+- active world tab
+- language
+- audio toggles
+- graphics mode
+- theme
+- font
+- text zoom
+- debug-related display preferences
 
-## Browser Compatibility
+## Documentation Map
 
-| Browser | Status |
-|---|---|
-| Chrome / Edge (108+) | Fully supported |
-| Firefox (110+) | Fully supported (requires local server) |
-| Safari (16+) | Supported |
-| Mobile Chrome / Safari | Supported (touch input fully mapped) |
+### Start here
 
-Web Audio API is required for music and SFX. The game runs silently if unavailable.
+- [AGENTS.md](AGENTS.md)
+- [stabilization-status.md](docs/project/stabilization-status.md)
+- [source-structure.md](docs/project/source-structure.md)
 
----
+### Mechanics
+
+- [energy-model.md](docs/implementation/energy-model.md)
+- [tentacle-lifecycle.md](docs/implementation/tentacle-lifecycle.md)
+- [capture-and-ownership.md](docs/implementation/capture-and-ownership.md)
+- [relay-mechanics.md](docs/implementation/relay-mechanics.md)
+- [shared-burst-mechanics.md](docs/implementation/shared-burst-mechanics.md)
+- [ai-relay-targeting.md](docs/implementation/ai-relay-targeting.md)
+
+### UX / Systems / Continuity
+
+- [ui-ux-visual-sweep.md](docs/implementation/ui-ux-visual-sweep.md)
+- [graphics-profiles.md](docs/implementation/graphics-profiles.md)
+- [local-persistence-guardrails.md](docs/implementation/local-persistence-guardrails.md)
+- [render-performance-instrumentation.md](docs/implementation/render-performance-instrumentation.md)
+- [content-alignment-review.md](docs/implementation/content-alignment-review.md)
+
+### Campaign / Balance
+
+- [campaign-balance-wave-a.md](docs/project/campaign-balance-wave-a.md)
+- [playtest-balance-plan.md](docs/project/playtest-balance-plan.md)
+- [priority-phase-balance-pass.md](docs/project/priority-phase-balance-pass.md)
+
+## Development Notes
+
+### Guardrails
+
+If you change:
+
+- gameplay rules
+- fixed campaign layouts
+- settings
+- tutorial
+- story
+- persistence
+- world mechanics
+
+you should also update the relevant validation scripts or documentation.
+
+### High-risk files
+
+- `src/entities/Tent.js`
+- `src/entities/TentCombat.js`
+- `src/core/Game.js`
+- `src/systems/WorldSystems.js`
+- `src/config/gameConfig.js`
+- `src/levels/FixedCampaignLayouts.js`
+
+## Roadmap
+
+The heavy stabilization phase is effectively complete.
+
+The highest-value next steps are:
+
+1. playtest the hardest authored phases
+2. continue campaign balance from evidence
+3. polish selectively
+4. only then begin the deeper Tentacle Wars fidelity wave
 
 ## License
 
-MIT — do whatever you want, just don't claim you built the procedural music engine.
+MIT.

@@ -5,10 +5,11 @@
    inline conditionals. Scoring weights are named constants.
    ================================================================ */
 
-import { MAX_SLOTS, NodeType, TentState } from '../constants.js';
-import { vd, bldC, domR, defR } from '../utils.js';
+import { GAMEPLAY_RULES, NodeType, TentState } from '../config/gameConfig.js';
+import { computeBuildCost, computeDistance } from '../math/simulationMath.js';
 import { Tent } from '../entities/Tent.js';
-import { bus } from '../EventBus.js';
+
+const { progression: PROGRESSION_RULES, ai: AI_RULES } = GAMEPLAY_RULES;
 
 /* ── AI PERSONALITY DEFINITIONS ── */
 const PERSONALITIES = {
@@ -55,7 +56,7 @@ function personalityFor(levelId, owner = 2) {
 export class AI {
   /**
    * @param {object} game  — Game instance
-   * @param {object} cfg   — Level config (aiMs, dm, id, …)
+   * @param {object} cfg   — Level config (aiThinkIntervalSeconds, distanceCostMultiplier, id, …)
    * @param {number} owner — Which owner this AI controls (2 = red, 3 = purple)
    */
   constructor(game, cfg, owner = 2) {
@@ -63,7 +64,7 @@ export class AI {
     this.cfg      = cfg;
     this.owner    = owner;
     this._timer   = 0;
-    this._interval= cfg.aiMs;
+    this._interval= cfg.aiThinkIntervalSeconds;
   }
 
   update(dt) {
@@ -72,88 +73,210 @@ export class AI {
     this._timer = 0;
 
     /* Adaptive speed: faster when player dominates, slower when AI winning */
-    const g   = this.game;
-    const pC  = g.nodes.filter(n => n.owner === 1).length;
-    const aiC = g.nodes.filter(n => n.owner === this.owner).length;
-    const playerAdv = (pC - aiC) / Math.max(1, g.nodes.length);
-    const speedMult = Math.max(0.45, Math.min(1.65, 1 - playerAdv * 0.5));
-    this._interval  = this.cfg.aiMs * speedMult * (0.76 + Math.random() * 0.48);
+    const game = this.game;
+    const playerNodeCount = game.nodes.filter(node => node.owner === 1).length;
+    const aiNodeCount = game.nodes.filter(node => node.owner === this.owner).length;
+    const playerAdvantage = (playerNodeCount - aiNodeCount) / Math.max(1, game.nodes.length);
+    const speedMult = Math.max(
+      AI_RULES.SPEED_MULT_MIN,
+      Math.min(AI_RULES.SPEED_MULT_MAX, 1 - playerAdvantage * AI_RULES.PLAYER_ADVANTAGE_SPEED_FACTOR)
+    );
+    const aiThinkIntervalSeconds = this.cfg.aiThinkIntervalSeconds;
+    this._interval = aiThinkIntervalSeconds * speedMult *
+      (AI_RULES.INTERVAL_JITTER_BASE + Math.random() * AI_RULES.INTERVAL_JITTER_RANGE);
 
     /* Purple AI checks strategic cuts every tick (independent of _think timer) */
-    if (this.owner === 3) this._checkStrategicCuts(g);
+    if (this.owner === 3) this._checkStrategicCuts(game);
 
     this._think();
   }
 
+  _buildRelayContext(targetNode) {
+    const game = this.game;
+    let centrality = 0;
+    let friendlyRouteValue = 0;
+    let playerRouteValue = 0;
+    let neutralRouteValue = 0;
+
+    for (const node of game.nodes) {
+      if (node === targetNode || node.type === NodeType.HAZARD) continue;
+      const distance = computeDistance(targetNode.x, targetNode.y, node.x, node.y);
+      const weight = Math.max(0, 1 - distance / AI_RULES.RELAY_CONTEXT_RADIUS_PX);
+      if (weight <= 0) continue;
+
+      /* Central relays are stronger because they can touch more nearby routes with
+         shorter, cheaper follow-up links. */
+      centrality += weight;
+
+      if (node.owner === this.owner && !node.isRelay) friendlyRouteValue += weight;
+      else if (node.owner === 1 && !node.isRelay) playerRouteValue += weight;
+      else if (node.owner === 0 && !node.isRelay) neutralRouteValue += weight;
+    }
+
+    let playerRelayLinks = 0;
+    let enemyPressure = 0;
+    for (const tentacle of game.tents) {
+      if (!tentacle.alive || (tentacle.state !== TentState.ACTIVE && tentacle.state !== TentState.ADVANCING)) continue;
+      if (tentacle.effectiveSourceNode === targetNode && tentacle.effectiveSourceNode.owner === 1) playerRelayLinks += 1;
+      if (tentacle.effectiveTargetNode === targetNode && tentacle.effectiveSourceNode.owner === 1) enemyPressure += 1;
+    }
+
+    return {
+      centrality,
+      friendlyRouteValue,
+      playerRouteValue,
+      neutralRouteValue,
+      playerRelayLinks,
+      enemyPressure,
+    };
+  }
+
+  _scoreRelayTarget(sourceNode, targetNode, proximityScore, isDefensive, personality, totalBuildCost) {
+    const relayContext = this._buildRelayContext(targetNode);
+    const playerContestProgress = targetNode.contest?.[1] || 0;
+    const ownContestProgress = targetNode.contest?.[this.owner] || 0;
+    const captureRequirement = Math.max(targetNode.captureThreshold || 20, targetNode.energy || 0);
+    const remainingEnergyAfterBuild = sourceNode.energy - totalBuildCost;
+
+    /* Relay scoring terms:
+       - centrality: nearby node density means the relay can shape more routes
+       - route value: friendly + neutral neighbors make the relay a launch point
+       - player influence: stealing or contesting player relay space is worth extra
+       - losing risk: avoid low-budget grabs into strong player coverage */
+    let score = 54 + proximityScore;
+    score += relayContext.centrality * 15;
+    score += relayContext.friendlyRouteValue * 7;
+    score += relayContext.neutralRouteValue * 5;
+    score += relayContext.playerRouteValue * (targetNode.owner === 1 ? 12 : 6);
+    score += relayContext.playerRelayLinks * 16;
+    score += playerContestProgress * 0.9;
+    score += ownContestProgress * 0.4;
+
+    if (targetNode.owner === 0) {
+      score += 18 + personality.expansionBonus;
+      score -= captureRequirement * 0.45;
+    } else if (targetNode.owner === 1) {
+      score += 26 + personality.attackBonus;
+      score -= targetNode.energy * 0.35;
+    } else if (targetNode.owner === this.owner) {
+      score = 12 + proximityScore + personality.siegeBonus + relayContext.playerRouteValue * 4;
+      if (targetNode.energy < captureRequirement * 0.4) score += 10;
+    }
+
+    const losingRisk =
+      relayContext.playerRouteValue * 10 +
+      relayContext.enemyPressure * 14 +
+      Math.max(0, captureRequirement - remainingEnergyAfterBuild) * 0.55 -
+      relayContext.friendlyRouteValue * 6;
+
+    score -= losingRisk;
+
+    if (remainingEnergyAfterBuild < captureRequirement * 0.45) score -= 24;
+    if (isDefensive) score *= targetNode.owner === this.owner ? 1.0 : personality.defensiveDampener;
+
+    return score;
+  }
+
+  _buildMoveScore(sourceNode, targetNode, proximityScore, isDefensive, personality, totalBuildCost) {
+    if (targetNode.isRelay) {
+      return this._scoreRelayTarget(sourceNode, targetNode, proximityScore, isDefensive, personality, totalBuildCost);
+    }
+
+    if (targetNode.owner === 0) {
+      const playerContestProgress = targetNode.contest?.[1] || 0;
+      let score = 72 + proximityScore + personality.expansionBonus - targetNode.energy * 0.2 - playerContestProgress * 1.8;
+      if (isDefensive) score *= personality.defensiveDampener;
+      return score;
+    }
+
+    if (targetNode.owner === 1) {
+      const energyAdvantage = sourceNode.energy - targetNode.energy;
+      const existingPressureBonus = this.game.tents.some(tentacle =>
+        tentacle.alive && tentacle.source.owner === this.owner && tentacle.target === targetNode
+      ) ? 18 : 0;
+      return (isDefensive ? 20 : 55) + energyAdvantage * 0.5 + proximityScore + existingPressureBonus + personality.attackBonus;
+    }
+
+    if (targetNode.owner === this.owner) {
+      if (targetNode.energy < targetNode.maxE * 0.5) return 22 + proximityScore + personality.siegeBonus;
+      if (isDefensive && targetNode.energy < targetNode.maxE * 0.4) return 55 + proximityScore;
+    }
+
+    return 0;
+  }
+
+  _createTentacleMove(sourceNode, targetNode, buildCost) {
+    const tentacle = new Tent(sourceNode, targetNode, buildCost);
+    tentacle.game = this.game;
+
+    /* Keep slot accounting consistent with the player path until the next
+       Physics.updateOutCounts() recomputes the frame-wide totals. */
+    sourceNode.outCount = (sourceNode.outCount || 0) + 1;
+
+    const opposingTentacle = this.game.tents.find(existingTentacle =>
+      existingTentacle.alive &&
+      existingTentacle.state === TentState.ACTIVE &&
+      existingTentacle.effectiveSourceNode === targetNode &&
+      existingTentacle.effectiveTargetNode === sourceNode
+    );
+    if (opposingTentacle) tentacle.activateImmediate();
+
+    this.game.tents.push(tentacle);
+  }
+
   _think() {
-    const g           = this.game;
-    const dm          = this.cfg.dm;
-    const defensive   = g.aiDefensive > 0;
-    const pers        = personalityFor(this.cfg.id || 0, this.owner);
-    const energyThresh= defensive ? 32 : pers.energyThreshold;
+    const game = this.game;
+    const distanceCostMultiplier = this.cfg.distanceCostMultiplier;
+    const isDefensive = game.aiDefensive > 0;
+    const personality = personalityFor(this.cfg.id || 0, this.owner);
+    const energyThreshold = isDefensive ? AI_RULES.DEFENSIVE_ENERGY_THRESHOLD : personality.energyThreshold;
 
     /* Eligible sources: AI-owned, non-relay, enough energy, has free slots */
-    const srcs = g.nodes.filter(n =>
-      n.owner === this.owner && !n.isRelay &&
-      n.energy > energyThresh &&
-      n.outCount < MAX_SLOTS[n.level]
+    const sourceNodes = game.nodes.filter(node =>
+      node.owner === this.owner && !node.isRelay &&
+      node.energy > energyThreshold &&
+      node.outCount < PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[node.level]
     );
-    if (!srcs.length) return;
+    if (!sourceNodes.length) return;
 
     const moves = [];
 
-    srcs.forEach(src => {
-      g.nodes.forEach(tgt => {
-        if (tgt === src || tgt.type === NodeType.HAZARD || tgt.isRelay) return;
+    sourceNodes.forEach(sourceNode => {
+      game.nodes.forEach(targetNode => {
+        if (targetNode === sourceNode || targetNode.type === NodeType.HAZARD) return;
         /* Skip if link already exists */
-        if (g.tents.some(t => t.alive && !t.reversed && t.source === src && t.target === tgt)) return;
+        if (game.tents.some(tentacle => tentacle.alive && !tentacle.reversed && tentacle.source === sourceNode && tentacle.target === targetNode)) return;
         /* Recheck slot */
-        if (src.outCount >= MAX_SLOTS[src.level]) return;
+        if (sourceNode.outCount >= PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[sourceNode.level]) return;
 
-        const d   = vd(src.x, src.y, tgt.x, tgt.y);
-        const tot = bldC(d) + d * dm;
-        if (src.energy < tot + 1) return;
+        const distance = computeDistance(sourceNode.x, sourceNode.y, targetNode.x, targetNode.y);
+        const totalBuildCost = computeBuildCost(distance) + distance * distanceCostMultiplier;
+        if (sourceNode.energy < totalBuildCost + 1) return;
 
-        const prox = 300 / (d + 60);
-        let sc = 0;
+        const proximityScore = 300 / (distance + 60);
+        const score = this._buildMoveScore(
+          sourceNode,
+          targetNode,
+          proximityScore,
+          isDefensive,
+          personality,
+          totalBuildCost,
+        );
 
-        if (tgt.owner === 0) {
-          const contest  = (tgt.contest?.[1]) || 0;
-          sc = 72 + prox + pers.expansionBonus - tgt.energy * 0.2 - contest * 1.8;
-          if (defensive) sc *= pers.defensiveDampener;
-
-        } else if (tgt.owner === 1) {
-          const energyAdv = src.energy - tgt.energy;
-          const underAtk  = g.tents.some(t => t.alive && t.source.owner === this.owner && t.target === tgt) ? 18 : 0;
-          sc = (defensive ? 20 : 55) + energyAdv * 0.5 + prox + underAtk + pers.attackBonus;
-
-        } else if (tgt.owner === this.owner) {
-          if (tgt.energy < tgt.maxE * 0.5) sc = 22 + prox + pers.siegeBonus;
-          if (defensive && tgt.energy < tgt.maxE * 0.4) sc = 55 + prox;
-        }
-
-        if (sc > 0) moves.push({ src, tgt, sc, cost: bldC(d) + d * dm });
+        if (score > 0) moves.push({ sourceNode, targetNode, score, buildCost: totalBuildCost });
       });
     });
 
     /* Pick top 2 non-conflicting moves */
-    moves.sort((a, b) => b.sc - a.sc);
-    const used = new Set();
+    moves.sort((leftMove, rightMove) => rightMove.score - leftMove.score);
+    const usedSourceIds = new Set();
     let picked = 0;
 
-    for (const m of moves) {
+    for (const move of moves) {
       if (picked >= 2) break;
-      if (used.has(m.src.id)) continue;
-      used.add(m.src.id);
-      const t = new Tent(m.src, m.tgt, m.cost);
-      t.game  = g;
-      /* If an active opposing tentacle already exists, skip growing — instant clash */
-      const opposing = g.tents.find(o =>
-        o.alive && o.state === TentState.ACTIVE &&
-        o.es === m.tgt && o.et === m.src
-      );
-      if (opposing) t.activateImmediate();
-      g.tents.push(t);
+      if (usedSourceIds.has(move.sourceNode.id)) continue;
+      usedSourceIds.add(move.sourceNode.id);
+      this._createTentacleMove(move.sourceNode, move.targetNode, move.buildCost);
       picked++;
     }
   }
@@ -162,51 +285,30 @@ export class AI {
    * Purple AI (owner 3) strategic cut mechanic.
    *
    * For each active purple tentacle targeting a player node, check whether
-   * the energy stored in the pipe (energyInPipe) is large enough to
-   * overwhelm the target. If so, simulate a cut near the target (cutRatio 0.85)
-   * to burst all pipe energy into the player node as damage — potentially
-   * capturing it in a single decisive move, just like a skilled player cut.
+   * the energy stored in the pipe (energyInPipe) is large enough to justify
+   * a decisive near-target cut. The actual damage / capture outcome is not
+   * computed here: it must go through the canonical tent slice path.
    *
    * Trigger condition: pipe holds ≥ 65% of target's current energy.
    * This prevents wasteful cuts; the purple AI only cuts when it's worth it.
    */
-  _checkStrategicCuts(g) {
-    g.tents.forEach(t => {
-      if (!t.alive || t.state !== TentState.ACTIVE) return;
+  _checkStrategicCuts(game) {
+    const strategicCutRatio = AI_RULES.STRATEGIC_CUT_RATIO;
 
-      const src = t.es, tgt = t.et;
-      if (src.owner !== 3 || tgt.owner !== 1) return;
+    game.tents.forEach(tentacle => {
+      if (!tentacle.alive || tentacle.state !== TentState.ACTIVE) return;
+
+      const sourceNode = tentacle.effectiveSourceNode;
+      const targetNode = tentacle.effectiveTargetNode;
+      if (sourceNode.owner !== 3 || targetNode.owner !== 1) return;
 
       /* Only cut when the pipe is charged enough to be decisive */
-      const pipe = t.energyInPipe || 0;
-      if (pipe < tgt.energy * 0.65) return;
+      const pipeEnergy = tentacle.energyInPipe || 0;
+      if (pipeEnergy < targetNode.energy * AI_RULES.STRATEGIC_CUT_PIPE_TARGET_RATIO) return;
 
-      /* Simulate cut at ratio 0.85 (near target): all pipe energy → target.
-         Formula mirrors Game.checkSlice() burst path (actualCut > 0.7). */
-      const dmg = pipe * 0.9 * domR(src.level) / defR(tgt.level);
-      tgt.energy    -= dmg;
-      tgt.underAttack = 1;
-
-      if (tgt.energy <= 0) {
-        const prevOwner = tgt.owner;
-        tgt.owner  = src.owner;
-        tgt.regen  = 0;
-        tgt.energy = Math.abs(tgt.energy) * 0.10;
-        tgt.cFlash = 1;
-        tgt.contest = null;
-        g.fogDirty  = true;
-        bus.emit('node:owner_change', tgt, prevOwner);
-        bus.emit('cell:lost', tgt);
-        /* Retract all tentacles that now point the wrong way */
-        g.tents.forEach(ot => {
-          if (!ot.alive) return;
-          if (ot.es === tgt && ot.et.owner !== src.owner) ot.kill();
-          if (ot.et === tgt && ot.es.owner !== tgt.owner) ot.kill();
-        });
-      }
-
-      /* Retract this tentacle — the burst is spent */
-      t.kill();
+      /* Canonical slice/burst entry point: reuse the same path as player cuts
+         so burst timing, clash handling, capture, and balance stay unified. */
+      tentacle.applySliceCut(strategicCutRatio);
     });
   }
 }

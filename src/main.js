@@ -9,17 +9,17 @@
      5. Reveal UI (fade out boot screen)
    ================================================================ */
 
-import { STATE }    from './GameState.js';
-import { T, setLang, applyLang, toggleLang, curLang } from './i18n.js';
+import { STATE }    from './core/GameState.js';
+import { T, setLang, applyLang, toggleLang, curLang } from './localization/i18n.js';
 import { Music }    from './audio/Music.js';
-import { Audio as SFX } from './audio/Audio.js';
-import { Game }     from './Game.js';
-import { IDS }      from './ui/IDS.js';
+import { SoundEffects as SFX } from './audio/SoundEffects.js';
+import { Game }     from './core/Game.js';
+import { DOM_IDS }  from './ui/DomIds.js';
 import {
   showScr, fadeGo, showToast, buildWorldTabs, buildStory, buildCredits,
   syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel,
-} from './ui/Screens.js';
-import { LEVELS } from './constants.js';
+} from './ui/ScreenController.js';
+import { LEVELS } from './config/gameConfig.js';
 
 function $id(id) { return document.getElementById(id); }
 
@@ -28,15 +28,16 @@ STATE.load();
 STATE.loadSettings();
 /* Apply persisted display settings immediately (before first render) */
 (function() {
-  const id = STATE.settings.fontId || 'orbitron';
+  const id = STATE.settings.fontId || 'exo2';
   document.documentElement.dataset.font = id;
   document.documentElement.style.setProperty('--ui-zoom', STATE.settings.textZoom ?? 1.0);
+  document.documentElement.dataset.theme = STATE.settings.theme || 'AURORA';
 })();
 
 let game;
 
 function initGame() {
-  const canvas = $id(IDS.CANVAS);
+  const canvas = $id(DOM_IDS.CANVAS);
   if (!canvas) { console.error('canvas element missing'); return; }
 
   /* Restore language */
@@ -69,8 +70,8 @@ function initGame() {
   document.addEventListener('keydown',    _startAudio, { once:true, passive:true });
 
   /* Reveal game after first paint */
-  const fade = $id(IDS.FADE);
-  const boot = $id(IDS.BOOTMSG);
+  const fade = $id(DOM_IDS.FADE);
+  const boot = $id(DOM_IDS.BOOTMSG);
   const reveal = () => {
     if (boot) boot.style.display = 'none';
     fade.classList.remove('in');
@@ -83,43 +84,49 @@ function initGame() {
 /* ── Wire all button listeners ── */
 function wireButtons() {
   /* Main menu */
-  $id(IDS.BTN_PLAY)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_PLAY)?.addEventListener('click', () => {
     Music.menuClick();
     fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); });
   });
-  $id(IDS.BTN_STORY)?.addEventListener('click', () => { buildStory(); fadeGo(() => showScr('story')); });
-  $id(IDS.BTN_SETTINGS)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_STORY)?.addEventListener('click', () => { buildStory(); fadeGo(() => showScr('story')); });
+  $id(DOM_IDS.BTN_SETTINGS)?.addEventListener('click', () => {
     Music.menuClick();
     refreshSettingsUI();
     refreshDisplayUI();
     if (STATE.settings.debug) updateDebugInfo();
     fadeGo(() => showScr('settings'));
   });
-  $id(IDS.BTN_CREDITS)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_CREDITS)?.addEventListener('click', () => {
     Music.menuClick();
     buildCredits();
     fadeGo(() => showScr('credits'));
   });
 
   /* Settings */
-  $id(IDS.BTN_SETTINGS_BACK)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_SETTINGS_BACK)?.addEventListener('click', () => {
     Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu'));
   });
-  $id(IDS.BTN_CREDITS_BACK)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_CREDITS_BACK)?.addEventListener('click', () => {
     Music.menuClick(); fadeGo(() => showScr('menu'));
   });
-  ['w2','w3','debug','sound','music'].forEach(key => {
+  ['w2','w3','debug','sound','music','showFps'].forEach(key => {
     const id  = 'tog' + key.charAt(0).toUpperCase() + key.slice(1);
     $id(id)?.addEventListener('click', () => toggleSetting(key));
   });
-  /* Explicit listener — bypasses the forEach so caching can't break it */
-  $id('togHighGraphics')?.addEventListener('click', () => toggleSetting('highGraphics'));
+  $id('togGraphicsMode')?.addEventListener('click', () => cycleGraphicsMode());
   $id('togTheme')?.addEventListener('click', () => {
-    STATE.settings.theme = STATE.settings.theme === 'LIGHT' ? 'DARK' : 'LIGHT';
-    STATE.saveSettings();
-    refreshSettingsUI();
+    cycleTheme();
   });
-  $id(IDS.BTN_RESET_PROG)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_COPY_DEBUG)?.addEventListener('click', async () => {
+    const snapshot = buildDebugSnapshot();
+    try {
+      await navigator.clipboard.writeText(snapshot);
+      showToast(curLang() === 'pt' ? 'Snapshot de debug copiado' : 'Debug snapshot copied');
+    } catch {
+      showToast(snapshot);
+    }
+  });
+  $id(DOM_IDS.BTN_RESET_PROG)?.addEventListener('click', () => {
     if (!confirm('Reset all progress?')) return;
     STATE.resetProgress();
     showToast('Progress reset');
@@ -127,53 +134,54 @@ function wireButtons() {
   });
 
   /* Story */
-  $id(IDS.BTN_STORY_BACK)?.addEventListener('click',  () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
-  $id(IDS.BTN_STORY_BACK2)?.addEventListener('click', () => fadeGo(() => showScr('menu')));
+  $id(DOM_IDS.BTN_STORY_BACK)?.addEventListener('click',  () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
+  $id(DOM_IDS.BTN_STORY_BACK2)?.addEventListener('click', () => fadeGo(() => showScr('menu')));
 
   /* Level select */
-  $id(IDS.BTN_BACK)?.addEventListener('click', () => { Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu')); });
+  $id(DOM_IDS.BTN_BACK)?.addEventListener('click', () => { Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu')); });
 
   /* Result */
-  $id(IDS.BTN_RL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
-  $id(IDS.BTN_RR)?.addEventListener('click', () => fadeGo(() => { showScr(null); game.loadLevel(STATE.curLvl); }));
-  $id(IDS.BTN_RN)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_RL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
+  $id(DOM_IDS.BTN_RR)?.addEventListener('click', () => fadeGo(() => { showScr(null); game.loadLevel(STATE.curLvl); }));
+  $id(DOM_IDS.BTN_RN)?.addEventListener('click', () => {
     if (STATE.curLvl < LEVELS.length - 1) {
-      STATE.curLvl++;
+      STATE.setCurrentLevel(STATE.curLvl + 1);
+      STATE.save();
       fadeGo(() => { showScr(null); game.loadLevel(STATE.curLvl); });
     }
   });
 
   /* Pause */
-  $id(IDS.BTN_RESUME)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_RESUME)?.addEventListener('click', () => {
     game.paused = false;
     showScr(null);
-    const w = game.cfg ? game.cfg.w || 1 : 1;
+    const w = game.cfg ? game.cfg.worldId || 1 : 1;
     if (w === 2) Music.playVoid();
     else if (w === 3) Music.playNexus();
     else Music.playGenesis();
   });
-  $id(IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
-  $id(IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); }));
-  $id(IDS.BTN_PSKIP)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
+  $id(DOM_IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); }));
+  $id(DOM_IDS.BTN_PSKIP)?.addEventListener('click', () => {
     if (STATE.curLvl < LEVELS.length - 1) {
       STATE.completed = Math.max(STATE.completed, STATE.curLvl);
+      STATE.setCurrentLevel(STATE.curLvl + 1);
       STATE.save();
-      STATE.curLvl++;
       fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); });
     } else showToast(T('alreadyFinal'));
   });
-  $id(IDS.BTN_PMENU)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_PMENU)?.addEventListener('click', () => {
     Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu'));
   });
 
   /* Language buttons (now in settings) */
-  $id(IDS.BTN_LANG_PT)?.addEventListener('click', () => setLang('pt'));
-  $id(IDS.BTN_LANG_EN)?.addEventListener('click', () => setLang('en'));
+  $id(DOM_IDS.BTN_LANG_PT)?.addEventListener('click', () => setLang('pt'));
+  $id(DOM_IDS.BTN_LANG_EN)?.addEventListener('click', () => setLang('en'));
 
   /* Font cycle */
-  $id(IDS.BTN_FONT_CYCLE)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_FONT_CYCLE)?.addEventListener('click', () => {
     const fonts = ['orbitron', 'techno', 'rajdhani', 'exo2'];
-    const idx   = fonts.indexOf(STATE.settings.fontId || 'orbitron');
+    const idx   = fonts.indexOf(STATE.settings.fontId || 'exo2');
     STATE.settings.fontId = fonts[(idx + 1) % fonts.length];
     STATE.saveSettings();
     applyFont();
@@ -187,11 +195,11 @@ function wireButtons() {
     return ZOOM_STEPS.reduce((best, v, i) =>
       Math.abs(v - cur) < Math.abs(ZOOM_STEPS[best] - cur) ? i : best, 0);
   }
-  $id(IDS.BTN_ZOOM_DEC)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_ZOOM_DEC)?.addEventListener('click', () => {
     STATE.settings.textZoom = ZOOM_STEPS[Math.max(0, _zoomIdx() - 1)];
     STATE.saveSettings(); applyZoom(); refreshDisplayUI();
   });
-  $id(IDS.BTN_ZOOM_INC)?.addEventListener('click', () => {
+  $id(DOM_IDS.BTN_ZOOM_INC)?.addEventListener('click', () => {
     STATE.settings.textZoom = ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, _zoomIdx() + 1)];
     STATE.saveSettings(); applyZoom(); refreshDisplayUI();
   });
@@ -212,10 +220,10 @@ function wireButtons() {
 function wireAudioBus() {
   const { bus } = (() => {
     /* Inline import — bus is a singleton, already constructed */
-    return import('./EventBus.js').then(m => ({ bus: m.bus }));
+    return import('./core/EventBus.js').then(m => ({ bus: m.bus }));
   })();
   /* Async wire after module resolves */
-  import('./EventBus.js').then(({ bus: b }) => {
+  import('./core/EventBus.js').then(({ bus: b }) => {
     b.on('node:levelup',       ()  => SFX.levelUp());
     b.on('node:capture',       ()  => SFX.capture());
     b.on('cell:killed_enemy',  ()  => SFX.killEnemy());
@@ -248,9 +256,11 @@ function toggleSetting(key) {
   refreshSettingsUI();
 
   if (key === 'debug') {
-    const row = $id(IDS.DEBUG_RESET_ROW);
-    const panel = $id(IDS.DEBUG_INFO_PANEL);
+    const row = $id(DOM_IDS.DEBUG_RESET_ROW);
+    const copyRow = $id(DOM_IDS.DEBUG_COPY_ROW);
+    const panel = $id(DOM_IDS.DEBUG_INFO_PANEL);
     if (row)  row.style.display  = STATE.settings.debug ? '' : 'none';
+    if (copyRow) copyRow.style.display = STATE.settings.debug ? '' : 'none';
     if (panel) panel.style.display = STATE.settings.debug ? '' : 'none';
     if (STATE.settings.debug) updateDebugInfo();
   }
@@ -271,6 +281,59 @@ function toggleSetting(key) {
   }
 }
 
+function cycleGraphicsMode() {
+  STATE.settings.graphicsMode = STATE.settings.graphicsMode === 'high' ? 'low' : 'high';
+  STATE.settings.highGraphics = STATE.settings.graphicsMode === 'high';
+  STATE.saveSettings();
+  refreshSettingsUI();
+  Music.menuClick();
+}
+
+const THEME_ORDER = ['AURORA', 'SOLAR', 'GLACIER'];
+
+function applyTheme() {
+  const theme = STATE.settings.theme || 'AURORA';
+  document.documentElement.dataset.theme = theme;
+}
+
+function cycleTheme() {
+  const currentTheme = STATE.settings.theme || 'AURORA';
+  const themeIndex = THEME_ORDER.indexOf(currentTheme);
+  STATE.settings.theme = THEME_ORDER[(themeIndex + 1 + THEME_ORDER.length) % THEME_ORDER.length];
+  STATE.saveSettings();
+  applyTheme();
+  refreshSettingsUI();
+  Music.menuClick();
+}
+
+function buildDebugSnapshot() {
+  const renderStats = game?.renderStats;
+  return [
+    `theme=${STATE.settings.theme}`,
+    `graphics=${STATE.settings.graphicsMode}`,
+    `font=${STATE.settings.fontId}`,
+    `zoom=${STATE.settings.textZoom}`,
+    `fps=${STATE.settings.showFps}`,
+    `lang=${STATE.curLang}`,
+    `completed=${STATE.completed}`,
+    `curLvl=${STATE.curLvl}`,
+    `sound=${STATE.settings.sound}`,
+    `music=${STATE.settings.music}`,
+    `debug=${STATE.settings.debug}`,
+    ...(renderStats ? [
+      `render_frame_ms=${renderStats.frameMs.toFixed(2)}`,
+      `render_avg_ms=${renderStats.avgFrameMs.toFixed(2)}`,
+      `render_nodes=${renderStats.nodeCount}`,
+      `render_tents=${renderStats.tentCount}`,
+      `render_hazards=${renderStats.hazardCount}`,
+      `render_pulsars=${renderStats.pulsarCount}`,
+      `render_orbs=${renderStats.orbCount}`,
+      `render_free_orbs=${renderStats.freeOrbCount}`,
+      `render_visual_events=${renderStats.visualEventCount}`,
+    ] : []),
+  ].join('\n');
+}
+
 /* ── Font / Zoom helpers ── */
 const FONT_LABELS = {
   orbitron: 'ORBITRON',
@@ -280,7 +343,7 @@ const FONT_LABELS = {
 };
 
 function applyFont() {
-  const id = STATE.settings.fontId || 'orbitron';
+  const id = STATE.settings.fontId || 'exo2';
   document.documentElement.dataset.font = id;
 }
 
@@ -290,9 +353,9 @@ function applyZoom() {
 }
 
 function refreshDisplayUI() {
-  const fontBtn = $id(IDS.BTN_FONT_CYCLE);
-  if (fontBtn) fontBtn.textContent = FONT_LABELS[STATE.settings.fontId || 'orbitron'] || 'ORBITRON';
-  const zoomEl = $id(IDS.ZOOM_DISPLAY);
+  const fontBtn = $id(DOM_IDS.BTN_FONT_CYCLE);
+  if (fontBtn) fontBtn.textContent = FONT_LABELS[STATE.settings.fontId || 'exo2'] || 'EXO 2';
+  const zoomEl = $id(DOM_IDS.ZOOM_DISPLAY);
   if (zoomEl) zoomEl.textContent = Math.round((STATE.settings.textZoom ?? 1.0) * 100) + '%';
 }
 

@@ -3,8 +3,11 @@
    Eliminates per-frame GC pressure from constant new Orb() allocation.
    ================================================================ */
 
-import { bezPt, clamp } from '../utils.js';
-import { CP, CE, ORB_IVB } from '../constants.js';
+import { clamp } from '../math/simulationMath.js';
+import { computeBezierPoint } from '../math/bezierGeometry.js';
+import { ORB_IVB } from '../config/gameConfig.js';
+import { ownerColor } from '../theme/ownerPalette.js';
+import { STATE } from '../core/GameState.js';
 
 /* ── ORB (tentacle energy particle) ── */
 
@@ -42,20 +45,23 @@ export class Orb {
     const src = tn.reversed ? tn.target : tn.source;
     const tgt = tn.reversed ? tn.source : tn.target;
     const cp  = tn.getCP();
-    const pos = bezPt(clamp(this.pos, 0, 1), src.x, src.y, cp.x, cp.y, tgt.x, tgt.y);
+    const pos = computeBezierPoint(clamp(this.pos, 0, 1), src.x, src.y, cp.x, cp.y, tgt.x, tgt.y);
     const lvl = src.level;
-    const col = src.owner === 1 ? CP[lvl] : CE[lvl];
+    const col = ownerColor(src.owner, lvl);
     const sz  = 2 + lvl * 0.32 + (this.rev ? 0.7 : 0);
 
-    const ramp  = Math.min(1, (tn.pipeAge || 0) / (tn.tt || 0.3));
+    const ramp  = Math.min(1, (tn.pipeAge || 0) / (tn.travelDuration || 0.3));
     const alpha = (this.rev ? 0.6 : 0.9) * Math.max(0.15, ramp);
+    const highGraphics = STATE.settings.graphicsMode === 'high';
 
     ctx.save();
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, sz, 0, Math.PI * 2);
     ctx.fillStyle   = col;
-    ctx.shadowColor = col;
-    ctx.shadowBlur  = 7;
+    if (highGraphics) {
+      ctx.shadowColor = col;
+      ctx.shadowBlur  = 7;
+    }
     ctx.globalAlpha = alpha;
     ctx.fill();
     ctx.restore();
@@ -141,10 +147,14 @@ export class FreeOrb {
 
   draw(ctx) {
     const a = Math.max(0, 1 - this.age / 0.8);
+    const highGraphics = STATE.settings.graphicsMode === 'high';
     ctx.save();
     ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
     ctx.fillStyle = this.col; ctx.globalAlpha = a * 0.9;
-    ctx.shadowColor = this.col; ctx.shadowBlur = 8;
+    if (highGraphics) {
+      ctx.shadowColor = this.col;
+      ctx.shadowBlur = 8;
+    }
     ctx.fill(); ctx.restore();
   }
 }
@@ -183,6 +193,8 @@ export class FreeOrbPool {
   reset() {
     while (this._active.length) this._pool.push(this._active.pop());
   }
+
+  get count() { return this._active.length; }
 }
 
 /* ── ORB SPAWNING LOGIC (used by Tent) ── */

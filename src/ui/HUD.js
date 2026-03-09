@@ -6,8 +6,9 @@
    querySelector overhead at 60 fps.
    ================================================================ */
 
-import { IDS } from './IDS.js';
-import { T }   from '../i18n.js';
+import { DOM_IDS } from './DomIds.js';
+import { T }   from '../localization/i18n.js';
+import { STATE } from '../core/GameState.js';
 
 function $(id) { return document.getElementById(id); }
 
@@ -21,95 +22,108 @@ export class HUD {
     this._sc   = '';
     this._lvl  = '';
     this._name = '';
+    this._fps  = '';
   }
 
   update(game) {
     /* Node counts */
-    const sp = game.nodes.filter(n => n.owner === 1).length;
-    const sn = game.nodes.filter(n => n.owner === 0).length;
-    const se = game.nodes.filter(n => n.owner === 2).length;
+    const playerNodeCount = game.nodes.filter(node => node.owner === 1).length;
+    const neutralNodeCount = game.nodes.filter(node => node.owner === 0).length;
+    const enemyNodeCount = game.nodes.filter(node => node.owner !== 0 && node.owner !== 1).length;
 
-    if (sp !== this._sp) { this._sp = sp; const el = $(IDS.SP); if (el) el.textContent = sp; }
-    if (sn !== this._sn) { this._sn = sn; const el = $(IDS.SN); if (el) el.textContent = sn; }
-    if (se !== this._se) { this._se = se; const el = $(IDS.SE); if (el) el.textContent = se; }
+    if (playerNodeCount !== this._sp) { this._sp = playerNodeCount; const el = $(DOM_IDS.SP); if (el) el.textContent = playerNodeCount; }
+    if (neutralNodeCount !== this._sn) { this._sn = neutralNodeCount; const el = $(DOM_IDS.SN); if (el) el.textContent = neutralNodeCount; }
+    if (enemyNodeCount !== this._se) { this._se = enemyNodeCount; const el = $(DOM_IDS.SE); if (el) el.textContent = enemyNodeCount; }
 
     /* Label translations */
-    const yo = document.querySelector('.hst.hp .lb');
-    if (yo) yo.textContent = T('you');
-    const no = document.querySelector('.hst.hn .lb');
-    if (no) no.textContent = T('neutral');
-    const eo = document.querySelector('.hst.he .lb');
-    if (eo) eo.textContent = T('enemy');
+    const playerLabel = document.querySelector('.hst.hp .lb');
+    if (playerLabel) playerLabel.textContent = T('you');
+    const neutralLabel = document.querySelector('.hst.hn .lb');
+    if (neutralLabel) neutralLabel.textContent = T('neutral');
+    const enemyLabel = document.querySelector('.hst.he .lb');
+    if (enemyLabel) enemyLabel.textContent = T('enemy');
 
     /* Par timer */
-    if (game.cfg && !game.cfg.tut && game.cfg.par) {
-      const t2  = Math.floor(game.scoreTime);
+    if (game.cfg && !game.cfg.isTutorial && game.cfg.par) {
+      const elapsedSeconds  = Math.floor(game.scoreTime);
       const par = game.cfg.par;
-      const diff= t2 - par;
-      const txt = diff <= 0 ? 'PAR ' + (-diff) + 's ▲' : 'PAR +' + diff + 's ▼';
-      if (txt !== this._par) {
-        this._par = txt;
-        const el  = $(IDS.HPAR);
+      const parDeltaSeconds = elapsedSeconds - par;
+      const parText = parDeltaSeconds <= 0 ? 'PAR ' + (-parDeltaSeconds) + 's ▲' : 'PAR +' + parDeltaSeconds + 's ▼';
+      if (parText !== this._par) {
+        this._par = parText;
+        const el  = $(DOM_IDS.HPAR);
         if (el) {
-          el.textContent = txt;
-          el.style.color = diff <= -10 ? '#00ff9d' : diff <= 0 ? '#00e5ff' : diff < 20 ? '#f5c518' : '#ff7090';
+          el.textContent = parText;
+          el.style.color = parDeltaSeconds <= -10 ? '#00ff9d' : parDeltaSeconds <= 0 ? '#00e5ff' : parDeltaSeconds < 20 ? '#f5c518' : '#ff7090';
         }
       }
     } else {
-      const el = $(IDS.HPAR);
+      const el = $(DOM_IDS.HPAR);
       if (el && this._par !== '') { this._par = ''; el.textContent = ''; }
     }
 
     /* Live score */
-    const hsc = $(IDS.HSCORE);
-    if (hsc && game.cfg && !game.cfg.tut && !game.done) {
-      const sc   = game.calcScore();
-      const st   = game._utils.starsFor(sc);
-      const sTxt = ['★','☆','☆'].map((_, i) => i < st ? '★' : '☆').join('') + ' ' + sc;
-      if (sTxt !== this._sc) {
-        this._sc          = sTxt;
-        hsc.style.display = '';
-        hsc.textContent   = sTxt;
+    const scoreElement = $(DOM_IDS.HSCORE);
+    if (scoreElement && game.cfg && !game.cfg.isTutorial && !game.done) {
+      const score = game.calcScore();
+      const starCount = game._utils.starsFor(score);
+      const scoreText = ['★','☆','☆'].map((_, i) => i < starCount ? '★' : '☆').join('') + ' ' + score;
+      if (scoreText !== this._sc) {
+        this._sc          = scoreText;
+        scoreElement.style.display = '';
+        scoreElement.textContent   = scoreText;
       }
-    } else if (hsc && hsc.style.display !== 'none') {
+    } else if (scoreElement && scoreElement.style.display !== 'none') {
       this._sc          = '';
-      hsc.style.display = 'none';
+      scoreElement.style.display = 'none';
+    }
+
+    const fpsEl = $(DOM_IDS.HFPS);
+    if (fpsEl) {
+      if (STATE.settings.showFps && game.fps > 0) {
+        const fpsText = `${Math.round(game.fps)} FPS`;
+        if (fpsText !== this._fps) {
+          this._fps = fpsText;
+          fpsEl.textContent = fpsText;
+        }
+        fpsEl.style.display = '';
+      } else if (fpsEl.style.display !== 'none') {
+        this._fps = '';
+        fpsEl.style.display = 'none';
+      }
     }
 
     /* Level label */
     if (game.cfg) {
-      const cfg = game.cfg;
-      const wLabel = cfg.w > 0 ? ' W' + cfg.w : '';
-      const lvlTxt = cfg.tut ? T('tutorial') : ('LVL ' + cfg.id + wLabel);
-      if (lvlTxt !== this._lvl) {
-        this._lvl = lvlTxt;
-        const el  = $(IDS.HLVL);
-        if (el) el.textContent = lvlTxt;
+      const levelConfig = game.cfg;
+      const worldLabel = levelConfig.worldId > 0 ? ' W' + levelConfig.worldId : '';
+      const levelText = levelConfig.isTutorial ? T('tutorial') : ('LVL ' + levelConfig.id + worldLabel);
+      if (levelText !== this._lvl) {
+        this._lvl = levelText;
+        const el  = $(DOM_IDS.HLVL);
+        if (el) el.textContent = levelText;
       }
-      if (cfg.name !== this._name) {
-        this._name = cfg.name;
-        const el   = $(IDS.HLN);
-        if (el) el.textContent = cfg.name;
+      if (levelConfig.name !== this._name) {
+        this._name = levelConfig.name;
+        const el   = $(DOM_IDS.HLN);
+        if (el) el.textContent = levelConfig.name;
       }
     }
   }
 
   /* Called once when a level loads, or language changes */
-  setLevel(cfg) {
+  setLevel(levelConfig) {
     this._sp = this._sn = this._se = -1;
-    this._par = this._sc = this._lvl = this._name = '';
+    this._par = this._sc = this._lvl = this._name = this._fps = '';
 
-    const hpause = $(IDS.HPAUSE);
-    if (hpause) hpause.style.display = cfg.tut ? 'none' : 'inline-flex';
+    const pauseButton = $(DOM_IDS.HPAUSE);
+    if (pauseButton) pauseButton.style.display = levelConfig.isTutorial ? 'none' : 'inline-flex';
   }
 
   setHints() {
-    const hh = $(IDS.HHINTS);
-    if (!hh) return;
-    const lang  = document.documentElement.lang || 'en';
-    const hints = lang === 'pt'
-      ? [['CLIQUE','selecionar → enviar'],['RE-CLIQUE NO NÓ','recolher todos'],['CLIQUE NO ALVO LIGADO','inverter fluxo'],['ARRASTAR DIR.','cortar links']]
-      : [['CLICK','select → link'],['RE-CLICK NODE','retract all'],['CLICK LINKED TARGET','reverse flow'],['R-DRAG','cut links']];
-    hh.innerHTML = hints.map(([b, t2]) => '<span><b>' + b + '</b> ' + t2 + '</span>').join('');
+    const hintsElement = $(DOM_IDS.HHINTS);
+    if (!hintsElement) return;
+    hintsElement.innerHTML = '';
+    hintsElement.style.display = 'none';
   }
 }

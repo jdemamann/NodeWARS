@@ -1,0 +1,658 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '..');
+
+const load = rel => import(path.join(ROOT, rel));
+
+async function testRelayNoFreeEnergy() {
+  const { NodeType, TentState } = await load('src/config/gameConfig.js');
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { Physics } = await load('src/systems/Physics.js');
+
+  const relay = new GameNode(0, 0, 0, 0, 1, NodeType.RELAY);
+  const target = new GameNode(1, 100, 0, 30, 1);
+  relay.maxE = 100;
+  target.maxE = 100;
+  relay.energy = 0;
+
+  const tent = new Tent(relay, target, 0);
+  const game = { nodes: [relay, target], tents: [tent], _frame: 0, fogDirty: false };
+  tent.game = game;
+  tent.state = TentState.ACTIVE;
+  tent.reachT = 1;
+  tent.pipeAge = tent.travelDuration;
+
+  Physics.updateOutCounts(game);
+  const beforeTarget = target.energy;
+
+  tent.update(0.5);
+
+  assert.equal(relay.tentFeedPerSec, 0, 'relay without upstream budget should have zero outgoing feed');
+  assert.equal(target.energy, beforeTarget, 'relay should not deliver energy without upstream budget');
+  assert.equal(relay.energy, 0, 'relay should not manufacture stored energy during output');
+}
+
+async function testProgrammaticRetractRefundsPayload() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+
+  const source = new GameNode(0, 0, 0, 50, 1);
+  const target = new GameNode(1, 100, 0, 20, 2);
+  source.maxE = 200;
+  target.maxE = 200;
+
+  const tent = new Tent(source, target, 40);
+  tent.state = TentState.ACTIVE;
+  tent.paidCost = 40;
+  tent.energyInPipe = 10;
+
+  const beforeEnergy = source.energy;
+  tent.kill();
+
+  assert.equal(source.energy, Math.min(source.maxE, beforeEnergy + 50), 'programmatic retract should refund build cost and in-transit payload');
+  assert.equal(tent.state, TentState.RETRACTING, 'programmatic retract should remain a visual retract');
+  assert.equal(tent.paidCost, 0, 'programmatic retract should clear refunded build payload from the tentacle');
+  assert.equal(tent.energyInPipe, 0, 'programmatic retract should clear refunded in-transit energy from the tentacle');
+}
+
+async function testSliceCutRulesStayCanonical() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+
+  const source = new GameNode(0, 0, 0, 30, 1);
+  const target = new GameNode(1, 100, 0, 20, 0);
+  source.maxE = 200;
+  target.maxE = 200;
+  target.captureThreshold = 999;
+
+  const refundTent = new Tent(source, target, 20);
+  refundTent.state = TentState.ACTIVE;
+  refundTent.paidCost = 20;
+  refundTent.energyInPipe = 10;
+  const sourceBeforeRefund = source.energy;
+  refundTent.kill(0.8);
+  assert.equal(source.energy, sourceBeforeRefund + 30, 'near-target cut should refund the full payload to the source');
+  assert.equal(refundTent.state, TentState.RETRACTING, 'near-target cut should visually retract');
+
+  const splitSource = new GameNode(2, 0, 0, 25, 1);
+  const splitTarget = new GameNode(3, 100, 0, 20, 0);
+  splitSource.maxE = 200;
+  splitTarget.maxE = 200;
+  splitTarget.captureThreshold = 999;
+  const splitTent = new Tent(splitSource, splitTarget, 20);
+  splitTent.state = TentState.ACTIVE;
+  splitTent.paidCost = 20;
+  splitTent.energyInPipe = 10;
+  splitTent.kill(0.5);
+  assert.equal(splitSource.energy, 40, 'middle cut should return the source share immediately');
+  assert.equal(splitTarget.contest[1], 15, 'middle cut should apply the remaining payload to the target immediately');
+  assert.equal(splitTent.state, TentState.RETRACTING, 'middle cut should retract the remaining body');
+
+  const burstSource = new GameNode(4, 0, 0, 25, 1);
+  const burstTarget = new GameNode(5, 100, 0, 20, 2);
+  burstSource.maxE = 200;
+  burstTarget.maxE = 200;
+  const burstTent = new Tent(burstSource, burstTarget, 20);
+  burstTent.state = TentState.ACTIVE;
+  burstTent.paidCost = 20;
+  burstTent.energyInPipe = 10;
+  const burstSourceBefore = burstSource.energy;
+  burstTent.kill(0.2);
+  assert.equal(burstSource.energy, burstSourceBefore, 'near-source burst should not refund energy immediately');
+  assert.equal(burstTent.state, TentState.BURSTING, 'near-source cut should enter the burst state');
+  assert.equal(burstTent._burstPayload, 30, 'near-source burst should preserve the full payload for delayed impact');
+}
+
+async function testMiddleCutReleasesClashInsteadOfDestroyingPartner() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+
+  const a = new GameNode(0, 0, 0, 40, 1);
+  const b = new GameNode(1, 100, 0, 40, 2);
+  a.maxE = 200;
+  b.maxE = 200;
+
+  const leftTent = new Tent(a, b, 20);
+  const rightTent = new Tent(b, a, 20);
+  leftTent.state = TentState.ACTIVE;
+  rightTent.state = TentState.ACTIVE;
+  leftTent.clashPartner = rightTent;
+  rightTent.clashPartner = leftTent;
+  leftTent.clashT = 0.4;
+  rightTent.clashT = 0.6;
+  leftTent.reachT = 1;
+  rightTent.reachT = 1;
+  leftTent.paidCost = 10;
+  leftTent.energyInPipe = 6;
+
+  leftTent.kill(0.5);
+
+  assert.equal(leftTent.state, TentState.RETRACTING, 'middle cut should retract the cut tentacle');
+  assert.equal(rightTent.state, TentState.ADVANCING, 'middle cut during clash should release the opposing tentacle to advance');
+  assert.equal(rightTent.clashPartner, null, 'released clash partner should no longer be linked');
+}
+
+async function testBuildCostTuningStaysPlayable() {
+  const { BUILD_RULES } = await load('src/config/gameConfig.js');
+  const { computeBuildCost } = await load('src/math/simulationMath.js');
+
+  assert.equal(BUILD_RULES.BASE_COST, 3, 'tentacle base build cost should stay on the lower tuned value');
+  assert.equal(BUILD_RULES.COST_PER_PIXEL, 0.028, 'tentacle per-pixel build cost should stay on the lower tuned value');
+  assert.ok(computeBuildCost(180) < 9, 'base build cost at 180px should stay below the old punitive threshold');
+  assert.ok(computeBuildCost(260) < 11, 'base build cost at 260px should stay within a playable early-game range before level surcharges');
+}
+
+async function testImmediateActivationTracksPaidCostCorrectly() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { computeBuildCost, computeDistance } = await load('src/math/simulationMath.js');
+
+  const source = new GameNode(0, 0, 0, 80, 1);
+  const target = new GameNode(1, 120, 0, 20, 2);
+  const distance = computeDistance(source.x, source.y, target.x, target.y);
+  const totalBuildCost = 40;
+  const tent = new Tent(source, target, totalBuildCost);
+
+  tent.activateImmediate();
+
+  assert.equal(tent.paidCost, computeBuildCost(distance), 'instant clash activation should only track the base connection cost as paid');
+  assert.ok(tent.paidCost < totalBuildCost, 'instant clash activation should not pretend the full ranged build cost was paid');
+}
+
+async function testGrowingTentacleCannotAdvanceWithoutBudget() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+
+  const source = new GameNode(0, 0, 0, 1, 1);
+  const target = new GameNode(1, 300, 0, 20, 0);
+  source.maxE = 200;
+  target.maxE = 200;
+
+  const tent = new Tent(source, target, 100);
+  tent.game = { tents: [tent], _frame: 0 };
+
+  tent.update(1);
+
+  assert.ok(tent.paidCost <= 1.000001, 'growing tentacle should not mark more build cost as paid than the source actually had');
+  assert.ok(tent.reachT <= 0.011, 'growing tentacle should not advance materially without available build budget');
+}
+
+async function testUnderAttackStillAllowsReducedOutput() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { computeNodeTentacleFeedRate } = await load('src/systems/EnergyBudget.js');
+
+  const node = new GameNode(0, 0, 0, 80, 1);
+  node.outCount = 2;
+  node.underAttack = 0.6;
+
+  assert.ok(computeNodeTentacleFeedRate(node) > 0, 'nodes under attack should keep a reduced outgoing budget instead of hard-stalling');
+}
+
+async function testVortexDrainsEffectiveSourceOnReversedTentacles() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+  const { WorldSystems } = await load('src/systems/WorldSystems.js');
+
+  const originalSource = new GameNode(0, 0, 0, 50, 1);
+  const originalTarget = new GameNode(1, 100, 0, 50, 1);
+  const tent = new Tent(originalSource, originalTarget, 0);
+  tent.state = TentState.ACTIVE;
+  tent.reachT = 1;
+  tent.pipeAge = tent.travelDuration;
+  tent.reversed = true;
+  tent.game = { _frame: 0 };
+
+  const game = {
+    time: 0,
+    hazards: [{ x: 50, y: 0, r: 80, phase: 0, drainRate: 10, _drainCd: 999, _warn: 0 }],
+    tents: [tent],
+  };
+
+  const beforeOriginalSource = originalSource.energy;
+  const beforeOriginalTarget = originalTarget.energy;
+  WorldSystems.updateVortex(game, 0.5);
+
+  assert.equal(originalSource.energy, beforeOriginalSource, 'reversed vortex drain should not debit the original source node');
+  assert.ok(originalTarget.energy < beforeOriginalTarget, 'reversed vortex drain should debit the effective source node');
+}
+
+async function testPulsarInjectsEnergyIntoOwnedNodes() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { WorldSystems } = await load('src/systems/WorldSystems.js');
+
+  const ownedNode = new GameNode(0, 20, 0, 20, 1);
+  ownedNode.maxE = 100;
+  const neutralNode = new GameNode(1, 25, 0, 20, 0);
+  neutralNode.maxE = 100;
+
+  const game = {
+    nodes: [ownedNode, neutralNode],
+    pulsars: [{ x: 0, y: 0, r: 100, timer: 0, interval: 4.5, strength: 22, pulse: 0, phase: 0, chargeTimer: 0, charging: false, isSuper: false }],
+  };
+
+  WorldSystems.updatePulsar(game, 0.1);
+
+  assert.ok(ownedNode.energy > 20, 'pulsar should inject energy into owned nodes in range');
+  assert.equal(neutralNode.energy, 20, 'pulsar should not inject energy into neutral nodes');
+}
+
+async function testAutoRetractKillsOutgoingEnemyTentacles() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+  const { WorldSystems } = await load('src/systems/WorldSystems.js');
+
+  const source = new GameNode(0, 0, 0, 10, 1);
+  const target = new GameNode(1, 100, 0, 20, 2);
+  const tent = new Tent(source, target, 0);
+  tent.state = TentState.ACTIVE;
+  tent.reachT = 1;
+  tent.pipeAge = tent.travelDuration;
+  source.autoRetract = true;
+
+  const game = {
+    nodes: [source, target],
+    tents: [tent],
+  };
+
+  WorldSystems.updateAutoRetract(game);
+
+  assert.equal(source.autoRetract, false, 'auto-retract flag should be consumed');
+  assert.equal(tent.state, TentState.RETRACTING, 'auto-retract should programmatically retract outgoing enemy tentacles');
+}
+
+async function testFixedCampaignLayoutsCoverAllLevels() {
+  const { LEVELS } = await load('src/config/gameConfig.js');
+  const { getFixedCampaignLayout } = await load('src/levels/FixedCampaignLayouts.js');
+
+  for (const level of LEVELS) {
+    const layout = getFixedCampaignLayout(level.id, 1000, 700);
+    assert.ok(layout, `level ${level.id} should have a fixed campaign layout`);
+    assert.equal(layout.nodes.length, level.nodes, `level ${level.id} fixed layout should match configured node count`);
+    if ((level.ai3 || 0) > 0) {
+      const purpleNodeCount = layout.nodes.filter(node => node.owner === 3).length;
+      assert.ok(purpleNodeCount > 0, `level ${level.id} should include at least one purple starting node when ai3 is enabled`);
+    }
+  }
+}
+
+async function testOwner3PaletteSelection() {
+  const { CE3 } = await load('src/config/gameConfig.js');
+  const { ownerColor, ownerPanelTheme, ownerRelayCoreColor } = await load('src/theme/ownerPalette.js');
+
+  assert.equal(ownerColor(3, 2), CE3[2], 'ownerColor should map owner 3 to the purple palette');
+  assert.match(ownerPanelTheme(3).border, /192,64,255/, 'owner 3 UI theme should use purple border tones');
+  assert.match(ownerRelayCoreColor(3), /192,64,255/, 'owner 3 relay core should use purple tones');
+}
+
+async function testAIRelayTargeting() {
+  const { NodeType } = await load('src/config/gameConfig.js');
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { AI } = await load('src/systems/AI.js');
+
+  const src = new GameNode(0, 0, 0, 90, 2);
+  const relay = new GameNode(1, 90, 0, 0, 0, NodeType.RELAY);
+  src.maxE = 120;
+  relay.captureThreshold = 20;
+
+  const game = { nodes: [src, relay], tents: [], aiDefensive: 0 };
+  const ai = new AI(game, { aiThinkIntervalSeconds: 1, distanceCostMultiplier: 0.01, id: 23 }, 2);
+
+  ai._think();
+
+  assert.ok(game.tents.some(t => t.target === relay), 'AI should be able to select a relay target');
+}
+
+async function testSharedBurstEntryPoint() {
+  const { TentState } = await load('src/config/gameConfig.js');
+  const { AI } = await load('src/systems/AI.js');
+
+  const ai = new AI(
+    { nodes: [], tents: [], aiDefensive: 0 },
+    { aiThinkIntervalSeconds: 1, distanceCostMultiplier: 0.01, id: 23 },
+    3,
+  );
+  let cutRatio = null;
+  const fakeTent = {
+    alive: true,
+    state: TentState.ACTIVE,
+    effectiveSourceNode: { owner: 3 },
+    effectiveTargetNode: { owner: 1, energy: 10 },
+    energyInPipe: 8,
+    applySliceCut(ratio) { cutRatio = ratio; },
+  };
+
+  ai._checkStrategicCuts({ tents: [fakeTent] });
+  assert.equal(cutRatio, 0.85, 'purple AI should invoke the canonical slice helper at the near-target cut ratio');
+
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const sliceSource = await fs.readFile(path.join(ROOT, 'src/input/SliceCutting.js'), 'utf8');
+  const sliceEffectsSource = await fs.readFile(path.join(ROOT, 'src/input/PlayerSliceEffects.js'), 'utf8');
+  assert.match(gameSource, /_applyPlayerSliceCut\(sliceCut\)/, 'player path should route slice hits through the canonical game-side slice applicator');
+  assert.match(gameSource, /applyPlayerSliceCut\(sliceCut,\s*\{/, 'player game-side applicator should delegate to the shared slice-effects helper');
+  assert.match(sliceEffectsSource, /sliceCut\.tentacle\.applySliceCut\(sliceCut\.effectiveCutRatio\)/, 'shared player slice-effects helper should call the canonical slice helper');
+  assert.match(sliceSource, /scanPlayerSliceCuts/, 'slice scan helper should own slice hit detection');
+}
+
+async function testOwnershipAndContestCanonicalization() {
+  const tentSource = await fs.readFile(path.join(ROOT, 'src/entities/Tent.js'), 'utf8');
+  const ownershipSource = await fs.readFile(path.join(ROOT, 'src/systems/Ownership.js'), 'utf8');
+
+  assert.match(tentSource, /applyOwnershipChange\(/, 'tent resolution should use the canonical ownership helper');
+  assert.doesNotMatch(tentSource, /const rival\s*=\s*s\.owner === 1 \? 2 : 1/, 'contest cancellation should no longer hard-code a single rival owner');
+  assert.match(ownershipSource, /retractInvalidTentaclesAfterOwnershipChange/, 'ownership helper should centralize invalid-link cleanup');
+}
+
+async function testRelayPlayerInteractionPaths() {
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const inputBindingSource = await fs.readFile(path.join(ROOT, 'src/input/GameInputBinding.js'), 'utf8');
+  const uiSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+
+  assert.doesNotMatch(gameSource, /!n\.isRelay && vdSq\(e\.offsetX - camX/, 'mouse hover path should not exclude relay nodes');
+  assert.doesNotMatch(gameSource, /!n\.isRelay && vdSq\(\s*tx - camX/, 'touch long-press path should not exclude relay nodes');
+  assert.doesNotMatch(uiSource, /if \(n\.isRelay\)\s*\{\s*game\.hoverNode = null/, 'relay info panel should no longer discard relay hover state');
+  assert.match(gameSource, /appendSlicePoint/, 'slice path update should import the appendSlicePoint helper');
+  assert.match(gameSource, /_beginMouseDragCandidate/, 'game should expose drag-to-connect input handlers');
+  assert.match(inputBindingSource, /_endMouseDrag/, 'mouse input binding should route left-button drag release through drag-to-connect');
+}
+
+async function testNeutralCaptureVisualUsesRealThresholds() {
+  const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
+  const uiSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+
+  assert.match(nodeRendererSource, /const captureThreshold = Math\.max\(1, n\.captureThreshold \|\| EMBRYO\)/, 'neutral capture ring should use the node capture threshold');
+  assert.doesNotMatch(nodeRendererSource, /const frac = \(sc \/ EMBRYO\) \* Math\.PI \* 2;/, 'neutral capture ring should no longer use the embryo baseline directly for all nodes');
+  assert.match(uiSource, /contest_leader/, 'neutral info panel should expose the current capture leader');
+}
+
+async function testTutorialCopyMatchesCurrentControlsAndRules() {
+  const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
+  const tutorialSource = await fs.readFile(path.join(ROOT, 'src/systems/Tutorial.js'), 'utf8');
+
+  assert.doesNotMatch(i18nSource, /recover most of the build cost/, 'english tutorial should not promise retract refunds');
+  assert.doesNotMatch(i18nSource, /maior parte do custo de construção/, 'portuguese tutorial should not promise retract refunds');
+  assert.doesNotMatch(i18nSource, /full \(250 energy\)/, 'english tutorial should not describe the removed fixed overflow threshold');
+  assert.doesNotMatch(i18nSource, /250 de energia/, 'portuguese tutorial should not describe the removed fixed overflow threshold');
+  assert.match(i18nSource, /drag from your cell and release on it/, 'english tutorial should teach drag-release tentacle creation');
+  assert.match(i18nSource, /arraste da sua célula e solte sobre ela/, 'portuguese tutorial should teach drag-release tentacle creation');
+  assert.match(i18nSource, /tutorialStepsWorld1/, 'tutorial copy should be grouped by explicit world keys');
+  assert.match(i18nSource, /export function getTutorialSteps\(/, 'i18n should expose an explicit tutorial step helper');
+  assert.match(tutorialSource, /getTutorialSteps\(STATE\.curLang, tutorialWorldId\)/, 'tutorial flow should consume the explicit tutorial helper');
+}
+
+async function testVisualPolishPathsStayPresent() {
+  const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
+  const hazardRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/HazardRenderer.js'), 'utf8');
+  const tutorialSource = await fs.readFile(path.join(ROOT, 'src/systems/Tutorial.js'), 'utf8');
+  const tentRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/TentRenderer.js'), 'utf8');
+
+  assert.match(nodeRendererSource, /'FLOW \+'/, 'relay nodes should advertise their flow-amplifier role');
+  assert.match(nodeRendererSource, /fillText\('REVEAL'/, 'owned signal nodes should advertise their reveal role');
+  assert.match(nodeRendererSource, /fillText\('CRIT'/, 'critical combat warning should exist for collapsing friendly nodes');
+  assert.match(nodeRendererSource, /const nucleusGradient = ctx\.createRadialGradient/, 'nodes should use a layered nucleus gradient');
+  assert.match(hazardRendererSource, /fillText\(charge > 0 \? 'CHARGING' : \(pulse > 0\.05 \? 'BURST' : 'READY'\)/, 'pulsars should expose readiness state text');
+  assert.match(tutorialSource, /cx: 'drag'/, 'tutorial ghost should demonstrate drag-release actions');
+  assert.match(tutorialSource, /cutTentacle/, 'tutorial ghost should support explicit cut-path guidance');
+  assert.match(tentRendererSource, /Outer membrane gives the tentacle a more organic silhouette/, 'tentacles should have an outer membrane layer');
+  assert.match(tentRendererSource, /Animated flow pulses make active tentacles feel pressurised instead of static/, 'tentacles should have animated flow pulses');
+}
+
+async function testGraphicsProfilesAreExplicitAndBackwardCompatible() {
+  const gameStateSource = await fs.readFile(path.join(ROOT, 'src/core/GameState.js'), 'utf8');
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+  const screensSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
+  const tentRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/TentRenderer.js'), 'utf8');
+  const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
+  const bgRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/BGRenderer.js'), 'utf8');
+  const hazardRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/HazardRenderer.js'), 'utf8');
+  const orbSource = await fs.readFile(path.join(ROOT, 'src/entities/Orb.js'), 'utf8');
+
+  assert.match(gameStateSource, /graphicsMode: 'low'/, 'settings should persist an explicit graphics profile');
+  assert.match(gameStateSource, /_normalizeGraphicsSettings\(/, 'game state should normalize old and new graphics settings');
+  assert.match(mainSource, /cycleGraphicsMode\(/, 'main settings flow should cycle between explicit graphics profiles');
+  assert.match(screensSource, /togGraphicsMode/, 'settings UI should expose the graphics mode toggle');
+  assert.match(indexSource, /id="togGraphicsMode"/, 'settings HTML should use the explicit graphics mode button');
+  assert.match(tentRendererSource, /const highGraphics = STATE\.settings\.graphicsMode === 'high'/, 'tent renderer should branch on the explicit graphics profile');
+  assert.match(nodeRendererSource, /const highGraphics = STATE\.settings\.graphicsMode === 'high'/, 'node renderer should branch on the explicit graphics profile');
+  assert.match(bgRendererSource, /const highGraphics = STATE\.settings\.graphicsMode === 'high'/, 'background renderer should branch on the explicit graphics profile');
+  assert.match(hazardRendererSource, /const highGraphics = STATE\.settings\.graphicsMode === 'high'/, 'hazard renderer should branch on the explicit graphics profile');
+  assert.match(orbSource, /const highGraphics = STATE\.settings\.graphicsMode === 'high'/, 'orb rendering should branch on the explicit graphics profile');
+}
+
+async function testHudAndPhaseFeedbackStayAligned() {
+  const rendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/Renderer.js'), 'utf8');
+  const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+  const hudSource = await fs.readFile(path.join(ROOT, 'src/ui/HUD.js'), 'utf8');
+  const screensSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const resultScreenViewSource = await fs.readFile(path.join(ROOT, 'src/ui/resultScreenView.js'), 'utf8');
+
+  assert.match(rendererSource, /UIRenderer\.drawPhaseStatus\(context, game, canvasWidth, canvasHeight\)/, 'renderer should draw the phase status overlay');
+  assert.match(uiRendererSource, /static drawPhaseStatus\(ctx, game, W, H\)/, 'UI renderer should expose the phase status overlay');
+  assert.match(hudSource, /node => node\.owner !== 0 && node\.owner !== 1/, 'HUD enemy count should include all hostile owners');
+  assert.match(hudSource, /hintsElement\.style\.display = 'none'/, 'HUD should keep the always-on control hint strip hidden');
+  assert.match(resultScreenViewSource, /levelConfig\.enemyCount \+ \(levelConfig\.purpleEnemyCount \|\| 0\)/, 'result screen should count both red and purple enemies');
+}
+
+async function testNeutralContestDoesNotArtificiallyStall() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+
+  const targetNode = new GameNode(0, 100, 0, 28, 0);
+  targetNode.captureThreshold = 88;
+  targetNode.maxE = 88;
+  targetNode.contest = { 1: 24, 2: 21 };
+
+  const playerSource = new GameNode(1, 0, 0, 60, 1);
+  const playerTent = new Tent(playerSource, targetNode, 0);
+
+  playerTent._cancelRivalContestProgress(targetNode, 1, 9);
+
+  assert.equal(targetNode.contest[1], 24, 'attacking owner progress should not be canceled by its own neutral contest pressure');
+  assert.ok(targetNode.contest[2] < 21, 'rival neutral contest progress should be reduced when the attacker keeps pushing');
+}
+
+async function testCanvasFeedbackEventsStayPresent() {
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const rendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/Renderer.js'), 'utf8');
+  const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+
+  assert.match(gameSource, /visualEvents = \[\]/, 'game should maintain a transient visual event queue');
+  assert.match(gameSource, /_bindVisualFeedbackEvents\(/, 'game should bind visual feedback events from the bus');
+  assert.match(gameSource, /phaseOutcome = 'win'/, 'game should mark a win outcome before the result screen');
+  assert.match(gameSource, /phaseOutcome = 'lose'/, 'game should mark a loss outcome before the result screen');
+  assert.match(rendererSource, /drawVisualEvents\(context, game\)/, 'renderer should draw transient capture and structure feedback');
+  assert.match(rendererSource, /drawPhaseOutcome\(context, game, canvasWidth, canvasHeight\)/, 'renderer should draw the pre-result phase outcome overlay');
+  assert.match(uiRendererSource, /static drawVisualEvents\(ctx, game\)/, 'UI renderer should expose transient visual event rendering');
+  assert.match(uiRendererSource, /static drawPhaseOutcome\(ctx, game, W, H\)/, 'UI renderer should expose phase outcome rendering');
+}
+
+async function testMenuAndDisplayControlsStayPresent() {
+  const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+  const screensSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const gameStateSource = await fs.readFile(path.join(ROOT, 'src/core/GameState.js'), 'utf8');
+  const hudSource = await fs.readFile(path.join(ROOT, 'src/ui/HUD.js'), 'utf8');
+  const cssSource = await fs.readFile(path.join(ROOT, 'styles/main.css'), 'utf8');
+  const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
+
+  assert.match(indexSource, /hero-logo/, 'main menu should include the custom logo structure');
+  assert.match(indexSource, /id="togShowFps"/, 'settings should expose the FPS toggle');
+  assert.match(indexSource, /id="btnCopyDebug"/, 'settings should expose the debug snapshot action');
+  assert.match(indexSource, /id="hfps"/, 'HUD should expose the FPS label');
+  assert.match(mainSource, /cycleTheme\(/, 'main settings flow should cycle themed UI variants');
+  assert.match(mainSource, /buildDebugSnapshot\(/, 'main settings flow should build a debug snapshot');
+  assert.match(screensSource, /showFps/, 'settings UI refresh should include the FPS toggle');
+  assert.match(gameStateSource, /showFps:\s+false/, 'game state should persist the FPS toggle');
+  assert.match(gameStateSource, /fontId:\s+'exo2'/, 'default font should favor the more legible preset');
+  assert.match(hudSource, /Math\.round\(game\.fps\)/, 'HUD should render the current FPS when enabled');
+  assert.match(cssSource, /html\[data-theme="AURORA"\]/, 'stylesheet should define the Aurora theme');
+  assert.match(cssSource, /html\[data-theme="SOLAR"\]/, 'stylesheet should define the Solar theme');
+  assert.match(cssSource, /html\[data-theme="GLACIER"\]/, 'stylesheet should define the Glacier theme');
+  assert.match(i18nSource, /setShowFps/, 'i18n should include the FPS setting labels');
+  assert.match(i18nSource, /setCopyDebug/, 'i18n should include the debug snapshot labels');
+}
+
+async function testRenderPerformanceInstrumentationStaysPresent() {
+  const rendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/Renderer.js'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const screenControllerSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+
+  assert.match(rendererSource, /const renderStartTime = performance\.now\(\)/, 'renderer should measure frame render cost');
+  assert.match(rendererSource, /game\.renderStats = \{/, 'renderer should publish render stats to the game state');
+  assert.match(gameSource, /this\.renderStats = \{/, 'game should initialize render stats storage');
+  assert.match(screenControllerSource, /render_ms:/, 'debug panel should expose render timing metrics');
+  assert.match(mainSource, /render_avg_ms=/, 'debug snapshot should include render timing metrics');
+}
+
+async function testAudioEventDensityProtectionStaysPresent() {
+  const soundEffectsSource = await fs.readFile(path.join(ROOT, 'src/audio/SoundEffects.js'), 'utf8');
+
+  assert.match(soundEffectsSource, /const SOUND_EVENT_COOLDOWNS_MS = \{/, 'sound effects should declare explicit high-density event cooldowns');
+  assert.match(soundEffectsSource, /function playWithCooldown\(eventKey, playback\)/, 'sound effects should route dense events through a cooldown helper');
+  assert.match(soundEffectsSource, /hazardDrain:\s*180/, 'hazard drain should keep a short cooldown to avoid spam');
+  assert.match(soundEffectsSource, /pulsarFire:\s*320/, 'pulsar fire should keep a short cooldown to avoid stacked pulses');
+  assert.match(soundEffectsSource, /clash:\s*\(\) => playWithCooldown\('clash'/, 'clash audio should be cooldown-gated');
+}
+
+async function testOwnerPaletteStaysCanonicalInNodeRendering() {
+  const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
+
+  assert.match(nodeRendererSource, /import \{ ownerColor, ownerRelayCoreColor \} from '\.\.\/theme\/ownerPalette\.js'/, 'node renderer should use the shared owner palette helpers');
+  assert.doesNotMatch(nodeRendererSource, /const CP\s+= \[/, 'node renderer should not keep its own player palette array');
+  assert.doesNotMatch(nodeRendererSource, /const CE\s+= \[/, 'node renderer should not keep its own enemy palette array');
+  assert.match(nodeRendererSource, /return ownerColor\(n\.owner, n\.level, '#5a6878'\)/, 'node renderer should resolve node colors through ownerColor');
+}
+
+async function testSettingsTutorialAndStoryStayInSync() {
+  const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
+  const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
+  const screenControllerSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+
+  const requiredSettingsKeys = [
+    'setGraphicsMode', 'setGraphicsModeDesc', 'setShowFps', 'setShowFpsDesc',
+    'setTheme', 'setThemeDesc', 'setFont', 'setFontDesc', 'setZoom', 'setZoomDesc',
+    'setLang', 'setLangDesc', 'setDebug', 'setDebugDesc', 'setCopyDebug', 'setCopyDebugDesc',
+    'setReset', 'setResetDesc',
+  ];
+
+  for (const key of requiredSettingsKeys) {
+    assert.match(indexSource, new RegExp(`data-t="${key}"`), `settings screen should reference ${key}`);
+    assert.match(i18nSource, new RegExp(`${key}:`), `i18n should define ${key}`);
+  }
+
+  assert.match(i18nSource, /tutorialStepsWorld1:/, 'i18n should keep world 1 tutorial steps');
+  assert.match(i18nSource, /tutorialStepsWorld2:/, 'i18n should keep world 2 tutorial steps');
+  assert.match(i18nSource, /tutorialStepsWorld3:/, 'i18n should keep world 3 tutorial steps');
+  assert.match(i18nSource, /returns the invested energy to the source cell/, 'world 1 tutorial should describe retract refunds');
+  assert.match(i18nSource, /owned non-relay cells within its radius/, 'world 3 tutorial/story should describe the real pulsar rule in English');
+  assert.match(i18nSource, /células próprias que não sejam retransmissores dentro do raio/, 'world 3 tutorial/story should describe the real pulsar rule in Portuguese');
+
+  assert.match(screenControllerSource, /story-strip/, 'story screen should keep lightweight visual chapter navigation');
+  assert.match(screenControllerSource, /stchap-card/, 'story screen should keep chapter cards');
+  assert.match(screenControllerSource, /ESSENTIAL INFORMATION|INFORMAÇÃO ESSENCIAL/, 'credits should stay concise and relevant');
+}
+
+async function testProgressAndSettingsPersistenceGuardrailsStayPresent() {
+  const { STATE } = await load('src/core/GameState.js');
+  const { store } = await load('src/core/storage.js');
+
+  const originalCurrentLevel = STATE.curLvl;
+  const originalActiveWorldTab = STATE.getActiveWorldTab();
+  const originalSettings = structuredClone(STATE.settings);
+
+  STATE.setCurrentLevel(7);
+  STATE.setActiveWorldTab(3);
+  STATE.save();
+
+  assert.equal(store.get('nw_curLvl'), 7, 'progress save should persist the current level id');
+  assert.equal(store.get('nw_activeWorldTab'), 3, 'progress save should persist the active world tab');
+
+  STATE.settings.graphicsMode = 'broken';
+  STATE.settings.highGraphics = true;
+  STATE.settings.theme = 'INVALID_THEME';
+  STATE.settings.fontId = 'INVALID_FONT';
+  STATE.settings.textZoom = 99;
+  STATE.saveSettings();
+
+  const persistedSettings = JSON.parse(store.get('nw_settings'));
+  assert.equal(persistedSettings.graphicsMode, 'high', 'settings save should normalize legacy/invalid graphics mode values');
+  assert.equal(persistedSettings.theme, 'AURORA', 'settings save should fall back to a valid theme');
+  assert.equal(persistedSettings.fontId, 'exo2', 'settings save should fall back to a valid font');
+  assert.equal(persistedSettings.textZoom, 2, 'settings save should clamp text zoom into the supported range');
+
+  STATE.settings = originalSettings;
+  STATE.setCurrentLevel(originalCurrentLevel);
+  STATE.setActiveWorldTab(originalActiveWorldTab);
+  STATE.save();
+}
+
+async function testLevelZeroNodesStayRenderable() {
+  const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
+  const rendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/Renderer.js'), 'utf8');
+
+  assert.match(nodeRendererSource, /function drawNodeHull\(ctx, x, y, radius, sides, angle\)/, 'node renderer should keep a dedicated hull helper');
+  assert.match(nodeRendererSource, /if \(!sides \|\| sides < 3\) \{[\s\S]*ctx\.arc\(x, y, radius, 0, Math\.PI \* 2\)/, 'level 0 nodes should fall back to circle rendering');
+  assert.match(rendererSource, /import \{ STATE \}\s+from '\.\.\/core\/GameState\.js'/, 'renderer should import STATE before reading graphics mode in render stats');
+}
+
+async function main() {
+  const tests = [
+    ['relay nodes do not create free energy', testRelayNoFreeEnergy],
+    ['programmatic retract refunds payload', testProgrammaticRetractRefundsPayload],
+    ['slice cut rules stay canonical', testSliceCutRulesStayCanonical],
+    ['middle cut releases clash instead of destroying the partner', testMiddleCutReleasesClashInsteadOfDestroyingPartner],
+    ['instant activation only tracks actually paid build cost', testImmediateActivationTracksPaidCostCorrectly],
+    ['growing tentacles cannot advance without source budget', testGrowingTentacleCannotAdvanceWithoutBudget],
+    ['build cost tuning stays playable', testBuildCostTuningStaysPlayable],
+    ['neutral contest does not artificially stall', testNeutralContestDoesNotArtificiallyStall],
+    ['nodes under attack keep reduced outgoing flow', testUnderAttackStillAllowsReducedOutput],
+    ['vortex drain uses the effective source on reversed tentacles', testVortexDrainsEffectiveSourceOnReversedTentacles],
+    ['pulsar injects energy into owned nodes only', testPulsarInjectsEnergyIntoOwnedNodes],
+    ['auto-retract kills outgoing enemy tentacles', testAutoRetractKillsOutgoingEnemyTentacles],
+    ['fixed campaign layouts cover all configured levels', testFixedCampaignLayoutsCoverAllLevels],
+    ['owner-3 palette selection is correct', testOwner3PaletteSelection],
+    ['AI can evaluate relays as targets', testAIRelayTargeting],
+    ['shared burst mechanic is used by both player and AI paths', testSharedBurstEntryPoint],
+    ['ownership and contest logic use canonical shared paths', testOwnershipAndContestCanonicalization],
+    ['player relay interaction paths stay enabled', testRelayPlayerInteractionPaths],
+    ['neutral capture visuals use real thresholds and show a leader', testNeutralCaptureVisualUsesRealThresholds],
+    ['tutorial copy matches current controls and rules', testTutorialCopyMatchesCurrentControlsAndRules],
+    ['visual polish paths for world 3, tutorial ghost, and critical combat stay present', testVisualPolishPathsStayPresent],
+    ['graphics profiles are explicit and backward compatible', testGraphicsProfilesAreExplicitAndBackwardCompatible],
+    ['HUD and phase feedback stay aligned with current gameplay', testHudAndPhaseFeedbackStayAligned],
+    ['canvas feedback events for capture and phase outcome stay present', testCanvasFeedbackEventsStayPresent],
+    ['menu display controls, themes, and debug helpers stay present', testMenuAndDisplayControlsStayPresent],
+    ['render performance instrumentation stays present', testRenderPerformanceInstrumentationStaysPresent],
+    ['audio event density protection stays present', testAudioEventDensityProtectionStaysPresent],
+    ['owner palette stays canonical in node rendering', testOwnerPaletteStaysCanonicalInNodeRendering],
+    ['settings, tutorial, and story content stay in sync', testSettingsTutorialAndStoryStayInSync],
+    ['progress and settings persistence guardrails stay present', testProgressAndSettingsPersistenceGuardrailsStayPresent],
+    ['level 0 nodes stay renderable', testLevelZeroNodesStayRenderable],
+  ];
+
+  let passed = 0;
+  for (const [name, fn] of tests) {
+    await fn();
+    passed += 1;
+    console.log(`PASS ${name}`);
+  }
+  console.log(`\n${passed}/${tests.length} smoke checks passed`);
+}
+
+main().catch(err => {
+  console.error('Smoke checks failed');
+  console.error(err);
+  process.exitCode = 1;
+});

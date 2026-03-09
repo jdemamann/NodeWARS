@@ -3,12 +3,14 @@
    Handles tutorial step logic, ghost-cursor drawing, and UI.
    ================================================================ */
 
-import { LANG, T } from '../i18n.js';
-import { STATE } from '../GameState.js';
-import { bezPt } from '../utils.js';
-import { NodeType, TentState } from '../constants.js';
-import { IDS } from '../ui/IDS.js';
-import { fadeGo, showScr } from '../ui/Screens.js';
+import { getTutorialSteps, T } from '../localization/i18n.js';
+import { STATE } from '../core/GameState.js';
+import { computeBezierPoint } from '../math/bezierGeometry.js';
+import { GAMEPLAY_RULES, NodeType, TentState } from '../config/gameConfig.js';
+import { DOM_IDS } from '../ui/DomIds.js';
+import { fadeGo, showScr } from '../ui/ScreenController.js';
+
+const { render: RENDER_RULES } = GAMEPLAY_RULES;
 
 export class Tutorial {
   constructor(game) {
@@ -28,8 +30,8 @@ export class Tutorial {
   }
 
   get steps() {
-    const w = this.game.cfg?.tutW || 1;
-    return LANG[STATE.curLang]['tut' + (w > 1 ? w : '')] || LANG[STATE.curLang].tut;
+    const tutorialWorldId = this.game.cfg?.tutorialWorldId || 1;
+    return getTutorialSteps(STATE.curLang, tutorialWorldId);
   }
 
   get cur() { return this.steps[this.step]; }
@@ -76,10 +78,10 @@ export class Tutorial {
   }
 
   _revealNext() {
-    const btn = document.getElementById(IDS.TUT_NEXT);
+    const btn = document.getElementById(DOM_IDS.TUT_NEXT);
     if (!btn) return;
     const isLast = this.step >= this.steps.length - 1;
-    const tw = this.game.cfg?.tutW || 1;
+    const tw = this.game.cfg?.tutorialWorldId || 1;
     btn.textContent = isLast
       ? (tw > 1 ? T('startWorld' + tw) || T('startCampaign') : T('startCampaign'))
       : 'NEXT →';
@@ -90,13 +92,13 @@ export class Tutorial {
     const s = this.cur; if (!s) return;
     if (s.action === 'read' || s.action === 'done') this.actionDone = true;
 
-    const tw = this.game.cfg?.tutW || 1;
+    const tw = this.game.cfg?.tutorialWorldId || 1;
     const tc = ({ 1:'#00ff9d', 2:'#c040ff', 3:'#ff9020' })[tw] || '#00ff9d';
 
-    const titleEl = document.getElementById(IDS.TUT_TITLE);
+    const titleEl = document.getElementById(DOM_IDS.TUT_TITLE);
     if (titleEl) { titleEl.textContent = s.title; titleEl.style.color = tc; }
 
-    const badgeEl = document.getElementById(IDS.TUT_BADGE);
+    const badgeEl = document.getElementById(DOM_IDS.TUT_BADGE);
     if (badgeEl) {
       const wn = { 1:'WORLD 1: GENESIS', 2:'WORLD 2: THE VOID', 3:'WORLD 3: NEXUS PRIME' }[tw];
       badgeEl.textContent = wn || '';
@@ -104,18 +106,18 @@ export class Tutorial {
       badgeEl.style.display = tw > 1 ? 'block' : 'none';
     }
 
-    const textEl = document.getElementById(IDS.TUT_TEXT);
+    const textEl = document.getElementById(DOM_IDS.TUT_TEXT);
     if (textEl) textEl.innerHTML = s.text;
 
     /* Step dots */
-    const dotsEl = document.getElementById(IDS.TUT_STEPS);
+    const dotsEl = document.getElementById(DOM_IDS.TUT_STEPS);
     if (dotsEl) {
       dotsEl.innerHTML = this.steps.map((_, i) =>
         `<div class="tstep${i < this.step ? ' done' : i === this.step ? ' on' : ''}"></div>`
       ).join('');
     }
 
-    const btn = document.getElementById(IDS.TUT_NEXT);
+    const btn = document.getElementById(DOM_IDS.TUT_NEXT);
     if (btn) {
       const isLast = this.step >= this.steps.length - 1;
       if (isLast) {
@@ -129,7 +131,7 @@ export class Tutorial {
       }
     }
 
-    const box = document.getElementById(IDS.TUTBOX);
+    const box = document.getElementById(DOM_IDS.TUTBOX);
     if (box) box.style.display = 'block';
   }
 
@@ -138,14 +140,14 @@ export class Tutorial {
     if (!this.actionDone && s?.action !== 'read' && s?.action !== 'done') return;
     this.step++;
     if (this.step >= this.steps.length) {
-      const box = document.getElementById(IDS.TUTBOX);
+      const box = document.getElementById(DOM_IDS.TUTBOX);
       if (box) box.style.display = 'none';
       this.done = true;
-      const tw      = this.game.cfg?.tutW || 1;
+      const tw      = this.game.cfg?.tutorialWorldId || 1;
       const nextLvl = { 1:1, 2:12, 3:23 }[tw] || 1;
       /* Mark tutorial completed and unlock the corresponding world */
       STATE.completed = Math.max(STATE.completed, tw === 1 ? 0 : tw === 2 ? 11 : 22);
-      STATE.curLvl    = nextLvl;
+      STATE.setCurrentLevel(nextLvl);
       STATE.save();
       fadeGo(() => { showScr(null); this.game.loadLevel(nextLvl); });
       return;
@@ -170,20 +172,20 @@ export class Tutorial {
 
     switch (s.action) {
       case 'select':   return { node: pNode,   r: pNode.radius + 16,   label: s.hint, cx: 'click' };
-      case 'tentacle': return neutral ? { node: neutral, r: neutral.radius + 16, label: s.hint, cx: 'click' } : null;
+      case 'tentacle': return neutral ? { node: neutral, fromNode: pNode, r: neutral.radius + 16, label: s.hint, cx: 'drag' } : null;
       case 'retract':  return { node: pNode,   r: pNode.radius + 16,   label: s.hint, cx: 'click' };
       case 'capture_relay': {
         const relay = nodes.find(n => n.isRelay && n.owner !== 1);
         return relay
-          ? { node: relay, r: relay.radius + 16, label: s.hint, cx: 'click' }
+          ? { node: relay, fromNode: pNode, r: relay.radius + 16, label: s.hint, cx: 'drag' }
           : { node: pNode, r: pNode.radius + 16, label: s.hint, cx: 'click' };
       }
       case 'cut': {
         const tent = game.tents.find(t => t.alive && (t.state === TentState.ACTIVE || t.state === TentState.GROWING) && t.source?.owner === 1);
         if (tent) {
           const cp = tent.getCP();
-          const mp = bezPt(0.5, tent.source.x, tent.source.y, cp.x, cp.y, tent.target.x, tent.target.y);
-          return { x: mp.x, y: mp.y, label: s.hint, r: 16, cx: 'scissors', direct: true };
+          const mp = computeBezierPoint(0.5, tent.source.x, tent.source.y, cp.x, cp.y, tent.target.x, tent.target.y);
+          return { x: mp.x, y: mp.y, label: s.hint, r: 16, cx: 'scissors', direct: true, cutTentacle: tent };
         }
         return { node: pNode, r: pNode.radius + 16, label: s.hint, cx: 'click' };
       }
@@ -205,11 +207,51 @@ export class Tutorial {
     const gx  = (g.node ? g.node.x : g.x) + _cx;
     const gy  = (g.node ? g.node.y : g.y) + _cy;
     const gr  = g.node ? g.node.radius + 16 : g.r;
+    const fromX = g.fromNode ? g.fromNode.x + _cx : null;
+    const fromY = g.fromNode ? g.fromNode.y + _cy : null;
     const H   = ctx.canvas.height;
     const pulse = Math.sin(time * 5) * 0.5 + 0.5;
 
     ctx.save();
     ctx.shadowColor = '#00ff9d';
+
+    if (g.fromNode) {
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(gx, gy);
+      ctx.strokeStyle = '#00ff9d';
+      ctx.lineWidth = 1.6;
+      ctx.globalAlpha = 0.4 + pulse * 0.22;
+      ctx.setLineDash(RENDER_RULES.TUTORIAL.GUIDE_DASH);
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.beginPath();
+      ctx.arc(gx, gy, RENDER_RULES.TUTORIAL.DRAG_RELEASE_RING_RADIUS_PX + pulse * 4, 0, Math.PI * 2);
+      ctx.strokeStyle = '#00ff9d';
+      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 0.55 + pulse * 0.2;
+      ctx.stroke();
+    }
+
+    if (g.cutTentacle) {
+      const cp = g.cutTentacle.getCP();
+      const left = computeBezierPoint(0.22, g.cutTentacle.source.x + _cx, g.cutTentacle.source.y + _cy, cp.x + _cx, cp.y + _cy, g.cutTentacle.target.x + _cx, g.cutTentacle.target.y + _cy);
+      const right = computeBezierPoint(0.78, g.cutTentacle.source.x + _cx, g.cutTentacle.source.y + _cy, cp.x + _cx, cp.y + _cy, g.cutTentacle.target.x + _cx, g.cutTentacle.target.y + _cy);
+      ctx.beginPath();
+      ctx.moveTo(left.x, left.y);
+      ctx.lineTo(right.x, right.y);
+      ctx.strokeStyle = '#f5c518';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.55 + pulse * 0.25;
+      ctx.setLineDash([4, 4]);
+      ctx.shadowColor = '#f5c518';
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.shadowColor = '#00ff9d';
+    }
 
     /* Pulsing rings */
     ctx.beginPath(); ctx.arc(gx, gy, gr + 6 + pulse * 10, 0, Math.PI * 2);
@@ -237,6 +279,24 @@ export class Tutorial {
       ctx.font = 'bold 24px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#00ff9d'; ctx.globalAlpha = 0.88 + pulse * 0.12; ctx.shadowBlur = 16;
       ctx.fillText('\u2702', gx, iconY);
+    } else if (g.cx === 'drag') {
+      ctx.save();
+      ctx.translate(gx, iconY);
+      if (!useAbove) ctx.scale(1, -1);
+      ctx.beginPath();
+      ctx.moveTo(-10, -2);
+      ctx.lineTo(6, -2);
+      ctx.lineTo(6, -6);
+      ctx.lineTo(14, 0);
+      ctx.lineTo(6, 6);
+      ctx.lineTo(6, 2);
+      ctx.lineTo(-10, 2);
+      ctx.closePath();
+      ctx.fillStyle = '#00ff9d';
+      ctx.globalAlpha = 0.92 + pulse * 0.08;
+      ctx.shadowBlur = 14;
+      ctx.fill();
+      ctx.restore();
     } else {
       ctx.save();
       ctx.translate(gx, iconY);
@@ -277,7 +337,7 @@ export class Tutorial {
 
   _drawReadIndicator(ctx, game, time) {
     const pN  = game.nodes.find(n => n.owner === 1);
-    const tw  = game.cfg?.tutW || 1;
+    const tw  = game.cfg?.tutorialWorldId || 1;
     const _cx = game.camX || 0, _cy = game.camY || 0;
 
     ctx.save();
@@ -299,13 +359,37 @@ export class Tutorial {
       const ps    = game.pulsars?.[0];
       const sw    = (time * 0.8) % (Math.PI * 2);
       if (relay) {
+        ctx.beginPath();
+        ctx.arc(relay.x, relay.y, relay.radius + 24, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0,229,255,0.35)';
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([5, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
         for (let i = 0; i < 3; i++) {
           const a = sw + (i/3)*Math.PI*2, rr = relay.radius + 20;
           ctx.beginPath(); ctx.arc(relay.x + Math.cos(a)*rr, relay.y + Math.sin(a)*rr, 3, 0, Math.PI*2);
           ctx.fillStyle = '#00e5ff'; ctx.globalAlpha = 0.6; ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 10; ctx.fill();
         }
+        if (pN) {
+          ctx.beginPath();
+          ctx.moveTo(pN.x, pN.y);
+          ctx.lineTo(relay.x, relay.y);
+          ctx.strokeStyle = 'rgba(0,229,255,0.35)';
+          ctx.lineWidth = 1.4;
+          ctx.setLineDash([5, 5]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       }
       if (ps) {
+        ctx.beginPath();
+        ctx.arc(ps.x, ps.y, ps.r, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,144,32,0.18)';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([6, 8]);
+        ctx.stroke();
+        ctx.setLineDash([]);
         for (let i = 0; i < 3; i++) {
           const a = -sw + (i/3)*Math.PI*2;
           ctx.beginPath(); ctx.arc(ps.x + Math.cos(a)*28, ps.y + Math.sin(a)*28, 3, 0, Math.PI*2);

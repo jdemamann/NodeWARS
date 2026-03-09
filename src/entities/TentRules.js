@@ -1,0 +1,35 @@
+import { TentState } from '../config/gameConfig.js';
+
+export function classifyTentacleCut(cutRatio, cutRules) {
+  return {
+    isKamikaze: cutRatio !== undefined && cutRatio < cutRules.BURST_MAX_RATIO,
+    isRefund: cutRatio === undefined || cutRatio > cutRules.REFUND_MIN_RATIO,
+    isMiddle:
+      cutRatio !== undefined &&
+      cutRatio >= cutRules.BURST_MAX_RATIO &&
+      cutRatio <= cutRules.REFUND_MIN_RATIO,
+  };
+}
+
+export function resolveGrowingTentacleCollision(tentacle, tents) {
+  for (let i = 0; i < tents.length; i++) {
+    const opposingTentacle = tents[i];
+    if (opposingTentacle === tentacle || opposingTentacle.state !== TentState.GROWING) continue;
+    if (opposingTentacle.source !== tentacle.target || opposingTentacle.target !== tentacle.source) continue;
+    if (opposingTentacle.effectiveSourceNode.owner === tentacle.effectiveSourceNode.owner) continue;
+    if (tentacle.reachT + opposingTentacle.reachT < 1.0) continue;
+
+    opposingTentacle.reachT = 1.0 - tentacle.reachT;
+    tentacle.state = TentState.ACTIVE;
+    opposingTentacle.state = TentState.ACTIVE;
+    tentacle.clashT = tentacle.reachT;
+    opposingTentacle.clashT = opposingTentacle.reachT;
+    tentacle.pipeAge = tentacle.reachT * tentacle.travelDuration;
+    opposingTentacle.pipeAge = opposingTentacle.reachT * opposingTentacle.travelDuration;
+    tentacle.clashPartner = opposingTentacle;
+    opposingTentacle.clashPartner = tentacle;
+    return true;
+  }
+
+  return false;
+}
