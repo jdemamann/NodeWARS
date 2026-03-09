@@ -163,12 +163,21 @@ function wireButtons() {
   $id(DOM_IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
   $id(DOM_IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); }));
   $id(DOM_IDS.BTN_PSKIP)?.addEventListener('click', () => {
-    if (STATE.curLvl < LEVELS.length - 1) {
+    if (STATE.canSkipLevel(game.cfg) && STATE.curLvl < LEVELS.length - 1) {
       STATE.completed = Math.max(STATE.completed, STATE.curLvl);
+      STATE.consumeLevelSkip(STATE.curLvl);
       STATE.setCurrentLevel(STATE.curLvl + 1);
       STATE.save();
       fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); });
-    } else showToast(T('alreadyFinal'));
+    } else {
+      showToast(
+        game.cfg?.isBoss
+          ? T('skipLockedBoss')
+          : STATE.curLvl >= LEVELS.length - 1
+            ? T('alreadyFinal')
+            : T('skipLockedProgress', Math.max(0, 5 - STATE.getLevelFailStreak(STATE.curLvl))),
+      );
+    }
   });
   $id(DOM_IDS.BTN_PMENU)?.addEventListener('click', () => {
     Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu'));

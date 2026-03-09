@@ -70,12 +70,22 @@ export const GAME_BALANCE = {
   // 1.1 = 10% tolerance, making the bandwidth cap a real but forgiving limit.
   TENTACLE_BANDWIDTH_TOLERANCE: 1.1,
 
+  // Fraction of the node's regen that stays with the node while it is feeding
+  // through active tentacles. This keeps allied support links from freezing
+  // the source node's growth completely.
+  SELF_REGEN_FRACTION: 0.30,
+
   // Tentacle travel speed in px/s (reserved for future explicit distance-speed tuning).
   TENTACLE_SPEED: 250,
 
   // Scales how fast the clash front moves per unit of force difference.
   // Higher = more volatile clashes that resolve quickly.
   CLASH_VOLATILITY: 0.20,
+
+  // Clashes should cost more commitment than ordinary support/attack flow.
+  // This multiplier is applied to the per-tentacle output share when two
+  // tentacles are directly fighting over the same lane.
+  CLASH_DRAIN_MULTIPLIER: 1.25,
 
   // Payload multiplier when a kamikaze burst (cutRatio < 0.3) reaches its target.
   SLICE_BURST_MULT: 1.5,
@@ -293,7 +303,7 @@ const RAW_LEVELS = [
   { id:8,  worldId:1, nodeEnergyCap:120, name:'FORTRESS',   nodes:13, enemyCount:3, enemyStartEnergy:46, playerStartEnergy:35, aiThinkIntervalSeconds:2.6, distanceCostMultiplier:0.09, neutralEnergyRange:[28,72], par:202, bunkerCount:3 },
   { id:9,  worldId:1, nodeEnergyCap:125, name:'OMEGA GRID', nodes:14, enemyCount:4, enemyStartEnergy:52, playerStartEnergy:36, aiThinkIntervalSeconds:2.1, distanceCostMultiplier:0.10, neutralEnergyRange:[30,80], par:238, bunkerCount:4 },
   /* W1 ── Boss: The Mirror */
-  { id:10, worldId:1, nodeEnergyCap:130, name:'ECHO', nodes:15, enemyCount:1, enemyStartEnergy:40, playerStartEnergy:40, aiThinkIntervalSeconds:1.35, distanceCostMultiplier:0.12, neutralEnergyRange:[35,90], par:278, isSymmetricLayout:true },
+  { id:10, worldId:1, nodeEnergyCap:130, name:'ECHO', nodes:15, enemyCount:1, enemyStartEnergy:40, playerStartEnergy:40, aiThinkIntervalSeconds:1.35, distanceCostMultiplier:0.12, neutralEnergyRange:[35,90], par:278, isSymmetricLayout:true, isBoss:true },
   /* TUT W2 */
   { id:11, worldId:2, nodeEnergyCap:130, tutorialWorldId:2, name:'VOID TUTORIAL', nodes:5, enemyCount:1, enemyStartEnergy:16, playerStartEnergy:40, aiThinkIntervalSeconds:8.0, distanceCostMultiplier:0.06, neutralEnergyRange:[15,40], par:999, isTutorial:true, vortexCount:1 },
   /* W2 — THE VOID ── Tier 1: The Drain Field */
@@ -309,7 +319,7 @@ const RAW_LEVELS = [
   { id:19, worldId:2, nodeEnergyCap:165, name:'VORTEX RING', nodes:13, enemyCount:3, enemyStartEnergy:54, playerStartEnergy:36, aiThinkIntervalSeconds:2.6, distanceCostMultiplier:0.09, neutralEnergyRange:[28,72], par:215, vortexCount:5, movingVortexCount:5 },
   { id:20, worldId:2, nodeEnergyCap:170, name:'ABYSS GATE',  nodes:14, enemyCount:4, enemyStartEnergy:60, playerStartEnergy:38, aiThinkIntervalSeconds:2.2, distanceCostMultiplier:0.10, neutralEnergyRange:[28,78], par:244, vortexCount:6, movingVortexCount:6 },
   /* W2 ── Boss: Heart of the Void — Super-Vortex + Purple Incursion */
-  { id:21, worldId:2, nodeEnergyCap:175, name:'OBLIVION', nodes:15, enemyCount:4, enemyStartEnergy:62, playerStartEnergy:40, aiThinkIntervalSeconds:1.6, distanceCostMultiplier:0.11, neutralEnergyRange:[32,88], par:274, vortexCount:6, movingVortexCount:3, pulsingVortexPeriodSeconds:5, hasSuperVortex:true, purpleEnemyCount:1, purpleEnemyStartEnergy:46 },
+  { id:21, worldId:2, nodeEnergyCap:175, name:'OBLIVION', nodes:15, enemyCount:4, enemyStartEnergy:62, playerStartEnergy:40, aiThinkIntervalSeconds:1.6, distanceCostMultiplier:0.11, neutralEnergyRange:[32,88], par:274, vortexCount:6, movingVortexCount:3, pulsingVortexPeriodSeconds:5, hasSuperVortex:true, purpleEnemyCount:1, purpleEnemyStartEnergy:46, isBoss:true },
   /* TUT W3 */
   { id:22, worldId:3, nodeEnergyCap:175, tutorialWorldId:3, name:'NEXUS TUTORIAL', nodes:5, enemyCount:1, enemyStartEnergy:16, playerStartEnergy:40, aiThinkIntervalSeconds:8.0, distanceCostMultiplier:0.06, neutralEnergyRange:[15,40], par:999, isTutorial:true, relayCount:1, pulsarCount:1 },
   /* W3 — NEXUS PRIME ── Tier 1: Signal Acquisition */
@@ -325,7 +335,7 @@ const RAW_LEVELS = [
   { id:30, worldId:3, nodeEnergyCap:196, name:'SIGNAL LOCK', nodes:14, enemyCount:4, enemyStartEnergy:55, playerStartEnergy:38, aiThinkIntervalSeconds:2.4, distanceCostMultiplier:0.09, neutralEnergyRange:[30,78], par:238, relayCount:5, pulsarCount:3, signalTowerCount:1, purpleEnemyCount:1, purpleEnemyStartEnergy:44 },
   { id:31, worldId:3, nodeEnergyCap:198, name:'APEX', nodes:14, enemyCount:5, enemyStartEnergy:65, playerStartEnergy:38, aiThinkIntervalSeconds:2.0, distanceCostMultiplier:0.10, neutralEnergyRange:[32,82], par:260, relayCount:6, pulsarCount:4, signalTowerCount:1, purpleEnemyCount:1, purpleEnemyStartEnergy:55 },
   /* W3 ── Boss: Nexus Core — Super-Pulsar + Relay Fortresses + Signal Tower + Purple Dominance */
-  { id:32, worldId:3, nodeEnergyCap:200, name:'TRANSCENDENCE', nodes:15, enemyCount:5, enemyStartEnergy:68, playerStartEnergy:42, aiThinkIntervalSeconds:1.5, distanceCostMultiplier:0.11, neutralEnergyRange:[35,90], par:300, relayCount:6, pulsarCount:4, signalTowerCount:1, fortifiedRelayCount:3, hasSuperPulsar:true, purpleEnemyCount:2, purpleEnemyStartEnergy:58 },
+  { id:32, worldId:3, nodeEnergyCap:200, name:'TRANSCENDENCE', nodes:15, enemyCount:5, enemyStartEnergy:68, playerStartEnergy:42, aiThinkIntervalSeconds:1.5, distanceCostMultiplier:0.11, neutralEnergyRange:[35,90], par:300, relayCount:6, pulsarCount:4, signalTowerCount:1, fortifiedRelayCount:3, hasSuperPulsar:true, purpleEnemyCount:2, purpleEnemyStartEnergy:58, isBoss:true },
 ];
 
 export const LEVELS = RAW_LEVELS;

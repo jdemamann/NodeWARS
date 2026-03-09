@@ -139,12 +139,13 @@ Updated:
 
 The player now gets stronger context during and after the phase:
 
-- a canvas phase-status card summarises objective pressure and active mechanics
 - HUD hints now teach drag-and-release instead of older interaction language
 - the enemy count now correctly includes all hostile factions, including purple AI
 - the result screen summarises special mechanics present in the phase
 
-This improves moment-to-moment orientation and avoids under-reporting threat in World 3.
+The original always-on canvas phase-status card was later removed because it added too much persistent clutter, especially on smaller screens. The result-screen and event-feedback improvements remain.
+
+This still improves orientation and avoids under-reporting threat in World 3 without keeping a permanent overlay on the battlefield.
 
 ### Capture and outcome game feel
 
@@ -207,6 +208,9 @@ A tutorial that teaches obsolete controls increases friction immediately. The cu
 
 - click-to-connect
 - drag-and-release connect
+- direct pause / exit flow inside the tutorial
+
+It also now explains that frenzy requires a single continuous slice gesture rather than three disconnected cuts over time.
 
 That is important for both discoverability and player comfort.
 
@@ -228,3 +232,4 @@ The lightweight regression suite now also protects:
 - tutorial copy alignment with current controls and rules
 - presence of World 3 structure cues, critical combat warning, and tutorial ghost guidance
 - presence of layered tentacle and node rendering paths
+- removal of the old persistent phase-status clutter

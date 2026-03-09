@@ -24,6 +24,14 @@ That helper is the canonical gameplay path for:
 
 Purple AI still performs decisive near-target cuts, but it no longer owns a separate damage formula. This keeps burst timing and balance aligned with the player mechanic and avoids future drift.
 
+## Frenzy Coupling
+
+The player-only frenzy bonus is intentionally **not** a rolling time-window mechanic.
+
+- it only counts active tentacles cut during the same continuous slice gesture
+- starting a new slice resets the frenzy cut set
+- separate cuts across different gestures must never accumulate into a delayed frenzy trigger
+
 ## Code Anchors
 
 - Canonical entry point: `src/entities/Tent.js`

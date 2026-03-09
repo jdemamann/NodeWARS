@@ -434,10 +434,9 @@ async function testHudAndPhaseFeedbackStayAligned() {
   const rendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/Renderer.js'), 'utf8');
   const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
   const hudSource = await fs.readFile(path.join(ROOT, 'src/ui/HUD.js'), 'utf8');
-  const screensSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
   const resultScreenViewSource = await fs.readFile(path.join(ROOT, 'src/ui/resultScreenView.js'), 'utf8');
 
-  assert.match(rendererSource, /UIRenderer\.drawPhaseStatus\(context, game, canvasWidth, canvasHeight\)/, 'renderer should draw the phase status overlay');
+  assert.doesNotMatch(rendererSource, /UIRenderer\.drawPhaseStatus\(context, game, canvasWidth, canvasHeight\)/, 'renderer should not draw the always-on phase status overlay');
   assert.match(uiRendererSource, /static drawPhaseStatus\(ctx, game, W, H\)/, 'UI renderer should expose the phase status overlay');
   assert.match(hudSource, /node => node\.owner !== 0 && node\.owner !== 1/, 'HUD enemy count should include all hostile owners');
   assert.match(hudSource, /hintsElement\.style\.display = 'none'/, 'HUD should keep the always-on control hint strip hidden');
@@ -607,6 +606,104 @@ async function testLevelZeroNodesStayRenderable() {
   assert.match(rendererSource, /import \{ STATE \}\s+from '\.\.\/core\/GameState\.js'/, 'renderer should import STATE before reading graphics mode in render stats');
 }
 
+async function testFpsHudAndSkipGuardrailsStayPresent() {
+  const hudSource = await fs.readFile(path.join(ROOT, 'src/ui/HUD.js'), 'utf8');
+  const gameStateSource = await fs.readFile(path.join(ROOT, 'src/core/GameState.js'), 'utf8');
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const rendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/Renderer.js'), 'utf8');
+  const configSource = await fs.readFile(path.join(ROOT, 'src/config/gameConfig.js'), 'utf8');
+
+  assert.match(hudSource, /fpsEl\.classList\.remove\('hud-hidden'\)/, 'FPS HUD should remove the hidden class when enabled');
+  assert.match(hudSource, /fpsEl\.style\.display = 'inline-block'/, 'FPS HUD should use an explicit visible display mode');
+  assert.match(gameStateSource, /levelFailStreaks/, 'GameState should track fail streaks per level');
+  assert.match(gameStateSource, /canSkipLevel\(levelConfig\)/, 'skip eligibility should be centralized in GameState');
+  assert.match(mainSource, /STATE\.canSkipLevel\(game\.cfg\)/, 'skip button action should respect the skip gate');
+  assert.match(gameSource, /skipButton\.style\.display = canSkipCurrentLevel \? '' : 'none'/, 'pause UI should hide skip when unavailable');
+  assert.doesNotMatch(rendererSource, /drawPhaseStatus\(context, game, canvasWidth, canvasHeight\)/, 'the always-on phase panel should no longer render every frame');
+  assert.match(configSource, /id:10[\s\S]*isBoss:true/, 'ECHO should be marked as a boss phase');
+  assert.match(configSource, /id:21[\s\S]*isBoss:true/, 'OBLIVION should be marked as a boss phase');
+  assert.match(configSource, /id:32[\s\S]*isBoss:true/, 'TRANSCENDENCE should be marked as a boss phase');
+}
+
+async function testWorldOneTutorialTabAndFeedClashBudgetStayAligned() {
+  const screenSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const energyBudgetSource = await fs.readFile(path.join(ROOT, 'src/systems/EnergyBudget.js'), 'utf8');
+  const configSource = await fs.readFile(path.join(ROOT, 'src/config/gameConfig.js'), 'utf8');
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const {
+    computeNodeTentacleFeedRate,
+    computeTentacleClashFeedRate,
+  } = await load('src/systems/EnergyBudget.js');
+
+  assert.match(screenSource, /\[1,2,3\]\.forEach\(w => \{/, 'level select should no longer create a standalone tutorial tab');
+  assert.match(screenSource, /worldFilter === 1 && levelConfig\.tutorialWorldId === 1/, 'World 1 grid should include the World 1 tutorial directly');
+  assert.match(configSource, /SELF_REGEN_FRACTION: 0\.30/, 'game balance should preserve a self-regen fraction while feeding');
+  assert.match(energyBudgetSource, /export function computeTentacleClashFeedRate/, 'energy budget should expose a dedicated clash feed rate');
+
+  const sourceNode = new GameNode(0, 0, 0, 40, 1);
+  sourceNode.level;
+  sourceNode.outCount = 1;
+  sourceNode.underAttack = 0;
+  sourceNode.energy = 40;
+
+  const supportFeedRate = computeNodeTentacleFeedRate(sourceNode);
+  const clashFeedRate = computeTentacleClashFeedRate(sourceNode, Infinity, 1);
+
+  assert.ok(supportFeedRate > 0, 'support feed rate should remain positive');
+  assert.ok(clashFeedRate > supportFeedRate, 'clash feed rate should commit more energy than ordinary support flow');
+}
+
+async function testTutorialExitAndMouseGestureGuardsStayPresent() {
+  const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const inputBindingSource = await fs.readFile(path.join(ROOT, 'src/input/GameInputBinding.js'), 'utf8');
+  const tutorialSource = await fs.readFile(path.join(ROOT, 'src/systems/Tutorial.js'), 'utf8');
+
+  assert.match(indexSource, /id="tutExit"/, 'tutorial overlay should expose a dedicated exit button');
+  assert.match(gameSource, /_slicePointerButton = null/, 'game should track which pointer button owns the active slice');
+  assert.match(gameSource, /_clearMouseGestureState\(\)/, 'game should expose a shared mouse gesture reset helper');
+  assert.match(gameSource, /_leftSlicePending/, 'left-button slice promotion should keep explicit pending state');
+  assert.match(gameSource, /if \(hoveredTargetNode && hoveredTargetNode !== this\.sel\)/, 'drag-connect should branch on a concrete hovered target while dragging');
+  assert.match(gameSource, /this\._dragConnectTarget = hoveredTargetNode;/, 'drag-connect should keep an explicit drop target while dragging');
+  assert.match(gameSource, /this\.hoverNode = this\._dragConnectTarget;/, 'drag-connect should keep the last valid target focused while dragging');
+  assert.match(gameSource, /const hitNode = dragTargetNode \|\| this\._findNodeAtScreenPoint\(screenX, screenY, INPUT_TUNING\.HOVER_HIT_PADDING_PX\)/, 'drag release should prefer the tracked hover target over a strict mouseup hit');
+  assert.match(gameSource, /_findSnapTargetNodeAtScreenPoint/, 'drag-connect should expose a snap-target helper for nearby nodes');
+  assert.match(inputBindingSource, /window\.addEventListener\('mouseup'/, 'mouse gestures should reset even when the pointer is released outside the canvas');
+  assert.match(tutorialSource, /this\.game\.paused = true;/, 'tutorial exit should pause the game before leaving to level select');
+  assert.match(tutorialSource, /showScr\('levels'\)/, 'tutorial exit should return directly to phase select');
+}
+
+async function testPrimaryButtonSliceUsesDistinctVisualAndDragTargeting() {
+  const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const hudSource = await fs.readFile(path.join(ROOT, 'src/ui/HUD.js'), 'utf8');
+  const inputBindingSource = await fs.readFile(path.join(ROOT, 'src/input/GameInputBinding.js'), 'utf8');
+
+  assert.match(uiRendererSource, /const isPrimarySlice = game\._slicePointerButton === 0/, 'slicer rendering should distinguish left-button slices');
+  assert.match(uiRendererSource, /ctx\.strokeStyle = isPrimarySlice \? '#00e5ff' : '#f5c518'/, 'left-button slices should not render with the same yellow cue as right-button slices');
+  assert.match(gameSource, /_dragConnectTarget = null/, 'game should clear tracked drag targets when the gesture ends');
+  assert.match(gameSource, /_findNodeAtScreenPoint\(screenX, screenY, INPUT_TUNING\.HOVER_HIT_PADDING_PX\)/, 'drag targeting should use gameplay node hit-testing with hover padding');
+  assert.match(gameSource, /Keep the last valid drag target "sticky"/, 'drag targeting should keep the last valid target through transient overlay overlap');
+  assert.match(hudSource, /pauseButton\.style\.display = 'inline-flex'/, 'pause button should stay visible even in tutorials');
+  assert.doesNotMatch(inputBindingSource, /!game\.cfg\.isTutorial/, 'Escape pause binding should no longer exclude tutorial levels');
+  assert.match(inputBindingSource, /function isSliceButtonStillPressed\(buttons, slicePointerButton\)/, 'input binding should explicitly track whether the active slice button is still pressed');
+  assert.match(inputBindingSource, /window\.addEventListener\('pointerup'/, 'slice should reset on pointerup as an extra guard');
+  assert.match(inputBindingSource, /window\.addEventListener\('contextmenu'/, 'slice should reset on contextmenu as an extra right-click guard');
+}
+
+async function testFrenzyRequiresSameContinuousSliceGesture() {
+  const playerSliceEffectsSource = await fs.readFile(path.join(ROOT, 'src/input/PlayerSliceEffects.js'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
+
+  assert.match(playerSliceEffectsSource, /state\.sliceGestureCutTentacles\.add\(sliceCut\.tentacle\)/, 'frenzy should track distinct tentacles cut during the current slice gesture');
+  assert.match(playerSliceEffectsSource, /state\.sliceGestureCutTentacles\.size >= 3/, 'frenzy should require three distinct tentacles in the same slice gesture');
+  assert.doesNotMatch(playerSliceEffectsSource, /frenzyLog\.push\(now\)/, 'frenzy should no longer be based on a rolling time window');
+  assert.match(gameSource, /this\._sliceGestureCutTentacles = new Set\(\)/, 'game should reset the per-slice frenzy tracker when slice gestures begin or end');
+  assert.match(i18nSource, /same continuous slice|mesmo gesto contínuo/, 'tutorial text should describe the same-gesture frenzy rule');
+}
+
 async function main() {
   const tests = [
     ['relay nodes do not create free energy', testRelayNoFreeEnergy],
@@ -640,6 +737,11 @@ async function main() {
     ['settings, tutorial, and story content stay in sync', testSettingsTutorialAndStoryStayInSync],
     ['progress and settings persistence guardrails stay present', testProgressAndSettingsPersistenceGuardrailsStayPresent],
     ['level 0 nodes stay renderable', testLevelZeroNodesStayRenderable],
+    ['FPS HUD and skip guardrails stay present', testFpsHudAndSkipGuardrailsStayPresent],
+    ['World 1 tutorial tab and feed/clash budgets stay aligned', testWorldOneTutorialTabAndFeedClashBudgetStayAligned],
+    ['Tutorial exit and mouse gesture guards stay present', testTutorialExitAndMouseGestureGuardsStayPresent],
+    ['Primary-button slice uses distinct visual and drag targeting', testPrimaryButtonSliceUsesDistinctVisualAndDragTargeting],
+    ['Frenzy requires the same continuous slice gesture', testFrenzyRequiresSameContinuousSliceGesture],
   ];
 
   let passed = 0;

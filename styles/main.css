@@ -284,6 +284,23 @@ html { overflow: hidden; height: 100%; }
   border-radius: 999px;
 }
 #tutNext:hover { background: var(--p); color: var(--bg); }
+#tutExit {
+  pointer-events: all;
+  margin-top: 8px;
+  margin-right: 8px;
+  display: inline-block;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: var(--tx-soft);
+  font-family: var(--font-copy);
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: all .18s;
+  border-radius: 999px;
+}
+#tutExit:hover { border-color: var(--ac); color: var(--ac); }
 .tut-world-badge {
   font: bold 7px 'Orbitron', sans-serif;
   letter-spacing: 3px; opacity: 0.7; margin-bottom: 4px; display: none;

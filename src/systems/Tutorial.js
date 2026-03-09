@@ -8,7 +8,7 @@ import { STATE } from '../core/GameState.js';
 import { computeBezierPoint } from '../math/bezierGeometry.js';
 import { GAMEPLAY_RULES, NodeType, TentState } from '../config/gameConfig.js';
 import { DOM_IDS } from '../ui/DomIds.js';
-import { fadeGo, showScr } from '../ui/ScreenController.js';
+import { fadeGo, showScr, buildWorldTabs, syncWorldTab } from '../ui/ScreenController.js';
 
 const { render: RENDER_RULES } = GAMEPLAY_RULES;
 
@@ -154,6 +154,16 @@ export class Tutorial {
     }
     this.actionDone = false;
     this.showStep();
+  }
+
+  exit() {
+    this.game.paused = true;
+    const tutorialBox = document.getElementById(DOM_IDS.TUTBOX);
+    if (tutorialBox) tutorialBox.style.display = 'none';
+    this.done = true;
+    syncWorldTab();
+    buildWorldTabs();
+    showScr('levels');
   }
 
   /* ── Ghost cursor target ── */

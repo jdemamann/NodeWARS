@@ -18,10 +18,12 @@ See also:
 - owned non-relay cells regenerate energy by tier
 - growth level is derived from current energy
 - higher levels increase slots and offensive throughput
+- cells retain a reduced fraction of self-regeneration while feeding allies
 
 ### Tentacles
 
 - tentacles are created by selecting a player-owned cell and targeting another cell
+- the same connect action can be done by click-click or drag-and-release
 - tentacles grow over time before becoming active
 - active tentacles transport energy through a pipe model
 - opposing tentacles can clash and push against each other
@@ -36,11 +38,13 @@ See also:
 ### Slicing
 
 - slicing is a primary tactical input
+- right-drag always slices, and left-drag can slice when the gesture does not start from a player node
 - both player cuts and purple AI strategic cuts use the same canonical slice entry point
 - the current implementation maps cut zones as:
   - near source: burst
   - middle: split
   - near target: refund
+- frenzy only triggers when 3 active tentacles are cut in the same continuous slice gesture
 
 ### Relays
 
@@ -53,6 +57,11 @@ See also:
 - AI remains heuristic-based
 - owner 3 uses the same shared burst path as the player
 - AI can evaluate relay targets
+
+### Campaign / Meta Rules
+
+- late high-pressure authored phases can give the player more than one starting node
+- phase skip only unlocks after repeated defeats and stays blocked on tutorial, boss, and final phases
 
 ### World-Specific Mechanics
 

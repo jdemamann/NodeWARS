@@ -95,7 +95,6 @@ export class Renderer {
 
     /* ── Screen-space UI ── */
     UIRenderer.drawVisualEvents(context, game);
-    UIRenderer.drawPhaseStatus(context, game, canvasWidth, canvasHeight);
     UIRenderer.drawInfoPanel(context, game, canvasWidth, canvasHeight);
     UIRenderer.drawFrenzy(context, game, canvasWidth, canvasHeight);
     UIRenderer.drawSlicer(context, game);

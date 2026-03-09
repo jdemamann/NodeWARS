@@ -7,7 +7,7 @@
    ================================================================ */
 
 import { TentState, GROW_PPS, ADV_PPS, EMBRYO, TIER_REGEN, GAME_BALANCE, CUT_RULES } from '../config/gameConfig.js';
-import { computeTentacleSourceFeedRate } from '../systems/EnergyBudget.js';
+import { computeTentacleClashFeedRate, computeTentacleSourceFeedRate } from '../systems/EnergyBudget.js';
 import { applyOwnershipChange } from '../systems/Ownership.js';
 import {
   computeDistance,
@@ -522,7 +522,7 @@ export class Tent {
   }
 
   _drainClashSourceBudget(sourceNode, dt) {
-    const feedRate = computeTentacleSourceFeedRate(sourceNode, this.maxBandwidth, dt);
+    const feedRate = computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt);
 
     /* Relay nodes obey the same pass-through rule during clashes:
        they can contest only with energy already buffered from upstream. */

@@ -11,6 +11,7 @@ Make sure local progress and settings survive player return without silent drift
 - completed progress
 - current level
 - score table
+- level fail streaks used by skip unlock rules
 - language
 - active world tab in level select
 - full settings payload
@@ -31,6 +32,7 @@ Without this, a player can come back to:
 
 - the wrong level
 - the wrong world tab
+- a skip state that no longer matches prior repeated losses
 - broken display settings caused by older or partial saves
 
 ## Validation
@@ -39,4 +41,5 @@ The smoke suite now checks:
 
 - `nw_curLvl` is persisted
 - `nw_activeWorldTab` is persisted
+- fail streak state survives save/load
 - invalid settings are normalized before storage

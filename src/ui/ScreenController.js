@@ -73,7 +73,7 @@ export function syncWorldTab() {
   const currentLevelConfig = LEVELS.find(levelConfig => levelConfig.id === STATE.curLvl);
   if (!currentLevelConfig) return;
   const currentWorldId = currentLevelConfig.worldId || 1;
-  _activeWorldTab = currentWorldId === 0 ? 0 : currentWorldId;
+  _activeWorldTab = currentWorldId === 0 ? 1 : currentWorldId;
   if (_activeWorldTab === 2 && !STATE.settings.w2 && !STATE.settings.debug) _activeWorldTab = 1;
   if (_activeWorldTab === 3 && !STATE.settings.w3 && !STATE.settings.debug) _activeWorldTab = 1;
   STATE.setActiveWorldTab(_activeWorldTab);
@@ -91,7 +91,7 @@ export function buildWorldTabs() {
   const w3ok = STATE.settings.w3 || STATE.settings.debug;
 
   tabs.innerHTML = '';
-  [0,1,2,3].forEach(w => {
+  [1,2,3].forEach(w => {
     if (w === 2 && !w2ok) return;
     if (w === 3 && !w3ok) return;
     const meta = worldMetaById[w];
@@ -126,14 +126,10 @@ export function buildGrid(worldFilter = _activeWorldTab) {
   const levelGridElement = $(DOM_IDS.LGRID);
   levelGridElement.innerHTML = '';
 
-  if (worldFilter === 0) {
-    const tutorialLevelConfig = LEVELS[0];
-    const tutorialButton = _makeLvBtn(tutorialLevelConfig, 0, '#00ff9d', false, 0 <= STATE.completed, !(0 <= STATE.completed), false, true);
-    levelGridElement.appendChild(tutorialButton);
-    return;
-  }
-
-  const levelsForWorld = LEVELS.filter(lv => lv.worldId === worldFilter);
+  const levelsForWorld = LEVELS.filter(levelConfig =>
+    levelConfig.worldId === worldFilter ||
+    (worldFilter === 1 && levelConfig.tutorialWorldId === 1),
+  );
   const worldAccent = getLevelGridWorldAccent(worldFilter);
   const w2ok= STATE.settings.w2 || STATE.settings.debug;
   const w3ok= STATE.settings.w3 || STATE.settings.debug;
@@ -282,10 +278,13 @@ export function endLevel(win, game) {
   const levelId = levelConfig.id;
 
   if (win && levelId >= 1) {
+    STATE.recordLevelWin(levelId);
     STATE.completed = Math.max(STATE.completed, levelId);
     if (score != null && (STATE.scores[levelId] === null || score > STATE.scores[levelId])) STATE.scores[levelId] = score;
     STATE.save();
     if ([10, 21, 32].includes(levelId)) setTimeout(() => SFX.worldUnlock(), 600);
+  } else if (!win) {
+    STATE.recordLevelLoss(levelId);
   }
 
   if (win) { SFX.win(); setTimeout(() => Music.playMenu(), 1500); }

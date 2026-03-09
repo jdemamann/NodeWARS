@@ -24,13 +24,13 @@ export function recordReactiveDefenseCut(sliceCut, state, onTrigger) {
 export function recordPlayerFrenzyCut(sliceCut, state, onTrigger) {
   if (sliceCut.effectiveSourceNode.owner !== 1) return;
 
-  const now = state.now;
-  state.frenzyLog.push(now);
-  state.frenzyLog = state.frenzyLog.filter(timestamp => now - timestamp < 1.5);
-  if (state.frenzyLog.length >= 3) {
+  if (state.hasTriggeredFrenzyThisSlice) return;
+
+  state.sliceGestureCutTentacles.add(sliceCut.tentacle);
+  if (state.sliceGestureCutTentacles.size >= 3) {
     state.frenzyDuration = 4.0;
     state.frenzyCount += 1;
-    state.frenzyLog = [];
+    state.hasTriggeredFrenzyThisSlice = true;
     onTrigger?.();
   }
 }

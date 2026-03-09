@@ -461,12 +461,17 @@ export class UIRenderer {
   /* ── Slicer line ── */
   static drawSlicer(ctx, game) {
     if (!game.slicing || game.slicePath.length < 2) return;
+    const isPrimarySlice = game._slicePointerButton === 0;
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(game.slicePath[0].x, game.slicePath[0].y);
     game.slicePath.forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.strokeStyle = '#f5c518'; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85;
-    ctx.shadowColor = '#f5c518'; ctx.shadowBlur = 10; ctx.setLineDash(RENDER_RULES.UI.SLICER_DASH);
+    ctx.strokeStyle = isPrimarySlice ? '#00e5ff' : '#f5c518';
+    ctx.lineWidth = isPrimarySlice ? 2 : 2.5;
+    ctx.globalAlpha = isPrimarySlice ? 0.55 : 0.85;
+    ctx.shadowColor = isPrimarySlice ? '#00e5ff' : '#f5c518';
+    ctx.shadowBlur = isPrimarySlice ? 6 : 10;
+    ctx.setLineDash(RENDER_RULES.UI.SLICER_DASH);
     ctx.stroke(); ctx.setLineDash([]);
     ctx.restore();
   }

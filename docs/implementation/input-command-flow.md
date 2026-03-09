@@ -15,6 +15,7 @@ Owns orchestration and state application:
 - applies resolved click intents to live game state
 - creates the actual `Tent` instance when a build is approved
 - controls hover pinning and selection state on the live game object
+- tracks drag-connect snap targets and same-gesture slice state
 
 ### `src/input/NodeHitTesting.js`
 
@@ -69,6 +70,7 @@ Owns pure input-state transitions and gesture helpers:
 - tap-to-slice promotion rule
 - tap activation rule
 - hover tracking state while not pinned
+- gesture cleanup primitives used to avoid orphaned slice state
 
 ### `src/input/GameInputBinding.js`
 
@@ -79,6 +81,7 @@ Owns raw DOM input binding for gameplay:
 - long-press timer orchestration
 - window resize / escape key wiring
 - delegation from DOM events into `Game` methods and input helpers
+- redundant release/cancel guards for slice cleanup (`mouseup`, `pointerup`, `pointercancel`, `contextmenu`, `blur`, `visibilitychange`)
 
 ### `src/input/SliceCutting.js`
 
@@ -95,8 +98,15 @@ Owns player-facing slice side effects after a cut is detected:
 
 - canonical tentacle cut application delegation
 - reactive defense tracking
-- frenzy tracking
+- same-gesture frenzy tracking
 - slice toast text assembly
+
+## Gesture Rules
+
+- `drag-and-release` only claims the gesture if it starts from a player-owned node
+- left-drag can still become a slice if it does **not** start from a player-owned node
+- drag-connect uses sticky snap targeting so a valid target remains selected even if the final frame hit test is imperfect
+- frenzy is evaluated per continuous slice gesture, not across multiple disconnected cuts
 
 ## Design Rule
 

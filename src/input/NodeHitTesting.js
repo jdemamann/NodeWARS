@@ -6,8 +6,19 @@ export function hasNodeHit(node, worldX, worldY, hitPaddingPx) {
 }
 
 export function findNodeAtWorldPoint(nodes, worldX, worldY, hitPaddingPx, { excludeHazards = true } = {}) {
-  return nodes.find(node => {
-    if (excludeHazards && node.type === NodeType.HAZARD) return false;
-    return hasNodeHit(node, worldX, worldY, hitPaddingPx);
-  }) || null;
+  let closestNode = null;
+  let closestDistanceSquared = Infinity;
+
+  nodes.forEach(node => {
+    if (excludeHazards && node.type === NodeType.HAZARD) return;
+    if (!hasNodeHit(node, worldX, worldY, hitPaddingPx)) return;
+
+    const distanceSquared = computeDistanceSquared(worldX, worldY, node.x, node.y);
+    if (distanceSquared < closestDistanceSquared) {
+      closestDistanceSquared = distanceSquared;
+      closestNode = node;
+    }
+  });
+
+  return closestNode;
 }

@@ -10,6 +10,7 @@ Current coverage:
 - programmatic retract refunds build/payload energy
 - instant activation only tracks actually paid build cost
 - growing tentacles cannot advance without source budget
+- support cells keep partial self-regeneration while feeding allies
 - nodes under attack keep reduced outgoing flow
 - vortex drain uses the effective source on reversed tentacles
 - pulsar injects energy into owned nodes only
@@ -30,6 +31,10 @@ Current coverage:
 - cooldown guards remain wired for high-density combat and world SFX
 - settings labels, tutorial copy, and story content stay aligned with current mechanics and localization
 - local progress and settings persistence guardrails stay intact
+- World 1 tutorial remains integrated into the World 1 phase tab
+- tutorial exit and mouse-gesture cleanup guards stay present
+- primary-button slice keeps its distinct visual and drag targeting behavior
+- frenzy only triggers from the same continuous slice gesture
 
 ## Run
 

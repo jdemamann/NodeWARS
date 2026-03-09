@@ -70,11 +70,13 @@ export class HUD {
       const scoreText = ['★','☆','☆'].map((_, i) => i < starCount ? '★' : '☆').join('') + ' ' + score;
       if (scoreText !== this._sc) {
         this._sc          = scoreText;
+        scoreElement.classList.remove('hud-hidden');
         scoreElement.style.display = '';
         scoreElement.textContent   = scoreText;
       }
     } else if (scoreElement && scoreElement.style.display !== 'none') {
       this._sc          = '';
+      scoreElement.classList.add('hud-hidden');
       scoreElement.style.display = 'none';
     }
 
@@ -86,9 +88,11 @@ export class HUD {
           this._fps = fpsText;
           fpsEl.textContent = fpsText;
         }
-        fpsEl.style.display = '';
+        fpsEl.classList.remove('hud-hidden');
+        fpsEl.style.display = 'inline-block';
       } else if (fpsEl.style.display !== 'none') {
         this._fps = '';
+        fpsEl.classList.add('hud-hidden');
         fpsEl.style.display = 'none';
       }
     }
@@ -117,7 +121,7 @@ export class HUD {
     this._par = this._sc = this._lvl = this._name = this._fps = '';
 
     const pauseButton = $(DOM_IDS.HPAUSE);
-    if (pauseButton) pauseButton.style.display = levelConfig.isTutorial ? 'none' : 'inline-flex';
+    if (pauseButton) pauseButton.style.display = 'inline-flex';
   }
 
   setHints() {

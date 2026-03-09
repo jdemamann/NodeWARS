@@ -32,8 +32,11 @@ Tutorial copy was reviewed against the current mechanics:
 
 - retract refunds the invested tentacle payload
 - click and drag-and-release are both taught
+- left-drag slice is treated as a valid gesture when the action does not begin from a player-owned node
 - cut rules remain source burst / middle split / target refund
+- frenzy now explicitly requires 3 active cuts in the same continuous slice gesture
 - pulsars only energize owned non-relay cells
+- tutorial exit now matches the same pause/phase-select flow used by normal phases
 
 ## Story
 

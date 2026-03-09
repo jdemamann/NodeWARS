@@ -93,7 +93,8 @@ export class Game {
 
     this.frenzyTimer = 0;
     this.frenzyCount = 0;
-    this._frenzyLog  = [];
+    this._sliceGestureCutTentacles = new Set();
+    this._hasTriggeredFrenzyThisSlice = false;
     this._aiCutLog   = [];
     this.aiDefensive = 0;
     this.wastedTents = 0;
@@ -121,6 +122,9 @@ export class Game {
     this._mouseDownStart = null;
     this._dragConnectSource = null;
     this._dragConnectActive = false;
+    this._dragConnectTarget = null;
+    this._leftSlicePending = null;
+    this._slicePointerButton = null;
 
     this._utils     = makeUtils(this);
     this._lang      = STATE.curLang;
@@ -242,6 +246,24 @@ export class Game {
     return findNodeAtWorldPoint(this.nodes, worldX, worldY, INPUT_TUNING.HOVER_HIT_PADDING_PX, { excludeHazards: false });
   }
 
+  _findSnapTargetNodeAtScreenPoint(screenX, screenY, excludedNode = null) {
+    const worldX = screenX - (this.camX || 0);
+    const worldY = screenY - (this.camY || 0);
+    let closestNode = null;
+    let closestDistance = INPUT_TUNING.NODE_SNAP_DISTANCE_PX;
+
+    this.nodes.forEach(node => {
+      if (node === excludedNode) return;
+      const distance = Math.hypot(node.x - worldX, node.y - worldY);
+      if (distance <= closestDistance) {
+        closestDistance = distance;
+        closestNode = node;
+      }
+    });
+
+    return closestNode;
+  }
+
   /* ─────────────────────────────── LEVEL LOADING ── */
   loadLevel(idx) {
     const cfg = LEVELS.find(l => l.id === idx) || LEVELS[idx];
@@ -253,7 +275,7 @@ export class Game {
     this.sel   = null; this.done = false; this.paused = false; this.scoreTime = 0;
     this.camX  = 0; this.camY = 0; this.fogDirty = true; this.fogRevealTimer = 0;
     this._fogTimer = 0; this.freeOrbPool = new FreeOrbPool(30);
-    this._frenzyLog = []; this._aiCutLog = []; this.wastedTents = 0;
+    this._sliceGestureCutTentacles = new Set(); this._hasTriggeredFrenzyThisSlice = false; this._aiCutLog = []; this.wastedTents = 0;
     this.frenzyCount = 0; this.cutsTotal = 0; this.frenzyTimer = 0;
     this.hoverNode = null; this.hoverPin = false;
     this.orbPool   = new OrbPool(150);
@@ -759,8 +781,8 @@ export class Game {
 
   _recordPlayerFrenzyCut(sliceCut) {
     const sliceState = {
-      now: this.time,
-      frenzyLog: this._frenzyLog,
+      sliceGestureCutTentacles: this._sliceGestureCutTentacles,
+      hasTriggeredFrenzyThisSlice: this._hasTriggeredFrenzyThisSlice,
       frenzyDuration: this.frenzyTimer,
       frenzyCount: this.frenzyCount || 0,
     };
@@ -769,7 +791,8 @@ export class Game {
       SFX.frenzy();
       bus.emit('frenzy:start');
     });
-    this._frenzyLog = sliceState.frenzyLog;
+    this._sliceGestureCutTentacles = sliceState.sliceGestureCutTentacles;
+    this._hasTriggeredFrenzyThisSlice = sliceState.hasTriggeredFrenzyThisSlice;
     this.frenzyTimer = sliceState.frenzyDuration;
     this.frenzyCount = sliceState.frenzyCount;
     showToast(buildPlayerSliceToastMessage(sliceCut));
@@ -818,20 +841,38 @@ export class Game {
     }
   }
 
-  _beginSlice(screenX, screenY) {
+  _beginSlice(screenX, screenY, button = 2) {
     this.slicing = true;
+    this._slicePointerButton = button;
+    this._sliceGestureCutTentacles = new Set();
+    this._hasTriggeredFrenzyThisSlice = false;
     this.slicePath = createSlicePathStart(screenX, screenY);
   }
 
   _beginMouseDragCandidate(screenX, screenY) {
     this._mouseDownStart = { x: screenX, y: screenY };
-    this._dragConnectSource = this._findNodeAtScreenPoint(screenX, screenY);
+    const pressedNode = this._findNodeAtScreenPoint(screenX, screenY);
+    this._dragConnectSource = pressedNode?.owner === 1 ? pressedNode : null;
     this._dragConnectActive = false;
+    this._dragConnectTarget = null;
+    this._leftSlicePending = this._dragConnectSource ? null : { x: screenX, y: screenY };
   }
 
   _extendMouseDrag(screenX, screenY) {
+    this.mx = screenX;
+    this.my = screenY;
+
+    if (this._leftSlicePending && !this._dragConnectSource && !this.slicing) {
+      const leftSliceDistance = Math.hypot(screenX - this._leftSlicePending.x, screenY - this._leftSlicePending.y);
+      if (leftSliceDistance >= INPUT_TUNING.DRAG_CONNECT_THRESHOLD_PX) {
+        this._beginSlice(this._leftSlicePending.x, this._leftSlicePending.y, 0);
+        this._leftSlicePending = null;
+        this._extendSlice(screenX, screenY);
+      }
+      return;
+    }
+
     if (!this._mouseDownStart || !this._dragConnectSource) return;
-    if (this._dragConnectSource.owner !== 1) return;
 
     const distance = Math.hypot(screenX - this._mouseDownStart.x, screenY - this._mouseDownStart.y);
     if (distance < INPUT_TUNING.DRAG_CONNECT_THRESHOLD_PX) return;
@@ -842,18 +883,35 @@ export class Game {
       this.sel.selected = true;
       this._dragConnectActive = true;
     }
+
+    const hoveredTargetNode =
+      this._findNodeAtScreenPoint(screenX, screenY, INPUT_TUNING.HOVER_HIT_PADDING_PX) ||
+      this._findSnapTargetNodeAtScreenPoint(screenX, screenY, this.sel);
+    if (hoveredTargetNode && hoveredTargetNode !== this.sel) {
+      this._dragConnectTarget = hoveredTargetNode;
+      this.hoverNode = hoveredTargetNode;
+    } else if (this._dragConnectTarget) {
+      /* Keep the last valid drag target "sticky" so temporary cursor overlap with
+         tooltips/UI does not cancel the drop target right before mouse release. */
+      this.hoverNode = this._dragConnectTarget;
+    } else {
+      this.hoverNode = null;
+    }
   }
 
   _endMouseDrag(screenX, screenY) {
     const dragSourceNode = this._dragConnectSource;
     const wasDragConnectActive = this._dragConnectActive;
+    const dragTargetNode = this._dragConnectTarget;
     this._mouseDownStart = null;
     this._dragConnectSource = null;
     this._dragConnectActive = false;
+    this._dragConnectTarget = null;
+    this._leftSlicePending = null;
 
     if (!wasDragConnectActive || !dragSourceNode) return false;
 
-    const hitNode = this._findNodeAtScreenPoint(screenX, screenY);
+    const hitNode = dragTargetNode || this._findNodeAtScreenPoint(screenX, screenY, INPUT_TUNING.HOVER_HIT_PADDING_PX);
     const clickIntent = resolvePlayerClickIntent({
       selectedNode: dragSourceNode,
       hitNode,
@@ -874,7 +932,19 @@ export class Game {
 
   _endSlice() {
     this.slicing = false;
+    this._slicePointerButton = null;
+    this._leftSlicePending = null;
+    this._sliceGestureCutTentacles = new Set();
+    this._hasTriggeredFrenzyThisSlice = false;
     this.slicePath = [];
+  }
+
+  _clearMouseGestureState() {
+    this._mouseDownStart = null;
+    this._dragConnectSource = null;
+    this._dragConnectActive = false;
+    this._dragConnectTarget = null;
+    this._leftSlicePending = null;
   }
 
   _pinHoverNodeAtScreenPoint(screenX, screenY) {
@@ -898,16 +968,25 @@ export class Game {
   }
 
   togglePause() {
-    if (this.cfg && this.cfg.isTutorial) return;
     this.paused = !this.paused;
     if (this.paused) {
+      const canSkipCurrentLevel = STATE.canSkipLevel(this.cfg);
+      const skipButton = $id(DOM_IDS.BTN_PSKIP);
+      const currentFailStreak = STATE.getLevelFailStreak(this.cfg?.id || 0);
       $id(DOM_IDS.PINFO).textContent   = T('phaseSuffix', this.cfg.id, this.cfg.name);
       $id(DOM_IDS.BTN_RESUME).textContent = T('resume');
       $id(DOM_IDS.BTN_PRL).textContent    = T('phaseSelect');
       $id(DOM_IDS.BTN_PRR).textContent    = T('restart');
-      $id(DOM_IDS.BTN_PSKIP).textContent  = T('skip');
+      if (skipButton) {
+        skipButton.textContent = T('skip');
+        skipButton.style.display = canSkipCurrentLevel ? '' : 'none';
+      }
       $id(DOM_IDS.BTN_PMENU).textContent  = T('mainMenu');
-      $id(DOM_IDS.PPSAVE).textContent     = T('progSaved');
+      $id(DOM_IDS.PPSAVE).textContent = canSkipCurrentLevel
+        ? T('skipReady')
+        : this.cfg?.isBoss
+          ? T('skipLockedBoss')
+          : T('skipLockedProgress', Math.max(0, 5 - currentFailStreak));
       showScr('pause');
       Music.playMenu();
     } else {
@@ -927,6 +1006,16 @@ export class Game {
     if (hpause) hpause.addEventListener('click', () => this.togglePause());
     const tutNext = $id(DOM_IDS.TUT_NEXT);
     if (tutNext) tutNext.addEventListener('click', () => this.tut.advance());
+    const tutExit = $id(DOM_IDS.TUT_EXIT);
+    if (tutExit) {
+      const exitTutorial = event => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.tut.exit();
+      };
+      tutExit.addEventListener('pointerdown', exitTutorial);
+      tutExit.addEventListener('click', exitTutorial);
+    }
     const hlang = $id(DOM_IDS.HLANG);
     if (hlang) hlang.addEventListener('click', () => {
       import('../localization/i18n.js').then(m => { m.toggleLang(); if (this.cfg && this.cfg.isTutorial) this.tut.showStep(); });

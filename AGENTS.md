@@ -70,12 +70,15 @@ It should stay short, current, and action-oriented.
 Do not break these:
 
 - programmatic retract refunds `paidCost + energyInPipe`
+- support cells keep partial self-regeneration while feeding allies
 - relay nodes do not create free energy
 - player and purple AI use the same canonical slice path
+- frenzy only triggers from `3` active cuts inside the same continuous slice gesture
 - owner `3` is supported symmetrically in gameplay and rendering
 - fixed campaign layouts must match configured level metadata
 - late high-pressure authored phases keep structural player opening support
 - progress and settings persist locally and normalize invalid values
+- phase skip stays locked behind repeated defeats and remains blocked on tutorials, bosses, and the final phase
 
 ## Commands To Run
 
@@ -154,4 +157,3 @@ Treat changes there as gameplay-sensitive.
 2. decide whether `24 RELAY RACE` also needs structural player opening support
 3. continue campaign balance from evidence
 4. only then start a Tentacle Wars fidelity wave
-

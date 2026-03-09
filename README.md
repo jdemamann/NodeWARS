@@ -48,7 +48,8 @@ The current project state is:
 | Select a node | `Left click` one of your nodes |
 | Connect / attack | `Click-click` or `drag-and-release` from your node to a target |
 | Retract outgoing tentacles | `Click` your selected node again |
-| Slice tentacles | `Right-click drag` across tentacles |
+| Slice tentacles | `Right-click drag` across tentacles, or `left-drag` when the gesture does not start from one of your nodes |
+| Pause / leave tutorial | `Pause` button or `Esc` |
 | Mobile interaction | touch input is supported through the same gameplay paths |
 
 ### Slice Rules
@@ -62,6 +63,11 @@ Tentacle cuts depend on **where** the slice lands along the effective source-to-
 | Near target | defensive refund |
 
 This is the canonical rule used by both the player and the purple AI.
+
+### Frenzy Rule
+
+- frenzy only triggers when `3` active tentacles are cut in the **same continuous slice gesture**
+- cuts from separate gestures do **not** stack toward frenzy
 
 ## World Mechanics
 
@@ -89,10 +95,13 @@ This is the canonical rule used by both the player and the purple AI.
 The current implementation deliberately preserves these rules:
 
 - programmatic retract refunds `paidCost + energyInPipe`
+- support cells keep a fraction of their own regeneration while feeding allies
 - relay nodes act as pass-through infrastructure, not energy sources
 - player and purple AI use the same shared slice / burst path
+- frenzy only counts cuts from one continuous slice gesture
 - owner `3` is supported in both gameplay and rendering
 - late high-pressure authored phases give the player extra structural opening support where needed
+- phase skip unlocks only after repeated defeats and remains blocked on tutorials, bosses, and the final phase
 
 ## Features
 
@@ -173,9 +182,11 @@ The game persists these locally:
 - progress
 - current level
 - active world tab
+- phase fail streaks used for skip unlocks
 - language
 - audio toggles
 - graphics mode
+- FPS toggle
 - theme
 - font
 - text zoom

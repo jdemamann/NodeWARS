@@ -33,6 +33,7 @@ export const DOM_IDS = Object.freeze({
   TUT_TITLE:  'tutTitle',
   TUT_TEXT:   'tutText',
   TUT_NEXT:   'tutNext',
+  TUT_EXIT:   'tutExit',
 
   /* Screens */
   SCREEN_MENU:     'sm',

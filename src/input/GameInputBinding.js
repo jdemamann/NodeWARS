@@ -9,15 +9,25 @@ import {
 
 const { input: INPUT_TUNING } = GAMEPLAY_RULES;
 
+function isSliceButtonStillPressed(buttons, slicePointerButton) {
+  if (slicePointerButton === 2) return (buttons & 2) === 2;
+  if (slicePointerButton === 0) return (buttons & 1) === 1;
+  return buttons !== 0;
+}
+
 export function bindGameInputEvents(game) {
   const canvas = game.canvas;
 
-  canvas.addEventListener('contextmenu', event => event.preventDefault());
+  canvas.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    if (game.slicing && game._slicePointerButton === 2) game._endSlice();
+  });
 
   canvas.addEventListener('mousedown', event => {
     if (game.state !== 'playing' || game.paused) return;
     if (event.button === 2) {
-      game._beginSlice(event.offsetX, event.offsetY);
+      event.preventDefault();
+      game._beginSlice(event.offsetX, event.offsetY, 2);
       return;
     }
     if (event.button === 0) {
@@ -29,7 +39,13 @@ export function bindGameInputEvents(game) {
     game.mx = event.offsetX;
     game.my = event.offsetY;
 
-    if (game.slicing && !game.paused) game._extendSlice(event.offsetX, event.offsetY);
+    if (game.slicing && !game.paused) {
+      if (!isSliceButtonStillPressed(event.buttons, game._slicePointerButton)) {
+        game._endSlice();
+      } else {
+        game._extendSlice(event.offsetX, event.offsetY);
+      }
+    }
     if (!game.slicing && !game.paused && (event.buttons & 1) === 1) game._extendMouseDrag(event.offsetX, event.offsetY);
     if (!game.hoverPin && game.state === 'playing' && !game.paused) {
       const hoveredNode = game._findHoverNodeAtScreenPoint(event.offsetX, event.offsetY);
@@ -48,6 +64,10 @@ export function bindGameInputEvents(game) {
       return;
     }
     if (game.state === 'playing' && !game.paused && event.button === 0) {
+      if (game.slicing && game._slicePointerButton === 0) {
+        game._endSlice();
+        return;
+      }
       const consumedByDrag = game._endMouseDrag(event.offsetX, event.offsetY);
       if (!consumedByDrag) game.click(event.offsetX, event.offsetY);
     }
@@ -55,9 +75,8 @@ export function bindGameInputEvents(game) {
 
   canvas.addEventListener('mouseleave', () => {
     if (!game.hoverPin) game.hoverNode = null;
-    game._mouseDownStart = null;
-    game._dragConnectSource = null;
-    game._dragConnectActive = false;
+    if (game.slicing) game._endSlice();
+    game._clearMouseGestureState();
   });
 
   canvas.addEventListener('touchstart', event => {
@@ -128,7 +147,33 @@ export function bindGameInputEvents(game) {
   canvas.addEventListener('touchcancel', () => game._clearTouchState());
 
   window.addEventListener('resize', () => game.resize());
+  window.addEventListener('mouseup', event => {
+    if (event.button === 2 && game.slicing) game._endSlice();
+    if (event.button === 0) {
+      if (game.slicing && game._slicePointerButton === 0) game._endSlice();
+      game._clearMouseGestureState();
+    }
+  });
+  window.addEventListener('pointerup', () => {
+    if (game.slicing) game._endSlice();
+    game._clearMouseGestureState();
+  });
+  window.addEventListener('pointercancel', () => {
+    if (game.slicing) game._endSlice();
+    game._clearMouseGestureState();
+  });
+  window.addEventListener('contextmenu', event => {
+    if (game.slicing) game._endSlice();
+    event.preventDefault();
+  });
+  window.addEventListener('blur', () => {
+    if (game.slicing) game._endSlice();
+    game._clearMouseGestureState();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && game.slicing) game._endSlice();
+  });
   window.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && game.state === 'playing' && game.cfg && !game.cfg.isTutorial) game.togglePause();
+    if (event.key === 'Escape' && game.state === 'playing' && game.cfg) game.togglePause();
   });
 }
