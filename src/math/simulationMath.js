@@ -2,7 +2,7 @@
    NODE WARS v3 — Simulation Math
    ================================================================ */
 
-import { LVL_STEP, BUILD_RULES } from '../config/gameConfig.js';
+import { LVL_STEP, BUILD_RULES, PROGRESSION_RULES } from '../config/gameConfig.js';
 
 export const computeDistance = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
 
@@ -16,6 +16,19 @@ export const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(max
 export const rnd = (minimum, maximum) => minimum + Math.random() * (maximum - minimum);
 
 export const computeEnergyLevel = energy => clamp(Math.floor(energy / LVL_STEP), 0, 5);
+export const computeMaxAttainableEnergyLevel = maxEnergy => clamp(Math.floor(maxEnergy / LVL_STEP), 0, 5);
+export function computeStableNodeLevel(energy, maxEnergy = 200, previousLevel = null) {
+  const clampedEnergy = clamp(energy, 0, maxEnergy);
+  const maxAttainableLevel = computeMaxAttainableEnergyLevel(maxEnergy);
+  const rawLevel = clamp(Math.floor(clampedEnergy / LVL_STEP), 0, maxAttainableLevel);
+  if (previousLevel == null) return rawLevel;
+
+  const stablePreviousLevel = clamp(previousLevel, 0, maxAttainableLevel);
+  if (rawLevel >= stablePreviousLevel) return rawLevel;
+
+  const demotionThreshold = stablePreviousLevel * LVL_STEP - PROGRESSION_RULES.LEVEL_DOWN_HYSTERESIS_ENERGY;
+  return clampedEnergy < demotionThreshold ? rawLevel : stablePreviousLevel;
+}
 export const computeNodeRadius = (energy, maxEnergy = 200) => 16 + (energy / maxEnergy) * 42;
 export const computeBuildCost = distance => BUILD_RULES.BASE_COST + distance * BUILD_RULES.COST_PER_PIXEL;
 

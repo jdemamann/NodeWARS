@@ -23,6 +23,10 @@ It should stay short, current, and action-oriented.
 3. `docs/project/task-backlog.md`
 4. `docs/implementation/current-gameplay-baseline.md`
 5. `docs/implementation/tentaclewars-fidelity-spec.md`
+6. `docs/project/check-matrix.md`
+7. `docs/project/development-working-rhythm.md`
+8. `docs/project/operational-kanban.md`
+9. `docs/project/skill-usage-map.md`
 
 ## Code Structure
 
@@ -86,12 +90,18 @@ Do not break these:
 
 - mechanics smoke suite:
   - `node scripts/smoke-checks.mjs`
+- progression sanity:
+  - `node scripts/game-state-progression-sanity.mjs`
+- deterministic input harness:
+  - `node scripts/input-harness.mjs`
 - campaign static sanity:
   - `node scripts/campaign-sanity.mjs`
+- release readiness:
+  - `node scripts/release-readiness.mjs`
 - long-run numeric stability:
   - `node scripts/simulation-soak.mjs`
 
-Run all three after gameplay, campaign, UI/settings, persistence, or render changes that may affect state.
+Run the relevant subset after gameplay, campaign, UI/settings, persistence, or render changes that may affect state. Use `npm run check` for the full local gate.
 
 ## Key Documentation
 
@@ -118,6 +128,37 @@ Planning / balance:
 - `docs/project/campaign-balance-wave-a.md`
 - `docs/project/playtest-balance-plan.md`
 - `docs/project/priority-phase-balance-pass.md`
+- `docs/project/ai-wave-2026-03-10.md`
+- `docs/project/check-matrix.md`
+- `docs/project/development-working-rhythm.md`
+- `docs/project/operational-kanban.md`
+- `docs/project/issue-intake-template.md`
+- `docs/project/campaign-balance-wave-b-plan.md`
+
+Domain agents:
+
+- `docs/agents/gameplay-systems-agent.md`
+- `docs/agents/ai-behavior-agent.md`
+- `docs/agents/campaign-level-agent.md`
+- `docs/agents/content-authored-levels-agent.md`
+- `docs/agents/meta-progression-agent.md`
+- `docs/agents/music-theme-agent.md`
+- `docs/agents/narrative-localization-agent.md`
+- `docs/agents/render-visual-language-agent.md`
+- `docs/agents/ui-ux-agent.md`
+- `docs/agents/performance-build-agent.md`
+- `docs/agents/qa-checks-agent.md`
+- `docs/agents/code-commentary-agent.md`
+
+Installed Codex skills:
+
+- `develop-web-game`
+- `doc`
+- `imagegen`
+- `playwright`
+- `playwright-interactive`
+- `screenshot`
+- `spreadsheet`
 
 ## Current Balance Context
 
@@ -129,11 +170,24 @@ Planning / balance:
 ## Workflow Expectations
 
 - Prefer small, test-backed changes.
+- Start each meaningful wave by checking the relevant domain agent and the check matrix.
+- If the task clearly matches an installed Codex skill, use the skill before ad-hoc work.
 - If changing gameplay rules, update at least one guardrail or explain why not.
 - If changing settings, tutorial, story, or persistence, verify all linked surfaces still agree.
 - If changing campaign progression, tutorial completion, or skip flow, keep `GameState` as the canonical source of next-level and unlock rules.
 - If changing campaign layouts, run both `smoke-checks` and `campaign-sanity`.
 - If changing world systems or simulation math, run `simulation-soak` too.
+
+## Safe Restart Point For New Skills
+
+It is safe to restart Codex whenever these conditions are true:
+
+- the current wave is not in the middle of a code edit
+- the relevant checks for the current wave have passed
+- any intended handoff docs are already updated
+
+There is no need to prepare extra implementation tasks before restarting just to activate installed skills.
+If a wave is already in progress, finish that wave first, then restart.
 
 ## High-Risk Files
 
@@ -156,7 +210,8 @@ Treat changes there as gameplay-sensitive.
 
 ## Current Best Next Steps
 
-1. playtest phases `18`, `21`, `30`, and `32`
-2. decide whether `24 RELAY RACE` also needs structural player opening support
-3. continue campaign balance from evidence
-4. only then start a Tentacle Wars fidelity wave
+1. evaluate whether `24 RELAY RACE` still needs structural support after Wave B tuning
+2. run playtest-driven tuning on the new AI tactical-state and enemy-slice wave
+3. keep expanding balance and micro-bug intake from live sessions
+4. prepare executable Linux/Android packaging only when port work becomes active
+5. only then start a Tentacle Wars fidelity wave

@@ -8,8 +8,13 @@
 import { GAMEPLAY_RULES, NodeType, TentState } from '../config/gameConfig.js';
 import { computeBuildCost, computeDistance } from '../math/simulationMath.js';
 import { Tent } from '../entities/Tent.js';
-import { getContestCaptureScore } from './NeutralContest.js';
 import { areAlliedOwners, areHostileOwners } from './OwnerTeams.js';
+import {
+  buildAiTacticalState,
+  buildMoveScore,
+  scoreRelayOriginAdjustment,
+  scoreSliceOpportunity,
+} from './AIScoring.js';
 
 const { progression: PROGRESSION_RULES, ai: AI_RULES } = GAMEPLAY_RULES;
 
@@ -67,14 +72,18 @@ export class AI {
     this.owner    = owner;
     this._timer   = 0;
     this._interval= cfg.aiThinkIntervalSeconds;
+    this._sliceCooldown = 0;
+    this._tacticalState = 'pressure';
   }
 
   update(dt) {
     this._timer += dt;
+    this._sliceCooldown = Math.max(0, this._sliceCooldown - dt);
+    this._tacticalState = buildAiTacticalState(this.game, this.owner, AI_RULES);
 
-    /* Purple AI checks opportunistic burst cuts continuously so a charged lane
-       can convert into pressure immediately, independent of build-think pacing. */
-    if (this.owner === 3) this._checkStrategicCuts(this.game);
+    /* Slice pressure is checked independently from build-think pacing so the
+       coalition can convert charged lanes into tempo spikes mid-fight. */
+    this._checkStrategicCuts(this.game);
 
     if (this._timer < this._interval) return;
     this._timer = 0;
@@ -93,143 +102,6 @@ export class AI {
       (AI_RULES.INTERVAL_JITTER_BASE + Math.random() * AI_RULES.INTERVAL_JITTER_RANGE);
 
     this._think();
-  }
-
-  _buildRelayContext(targetNode) {
-    const game = this.game;
-    let centrality = 0;
-    let friendlyRouteValue = 0;
-    let playerRouteValue = 0;
-    let neutralRouteValue = 0;
-
-    for (const node of game.nodes) {
-      if (node === targetNode || node.type === NodeType.HAZARD) continue;
-      const distance = computeDistance(targetNode.x, targetNode.y, node.x, node.y);
-      const weight = Math.max(0, 1 - distance / AI_RULES.RELAY_CONTEXT_RADIUS_PX);
-      if (weight <= 0) continue;
-
-      /* Central relays are stronger because they can touch more nearby routes with
-         shorter, cheaper follow-up links. */
-      centrality += weight;
-
-      if (node.owner === this.owner && !node.isRelay) friendlyRouteValue += weight;
-      else if (node.owner === 1 && !node.isRelay) playerRouteValue += weight;
-      else if (node.owner === 0 && !node.isRelay) neutralRouteValue += weight;
-    }
-
-    let playerRelayLinks = 0;
-    let enemyPressure = 0;
-    for (const tentacle of game.tents) {
-      if (!tentacle.alive || (tentacle.state !== TentState.ACTIVE && tentacle.state !== TentState.ADVANCING)) continue;
-      if (tentacle.effectiveSourceNode === targetNode && tentacle.effectiveSourceNode.owner === 1) playerRelayLinks += 1;
-      if (tentacle.effectiveTargetNode === targetNode && tentacle.effectiveSourceNode.owner === 1) enemyPressure += 1;
-    }
-
-    return {
-      centrality,
-      friendlyRouteValue,
-      playerRouteValue,
-      neutralRouteValue,
-      playerRelayLinks,
-      enemyPressure,
-    };
-  }
-
-  _scoreRelayTarget(sourceNode, targetNode, proximityScore, isDefensive, personality, totalBuildCost) {
-    const relayContext = this._buildRelayContext(targetNode);
-    const playerContestProgress = targetNode.contest?.[1] || 0;
-    const ownContestProgress = targetNode.contest?.[this.owner] || 0;
-    const captureRequirement = Math.max(targetNode.captureThreshold || 20, targetNode.energy || 0);
-    const remainingEnergyAfterBuild = sourceNode.energy - totalBuildCost;
-
-    /* Relay scoring terms:
-       - centrality: nearby node density means the relay can shape more routes
-       - route value: friendly + neutral neighbors make the relay a launch point
-       - player influence: stealing or contesting player relay space is worth extra
-       - losing risk: avoid low-budget grabs into strong player coverage */
-    let score = 54 + proximityScore;
-    score += relayContext.centrality * 15;
-    score += relayContext.friendlyRouteValue * 7;
-    score += relayContext.neutralRouteValue * 5;
-    score += relayContext.playerRouteValue * (targetNode.owner === 1 ? 12 : 6);
-    score += relayContext.playerRelayLinks * 16;
-    score += playerContestProgress * 0.9;
-    score += ownContestProgress * 0.4;
-
-    if (targetNode.owner === 0) {
-      score += 18 + personality.expansionBonus;
-      score -= captureRequirement * 0.45;
-    } else if (targetNode.owner === 1) {
-      score += 26 + personality.attackBonus;
-      score -= targetNode.energy * 0.35;
-    } else if (areAlliedOwners(targetNode.owner, this.owner)) {
-      score = 12 + proximityScore + personality.siegeBonus + relayContext.playerRouteValue * 4;
-      if (targetNode.owner !== this.owner) score += 10;
-      if (targetNode.energy < captureRequirement * 0.4) score += 10;
-    }
-
-    const losingRisk =
-      relayContext.playerRouteValue * 10 +
-      relayContext.enemyPressure * 14 +
-      Math.max(0, captureRequirement - remainingEnergyAfterBuild) * 0.55 -
-      relayContext.friendlyRouteValue * 6;
-
-    score -= losingRisk;
-
-    if (remainingEnergyAfterBuild < captureRequirement * 0.45) score -= 24;
-    if (isDefensive) score *= targetNode.owner === this.owner ? 1.0 : personality.defensiveDampener;
-
-    return score;
-  }
-
-  _buildMoveScore(sourceNode, targetNode, proximityScore, isDefensive, personality, totalBuildCost) {
-    if (targetNode.isRelay) {
-      return this._scoreRelayTarget(sourceNode, targetNode, proximityScore, isDefensive, personality, totalBuildCost);
-    }
-
-    if (targetNode.owner === 0) {
-      const playerContestProgress = targetNode.contest?.[1] || 0;
-      const alliedContestProgress = getContestCaptureScore(targetNode, this.owner);
-      let score =
-        72 +
-        proximityScore +
-        personality.expansionBonus +
-        alliedContestProgress * 0.35 -
-        targetNode.energy * 0.2 -
-        playerContestProgress * 1.8;
-      if (isDefensive) score *= personality.defensiveDampener;
-      return score;
-    }
-
-    if (targetNode.owner === 1) {
-      const energyAdvantage = sourceNode.energy - targetNode.energy;
-      const existingPressureBonus = this.game.tents.some(tentacle =>
-        tentacle.alive && tentacle.source.owner === this.owner && tentacle.target === targetNode
-      ) ? 18 : 0;
-      let score = (isDefensive ? 20 : 55) + energyAdvantage * 0.5 + proximityScore + existingPressureBonus + personality.attackBonus;
-
-      if (this.owner === 3) {
-        /* Purple AI should feel more like a kill-confirm faction than red AI:
-           prioritize already-weakened player nodes, existing pressure lanes,
-           and heavily contested player positions over passive macro play. */
-        if (targetNode.energy < targetNode.maxE * 0.35) score += 18;
-        if (targetNode.underAttack > 0.2) score += 10;
-        if (existingPressureBonus > 0) score += 12;
-      }
-
-      return score;
-    }
-
-    if (areAlliedOwners(targetNode.owner, this.owner)) {
-      const alliedSupportBonus = targetNode.owner !== this.owner ? 10 : 0;
-      if (targetNode.energy < targetNode.maxE * 0.5) return 22 + proximityScore + personality.siegeBonus + alliedSupportBonus;
-      if (isDefensive && targetNode.energy < targetNode.maxE * 0.4) return 55 + proximityScore + alliedSupportBonus;
-      if (targetNode.owner !== this.owner && targetNode.energy < targetNode.maxE * 0.75) {
-        return 16 + proximityScore + alliedSupportBonus;
-      }
-    }
-
-    return 0;
   }
 
   _createTentacleMove(sourceNode, targetNode, buildCost) {
@@ -268,27 +140,13 @@ export class AI {
     return relayHasUsableBudget && sourceNode.energy > Math.max(8, energyThreshold * 0.35);
   }
 
-  _scoreRelayOriginAdjustment(sourceNode, distance, totalBuildCost) {
-    if (!sourceNode.isRelay) return 0;
-
-    const remainingRelayEnergy = sourceNode.energy - totalBuildCost;
-    let adjustment = 0;
-
-    /* Relay launches should prefer short tactical follow-ups backed by real
-       buffered energy instead of turning every captured relay into long-range spam. */
-    if (distance > AI_RULES.RELAY_CONTEXT_RADIUS_PX * 0.45) adjustment -= 12;
-    if (distance > AI_RULES.RELAY_CONTEXT_RADIUS_PX * 0.7) adjustment -= 18;
-    if (remainingRelayEnergy < totalBuildCost * 0.35) adjustment -= 16;
-
-    return adjustment;
-  }
-
   _think() {
     const game = this.game;
     const distanceCostMultiplier = this.cfg.distanceCostMultiplier;
     const isDefensive = game.aiDefensive > 0;
     const personality = personalityFor(this.cfg.id || 0, this.owner);
     const energyThreshold = isDefensive ? AI_RULES.DEFENSIVE_ENERGY_THRESHOLD : personality.energyThreshold;
+    const tacticalState = this._tacticalState;
 
     /* Eligible sources: AI-owned nodes with usable energy and free slots.
        Owned relays are allowed when they actually hold buffered pass-through budget. */
@@ -312,16 +170,21 @@ export class AI {
         if (sourceNode.energy < totalBuildCost + 1) return;
 
         const proximityScore = 300 / (distance + 60);
-        let score = this._buildMoveScore(
+        let score = buildMoveScore({
+          game,
+          owner: this.owner,
           sourceNode,
           targetNode,
           proximityScore,
           isDefensive,
           personality,
           totalBuildCost,
-        );
+          aiRules: AI_RULES,
+          tentState: TentState,
+          tacticalState,
+        });
 
-        score += this._scoreRelayOriginAdjustment(sourceNode, distance, totalBuildCost);
+        score += scoreRelayOriginAdjustment(sourceNode, distance, totalBuildCost, AI_RULES);
 
         if (score > 0) moves.push({ sourceNode, targetNode, score, buildCost: totalBuildCost });
       });
@@ -330,12 +193,19 @@ export class AI {
     /* Pick top 2 non-conflicting moves */
     moves.sort((leftMove, rightMove) => rightMove.score - leftMove.score);
     const usedSourceIds = new Set();
+    const targetPickCounts = new Map();
     let picked = 0;
 
     for (const move of moves) {
       if (picked >= 2) break;
       if (usedSourceIds.has(move.sourceNode.id)) continue;
+      const targetPickCount = targetPickCounts.get(move.targetNode.id) || 0;
+      const canDoubleFocusPlayer =
+        move.targetNode.owner === 1 &&
+        move.score >= AI_RULES.ALLOW_MULTI_SOURCE_PLAYER_FOCUS_THRESHOLD;
+      if (targetPickCount > 0 && !canDoubleFocusPlayer) continue;
       usedSourceIds.add(move.sourceNode.id);
+      targetPickCounts.set(move.targetNode.id, targetPickCount + 1);
       this._createTentacleMove(move.sourceNode, move.targetNode, move.buildCost);
       picked++;
     }
@@ -353,22 +223,43 @@ export class AI {
    * This prevents wasteful cuts; the purple AI only cuts when it's worth it.
    */
   _checkStrategicCuts(game) {
-    const strategicCutRatio = AI_RULES.STRATEGIC_CUT_RATIO;
+    if (this._sliceCooldown > 0) return;
 
+    const strategicCutRatio = AI_RULES.STRATEGIC_CUT_RATIO;
+    const sliceScoreThreshold = this.owner === 3
+      ? AI_RULES.PURPLE_SLICE_SCORE_THRESHOLD
+      : AI_RULES.RED_SLICE_SCORE_THRESHOLD;
+
+    const sliceCandidates = [];
     game.tents.forEach(tentacle => {
-      if (!tentacle.alive || tentacle.state !== TentState.ACTIVE) return;
+      if (!tentacle.alive) return;
+      if (tentacle.state !== TentState.ACTIVE && tentacle.state !== TentState.ADVANCING) return;
 
       const sourceNode = tentacle.effectiveSourceNode;
       const targetNode = tentacle.effectiveTargetNode;
-      if (sourceNode.owner !== 3 || targetNode.owner !== 1) return;
+      if (sourceNode.owner !== this.owner || targetNode.owner !== 1) return;
 
-      /* Only cut when the pipe is charged enough to be decisive */
       const pipeEnergy = tentacle.energyInPipe || 0;
       if (pipeEnergy < targetNode.energy * AI_RULES.STRATEGIC_CUT_PIPE_TARGET_RATIO) return;
 
-      /* Canonical slice/burst entry point: reuse the same path as player cuts
-         so burst timing, clash handling, capture, and balance stay unified. */
-      tentacle.applySliceCut(strategicCutRatio);
+      const score = scoreSliceOpportunity({
+        game,
+        owner: this.owner,
+        tentacle,
+        tacticalState: this._tacticalState,
+        aiRules: AI_RULES,
+      });
+
+      if (score >= sliceScoreThreshold) {
+        sliceCandidates.push({ tentacle, score });
+      }
     });
+
+    if (!sliceCandidates.length) return;
+    sliceCandidates.sort((leftCandidate, rightCandidate) => rightCandidate.score - leftCandidate.score);
+    sliceCandidates[0].tentacle.applySliceCut(strategicCutRatio);
+    this._sliceCooldown = this.owner === 3
+      ? AI_RULES.PURPLE_SLICE_COOLDOWN_SEC
+      : AI_RULES.RED_SLICE_COOLDOWN_SEC;
   }
 }

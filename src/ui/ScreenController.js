@@ -17,6 +17,9 @@ import { getLevelSelectWorldMeta, getLevelGridWorldAccent, getWorldBannerMeta } 
 import { buildLevelMechanicBadge, buildPurpleEnemyBadge } from './levelSelectView.js';
 import { buildResultInfoMarkup } from './resultScreenView.js';
 import { buildCampaignEndingMarkup } from './campaignEndingView.js';
+import { buildStoryMarkup } from './storyScreenView.js';
+import { buildCreditsMarkup } from './creditsView.js';
+import { applyDebugSettingsVisibility, applySettingsToggleState } from './settingsView.js';
 
 function $(id) { return document.getElementById(id); }
 
@@ -53,21 +56,101 @@ export function fadeGo(cb) {
 }
 
 let _toastTmr = null;
-export function showToast(msg) {
-  const toastElement = $(DOM_IDS.TOAST);
-  toastElement.textContent = msg;
-  toastElement.classList.add('on');
-  if (_toastTmr) clearTimeout(_toastTmr);
-  _toastTmr = setTimeout(() => toastElement.classList.remove('on'), 2800);
+let _notificationSeq = 0;
+const _notificationRecent = new Map();
+const _notificationPriority = {
+  warning: 4,
+  objective: 3,
+  music: 2,
+  status: 2,
+  debug: 1,
+};
+
+function pruneNotificationStack(notificationStack) {
+  const cards = Array.from(notificationStack.children);
+  while (cards.length > 3) {
+    const card = cards.shift();
+    card?.remove();
+  }
 }
 
-function getStoryChapterMeta(chapterTitle) {
-  if (!chapterTitle) return { icon: '◈', accentClass: 'story-accent-prologue' };
-  if (chapterTitle.includes('WORLD 1') || chapterTitle.includes('MUNDO 1')) return { icon: '◈', accentClass: 'story-accent-genesis' };
-  if (chapterTitle.includes('WORLD 2') || chapterTitle.includes('MUNDO 2') || chapterTitle.includes('VOID') || chapterTitle.includes('VAZIO')) return { icon: '⊗', accentClass: 'story-accent-void' };
-  if (chapterTitle.includes('WORLD 3') || chapterTitle.includes('MUNDO 3') || chapterTitle.includes('NEXUS')) return { icon: '⚡', accentClass: 'story-accent-nexus' };
-  if (chapterTitle.includes('EPILOGUE') || chapterTitle.includes('EPÍLOGO')) return { icon: '✦', accentClass: 'story-accent-epilogue' };
-  return { icon: '◈', accentClass: 'story-accent-prologue' };
+export function showNotification({
+  kind = 'status',
+  kicker = '',
+  title = '',
+  body = '',
+  meta = '',
+  icon = '•',
+  durationMs = 3200,
+  dedupeKey = '',
+  dedupeMs = null,
+} = {}) {
+  const notificationStack = $(DOM_IDS.NOTIFICATIONS);
+  if (!notificationStack) return;
+
+  const priority = _notificationPriority[kind] || 0;
+  const dedupeWindowMs = dedupeMs ?? Math.min(Math.max(durationMs, 800), 4500);
+  const now = performance?.now?.() ?? Date.now();
+  if (dedupeKey) {
+    const lastSeenAt = _notificationRecent.get(dedupeKey) || -Infinity;
+    if (now - lastSeenAt < dedupeWindowMs) return;
+    _notificationRecent.set(dedupeKey, now);
+  }
+
+  const activeCards = Array.from(notificationStack.children);
+  const highestActivePriority = activeCards.reduce((highest, card) => {
+    const cardPriority = Number(card.dataset.priority || 0);
+    return Math.max(highest, cardPriority);
+  }, 0);
+
+  if (highestActivePriority > priority && priority <= 2) return;
+  if (priority >= 3) {
+    activeCards
+      .filter(card => Number(card.dataset.priority || 0) < priority)
+      .forEach(card => card.remove());
+  }
+
+  const notificationCard = document.createElement('div');
+  const notificationId = `notif-${++_notificationSeq}`;
+  notificationCard.id = notificationId;
+  notificationCard.className = `notif-card kind-${kind}`;
+  notificationCard.dataset.priority = String(priority);
+  if (dedupeKey) notificationCard.dataset.dedupeKey = dedupeKey;
+  notificationCard.innerHTML =
+    '<div class="notif-inner">' +
+      `<div class="notif-icon">${icon}</div>` +
+      '<div class="notif-copy">' +
+        (kicker ? `<div class="notif-kicker">${kicker}</div>` : '') +
+        (title ? `<div class="notif-title">${title}</div>` : '') +
+        (body ? `<div class="notif-body">${body}</div>` : '') +
+        (meta ? `<div class="notif-meta">${meta}</div>` : '') +
+      '</div>' +
+    '</div>';
+
+  notificationStack.appendChild(notificationCard);
+  pruneNotificationStack(notificationStack);
+
+  const queueVisualMount = globalThis.requestAnimationFrame || (callback => window.setTimeout(callback, 0));
+  queueVisualMount(() => notificationCard.classList.add('on'));
+
+  const dismiss = () => {
+    notificationCard.classList.remove('on');
+    window.setTimeout(() => notificationCard.remove(), 260);
+  };
+
+  window.setTimeout(dismiss, durationMs);
+}
+
+export function showToast(msg) {
+  if (_toastTmr) clearTimeout(_toastTmr);
+  showNotification({
+    kind: 'status',
+    icon: '◈',
+    body: msg,
+    durationMs: 2800,
+    dedupeKey: `toast:${msg}`,
+  });
+  _toastTmr = setTimeout(() => {}, 2800);
 }
 
 /* ── Level-select: world tabs + grid ── */
@@ -212,35 +295,7 @@ function _makeLvBtn(levelConfig, phaseNum, accentColor, isLocked, isDone, isNext
 /* ── Story screen ── */
 export function buildStory() {
   const wrap = $(DOM_IDS.STORY_WRAP);
-  wrap.innerHTML = '';
-  const stor = T('stor');
-  const title = document.createElement('div');
-  title.className  = 'sttitle';
-  title.textContent= T('storTitle');
-  wrap.appendChild(title);
-
-  const worldStrip = document.createElement('div');
-  worldStrip.className = 'story-strip';
-  worldStrip.innerHTML =
-    '<div class="story-chip story-accent-genesis"><span class="story-chip-icon">◈</span><span>GENESIS</span></div>' +
-    '<div class="story-chip story-accent-void"><span class="story-chip-icon">⊗</span><span>VOID</span></div>' +
-    '<div class="story-chip story-accent-nexus"><span class="story-chip-icon">⚡</span><span>NEXUS PRIME</span></div>';
-  wrap.appendChild(worldStrip);
-
-  stor.forEach(item => {
-    if (item.t) {
-      const chapterMeta = getStoryChapterMeta(item.t);
-      const chapterCard = document.createElement('div');
-      chapterCard.className = 'stchap-card ' + chapterMeta.accentClass;
-      chapterCard.innerHTML =
-        '<div class="stchap-icon">' + chapterMeta.icon + '</div>' +
-        '<div class="stchap">' + item.t + '</div>';
-      wrap.appendChild(chapterCard);
-    }
-    if (item.p) { const d = document.createElement('div'); d.className = 'stpara'; d.innerHTML   = item.p; wrap.appendChild(d); }
-    if (item.q) { const d = document.createElement('div'); d.className = 'stquote';d.textContent = item.q; wrap.appendChild(d); }
-    if (item.t || item.p || item.q) { const hr = document.createElement('hr'); hr.className = 'stdivider'; wrap.appendChild(hr); }
-  });
+  wrap.innerHTML = buildStoryMarkup(T);
   const sb = $(DOM_IDS.BTN_STORY_BACK);
   if (sb) sb.textContent = T('enterGrid');
   const sb2 = $(DOM_IDS.BTN_STORY_BACK2);
@@ -283,8 +338,13 @@ export function endLevel(win, game) {
     STATE.recordLevelLoss(levelId);
   }
 
-  if (win) { SFX.win(); setTimeout(() => Music.playMenu(), 1500); }
-  else     { SFX.lose(); setTimeout(() => Music.playMenu(), 1200); }
+  if (win) {
+    SFX.win();
+    if (levelId !== 32) setTimeout(() => Music.playMenu(), 1500);
+  } else {
+    SFX.lose();
+    setTimeout(() => Music.playMenu(), 1200);
+  }
 
   setTimeout(() => {
     if (win && levelId === 32) {
@@ -363,6 +423,7 @@ export function endLevel(win, game) {
 }
 
 export function showCampaignEnding(game, { debugPreview = false } = {}) {
+  Music.playEnding();
   const endingModel = buildCampaignEndingMarkup(game, T, curLang(), { debugPreview });
   const titleElement = $(DOM_IDS.ENDING_TITLE);
   const subtitleElement = $(DOM_IDS.ENDING_SUB);
@@ -388,38 +449,8 @@ export function showCampaignEnding(game, { debugPreview = false } = {}) {
 
 /* ── Settings UI ── */
 export function refreshSettingsUI() {
-  ['w2','w3','debug','sound','music','showFps'].forEach(k => {
-    const id  = 'tog' + k.charAt(0).toUpperCase() + k.slice(1);
-    const btn = $(id);
-    if (!btn) return;
-    const isEnabled = k === 'w2'
-      ? STATE.isWorldUnlocked(2)
-      : k === 'w3'
-        ? STATE.isWorldUnlocked(3)
-        : !!STATE.settings[k];
-    btn.textContent = isEnabled ? 'ON' : 'OFF';
-    btn.classList.toggle('on', isEnabled);
-  });
-  const graphicsBtn = $('togGraphicsMode');
-  if (graphicsBtn) {
-    const mode = STATE.settings.graphicsMode === 'high' ? 'HIGH' : 'LOW';
-    graphicsBtn.textContent = mode;
-    graphicsBtn.classList.toggle('on', mode === 'HIGH');
-  }
-  const themeBtn = $('togTheme');
-  if (themeBtn) {
-    const t = STATE.settings.theme || 'AURORA';
-    themeBtn.textContent = t;
-    themeBtn.classList.toggle('on', t !== 'GLACIER');
-  }
-  const debugResetRow = $(DOM_IDS.DEBUG_RESET_ROW);
-  if (debugResetRow) debugResetRow.style.display = STATE.settings.debug ? '' : 'none';
-  const debugCopyRow = $(DOM_IDS.DEBUG_COPY_ROW);
-  if (debugCopyRow) debugCopyRow.style.display = STATE.settings.debug ? '' : 'none';
-  const debugEndingRow = $(DOM_IDS.DEBUG_ENDING_ROW);
-  if (debugEndingRow) debugEndingRow.style.display = STATE.settings.debug ? '' : 'none';
-  const debugPanel = $(DOM_IDS.DEBUG_INFO_PANEL);
-  if (debugPanel) debugPanel.style.display = STATE.settings.debug ? '' : 'none';
+  applySettingsToggleState(STATE);
+  applyDebugSettingsVisibility(STATE.settings.debug);
 }
 
 export function updateDebugInfo() {
@@ -454,49 +485,7 @@ export function updateDebugInfo() {
 export function buildCredits() {
   const wrap = $(DOM_IDS.CRED_WRAP);
   if (!wrap) return;
-  const pt = curLang() === 'pt';
-
-  const sections = [
-    {
-      title: pt ? 'CRIAÇÃO' : 'CREATION',
-      items: [
-        { label: pt ? 'Direção, design e código' : 'Direction, design, and code', value: 'Jonis Alves Demamann' },
-      ],
-    },
-    {
-      title: pt ? 'PRODUÇÃO' : 'PRODUCTION',
-      items: [
-        { label: pt ? 'Render' : 'Render', value: 'HTML5 Canvas 2D' },
-        { label: pt ? 'Áudio procedural' : 'Procedural audio', value: 'Web Audio API' },
-        { label: pt ? 'Plataforma' : 'Platform', value: 'Vanilla JavaScript ES Modules' },
-      ],
-    },
-    {
-      title: pt ? 'CONTATO' : 'CONTACT',
-      items: [
-        { label: 'E-mail', value: 'jonis@outlook.com' },
-      ],
-    },
-  ];
-
-  let html = '<div class="cred-title">' + T('creditsTitle') + '</div>';
-  html += '<div class="cred-sub">' + (pt ? 'INFORMAÇÃO ESSENCIAL' : 'ESSENTIAL INFORMATION') + '</div>';
-
-  sections.forEach(sec => {
-    html += '<div class="cred-block"><div class="cred-block-title">' + sec.title + '</div>';
-    sec.items.forEach(item => {
-      html += '<div class="cred-item"><b>' + item.label + '</b> — ' + item.value + '</div>';
-    });
-    html += '</div>';
-  });
-
-  html += '<div class="cred-sig">' +
-    '<div class="cred-sig-name">Jonis Alves Demamann</div>' +
-    '<div class="cred-sig-contact"><a href="mailto:jonis@outlook.com">jonis@outlook.com</a></div>' +
-  '</div>';
-  html += '<div class="cred-copy">© 2025 Jonis Alves Demamann · NODE WARS</div>';
-
-  wrap.innerHTML = html;
+  wrap.innerHTML = buildCreditsMarkup(T, curLang() === 'pt');
 }
 
 /* ── Back-reference to game instance (injected from main.js) ── */

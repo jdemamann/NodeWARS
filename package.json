@@ -4,8 +4,17 @@
     "smoke": "node scripts/smoke-checks.mjs",
     "ui-sanity": "node scripts/ui-actions-sanity.mjs",
     "ui-dom-sanity": "node scripts/ui-dom-sanity.mjs",
+    "progression-sanity": "node scripts/game-state-progression-sanity.mjs",
+    "input-harness": "node scripts/input-harness.mjs",
     "campaign-sanity": "node scripts/campaign-sanity.mjs",
+    "release-readiness": "node scripts/release-readiness.mjs",
     "soak": "node scripts/simulation-soak.mjs",
-    "check": "npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run campaign-sanity && npm run soak"
+    "check:gameplay": "npm run smoke && npm run input-harness && npm run soak",
+    "check:ui": "npm run ui-sanity && npm run ui-dom-sanity",
+    "check:campaign": "npm run campaign-sanity && npm run progression-sanity && npm run smoke",
+    "check:content": "npm run ui-sanity && npm run campaign-sanity",
+    "check:release": "npm run release-readiness",
+    "check:full": "npm run check",
+    "check": "npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run progression-sanity && npm run input-harness && npm run campaign-sanity && npm run release-readiness && npm run soak"
   }
 }

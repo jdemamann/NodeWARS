@@ -1,16 +1,13 @@
 /* ================================================================
    NODE WARS v3 — Procedural Music Engine
 
-   ╔══════════════════════════════════════════════════════════╗
-   ║  "DRIFT SIGNAL" — MENU / UI THEME          (SACRED)     ║
-   ║  BPM: 78 | Prog: Am→F→C→G | Timbre: triangle+sine      ║
-   ║  Do NOT alter chord progression, BPM, or timbre.        ║
-   ╚══════════════════════════════════════════════════════════╝
+   The soundtrack is grouped by gameplay context instead of per-level
+   one-offs so the campaign can scale musical identity without needing
+   a unique track for every single phase.
 
-   Gameplay themes share the same soul:
-     playGenesis() — W1: "Genesis Pulse"    (82 BPM, Am→C→F→G)
-     playVoid()    — W2: "Hollow Signal"    (72 BPM, Dm→Bb→F→C)
-     playNexus()   — W3: "Current"          (88 BPM, Am→Em→F→G)
+   Menu theme remains sacred. Gameplay themes are selected through
+   Music.playLevelTheme(levelConfig), which maps phase groups to a
+   reusable procedural motif and exposes metadata for UI notifications.
    ================================================================ */
 
 import { STATE } from '../core/GameState.js';
@@ -21,11 +18,132 @@ let isPlayingTrack = false;
 let currentTrack = null;
 let scheduledTimers = [];
 let beatIntervalId = null;
+let trackChangeListener = null;
 
-const C4=261.63,D4=293.66,E4=329.63,F4=349.23,G4=392.00,A4=440.00,B4=493.88;
-const C3=130.81,D3=146.83,E3=164.81,F3=174.61,G3=196.00,A3=220.00,Bb3=233.08;
-const C5=523.25,E5=659.26,G5=784.00,A5=880.00;
-const Bb2=116.54, F2=87.31;
+const C3 = 130.81;
+const D3 = 146.83;
+const E3 = 164.81;
+const F3 = 174.61;
+const G3 = 196.00;
+const A3 = 220.00;
+const Bb3 = 233.08;
+const B3 = 246.94;
+const C4 = 261.63;
+const D4 = 293.66;
+const E4 = 329.63;
+const F4 = 349.23;
+const G4 = 392.00;
+const A4 = 440.00;
+const Bb4 = 466.16;
+const B4 = 493.88;
+const C5 = 523.25;
+const D5 = 587.33;
+const E5 = 659.26;
+const F5 = 698.46;
+const G5 = 784.00;
+const A5 = 880.00;
+
+const TRACKS = Object.freeze({
+  menu: {
+    id: 'menu',
+    titleKey: 'trackDriftSignal',
+    roleKey: 'trackRoleMenu',
+    icon: '◈',
+    bpm: 78,
+    loopSeconds: 16,
+    kind: 'menu',
+  },
+  genesisPulse: {
+    id: 'genesisPulse',
+    titleKey: 'trackGenesisPulse',
+    roleKey: 'trackRoleWorld1Opening',
+    icon: '◈',
+    bpm: 82,
+    loopSeconds: 15,
+    kind: 'world1',
+  },
+  siegeBloom: {
+    id: 'siegeBloom',
+    titleKey: 'trackSiegeBloom',
+    roleKey: 'trackRoleWorld1Pressure',
+    icon: '◈',
+    bpm: 86,
+    loopSeconds: 14,
+    kind: 'world1',
+  },
+  echoCore: {
+    id: 'echoCore',
+    titleKey: 'trackEchoCore',
+    roleKey: 'trackRoleBoss',
+    icon: '✦',
+    bpm: 92,
+    loopSeconds: 14,
+    kind: 'boss',
+  },
+  hollowSignal: {
+    id: 'hollowSignal',
+    titleKey: 'trackHollowSignal',
+    roleKey: 'trackRoleWorld2Opening',
+    icon: '⊗',
+    bpm: 72,
+    loopSeconds: 18,
+    kind: 'world2',
+  },
+  entropyCurrent: {
+    id: 'entropyCurrent',
+    titleKey: 'trackEntropyCurrent',
+    roleKey: 'trackRoleWorld2Pressure',
+    icon: '⊗',
+    bpm: 76,
+    loopSeconds: 17,
+    kind: 'world2',
+  },
+  oblivionGate: {
+    id: 'oblivionGate',
+    titleKey: 'trackOblivionGate',
+    roleKey: 'trackRoleBoss',
+    icon: '✦',
+    bpm: 80,
+    loopSeconds: 17,
+    kind: 'boss',
+  },
+  current: {
+    id: 'current',
+    titleKey: 'trackCurrent',
+    roleKey: 'trackRoleWorld3Opening',
+    icon: '⚡',
+    bpm: 88,
+    loopSeconds: 14,
+    kind: 'world3',
+  },
+  signalWar: {
+    id: 'signalWar',
+    titleKey: 'trackSignalWar',
+    roleKey: 'trackRoleWorld3Pressure',
+    icon: '⚡',
+    bpm: 94,
+    loopSeconds: 13,
+    kind: 'world3',
+  },
+  transcendenceProtocol: {
+    id: 'transcendenceProtocol',
+    titleKey: 'trackTranscendenceProtocol',
+    roleKey: 'trackRoleWorld3Finale',
+    icon: '⚡',
+    bpm: 98,
+    loopSeconds: 13,
+    kind: 'world3',
+  },
+  networkAwakens: {
+    id: 'networkAwakens',
+    titleKey: 'trackNetworkAwakens',
+    roleKey: 'trackRoleEnding',
+    icon: '✦',
+    bpm: 84,
+    loopSeconds: 16,
+    kind: 'ending',
+  },
+});
 
 function getAudioContext() {
   if (!audioContext) {
@@ -34,7 +152,9 @@ function getAudioContext() {
       masterGainNode = audioContext.createGain();
       masterGainNode.gain.setValueAtTime(0.0, audioContext.currentTime);
       masterGainNode.connect(audioContext.destination);
-    } catch (e) { return null; }
+    } catch {
+      return null;
+    }
   }
   if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
   return audioContext;
@@ -47,6 +167,7 @@ function getMusicVolume() {
 function osc(freq, type, dur, gain, delay = 0, detune = 0) {
   const activeAudioContext = getAudioContext();
   if (!activeAudioContext || !masterGainNode) return;
+
   try {
     const oscillator = activeAudioContext.createOscillator();
     const gainNode = activeAudioContext.createGain();
@@ -60,16 +181,20 @@ function osc(freq, type, dur, gain, delay = 0, detune = 0) {
     gainNode.connect(masterGainNode);
     oscillator.start(activeAudioContext.currentTime + delay);
     oscillator.stop(activeAudioContext.currentTime + delay + dur + 0.05);
-  } catch (e) {}
+  } catch {
+    /* Audio scheduling should fail silently in unsupported contexts. */
+  }
 }
 
 function noiseHit(dur, gain, delay = 0, freq = 800) {
   const activeAudioContext = getAudioContext();
   if (!activeAudioContext || !masterGainNode) return;
+
   try {
     const noiseBuffer = activeAudioContext.createBuffer(1, Math.ceil(activeAudioContext.sampleRate * dur), activeAudioContext.sampleRate);
     const channelData = noiseBuffer.getChannelData(0);
     for (let index = 0; index < channelData.length; index += 1) channelData[index] = Math.random() * 2 - 1;
+
     const bufferSource = activeAudioContext.createBufferSource();
     const gainNode = activeAudioContext.createGain();
     const bandPassFilter = activeAudioContext.createBiquadFilter();
@@ -83,21 +208,25 @@ function noiseHit(dur, gain, delay = 0, freq = 800) {
     bandPassFilter.connect(gainNode);
     gainNode.connect(masterGainNode);
     bufferSource.start(activeAudioContext.currentTime + delay);
-  } catch (e) {}
+  } catch {
+    /* Audio scheduling should fail silently in unsupported contexts. */
+  }
 }
 
 function fadeIn(dur = 1.5) {
   const activeAudioContext = getAudioContext();
   if (!activeAudioContext || !masterGainNode) return;
-  const target = 0.35 * getMusicVolume();
+
+  const targetGain = 0.35 * getMusicVolume();
   masterGainNode.gain.cancelScheduledValues(activeAudioContext.currentTime);
   masterGainNode.gain.setValueAtTime(masterGainNode.gain.value, activeAudioContext.currentTime);
-  masterGainNode.gain.linearRampToValueAtTime(target, activeAudioContext.currentTime + dur);
+  masterGainNode.gain.linearRampToValueAtTime(targetGain, activeAudioContext.currentTime + dur);
 }
 
 function fadeOut(dur = 1.0) {
   const activeAudioContext = getAudioContext();
   if (!activeAudioContext || !masterGainNode) return;
+
   masterGainNode.gain.cancelScheduledValues(activeAudioContext.currentTime);
   masterGainNode.gain.setValueAtTime(masterGainNode.gain.value, activeAudioContext.currentTime);
   masterGainNode.gain.linearRampToValueAtTime(0.0, activeAudioContext.currentTime + dur);
@@ -114,172 +243,555 @@ function stopAll() {
   currentTrack = null;
 }
 
+function scheduleTimer(callback, delayMs) {
+  const timerId = setTimeout(callback, delayMs);
+  scheduledTimers.push(timerId);
+  return timerId;
+}
+
+function formatLoopDuration(loopSeconds) {
+  const minutes = Math.floor(loopSeconds / 60);
+  const seconds = Math.round(loopSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+function getTrackInfo(trackId = currentTrack) {
+  if (!trackId || !TRACKS[trackId]) return null;
+  const trackDef = TRACKS[trackId];
+  return {
+    ...trackDef,
+    durationLabel: formatLoopDuration(trackDef.loopSeconds),
+  };
+}
+
+function announceTrackChange(trackDef) {
+  if (typeof trackChangeListener !== 'function') return;
+  trackChangeListener(getTrackInfo(trackDef.id));
+}
+
+function beginTrack(trackId, fadeInDuration) {
+  if (isPlayingTrack && currentTrack === trackId) return false;
+  stopAll();
+  const activeAudioContext = getAudioContext();
+  currentTrack = trackId;
+  if (getMusicVolume() > 0) announceTrackChange(TRACKS[trackId]);
+  if (!activeAudioContext) {
+    isPlayingTrack = false;
+    return false;
+  }
+  isPlayingTrack = true;
+  fadeIn(fadeInDuration);
+  return true;
+}
+
+function playLayeredTheme(trackId, config) {
+  if (!beginTrack(trackId, config.fadeInDuration ?? 1.8)) return;
+
+  let chordIndex = 0;
+  let beatStep = 0;
+  const beatMs = 60000 / config.bpm;
+  const beatStepMs = beatMs / 4;
+
+  function playCycle() {
+    if (!isPlayingTrack || currentTrack !== trackId) return;
+
+    const chordFrequencies = config.chords[chordIndex];
+    const bassFrequency = config.bassLine?.[chordIndex] || chordFrequencies[0] / 2;
+    osc(bassFrequency, 'sine', config.cycleDurationSec ?? 3.6, config.bassGain ?? 0.22, 0);
+
+    chordFrequencies.forEach((frequency, index) => {
+      osc(frequency, config.chordWaveA ?? 'triangle', config.chordDurationSec ?? 3.2, config.chordGainA ?? 0.08, config.chordDelaySec ?? 0.04, index * (config.chordDetuneStep ?? 4));
+      osc(frequency, config.chordWaveB ?? 'sine', config.chordDurationSec ?? 3.2, config.chordGainB ?? 0.05, config.chordDelaySec ?? 0.04, -index * (config.chordDetuneStep ?? 4));
+    });
+
+    (config.arpPrimary?.[chordIndex] || []).forEach((frequency, index) => {
+      osc(
+        frequency,
+        config.arpPrimaryWave ?? 'triangle',
+        config.arpPrimaryDurSec ?? 0.18,
+        config.arpPrimaryGain ?? 0.09,
+        (config.arpPrimaryDelaySec ?? 0.1) + index * (config.arpPrimaryStepSec ?? 0.24),
+      );
+    });
+
+    (config.arpSecondary?.[chordIndex] || []).forEach((frequency, index) => {
+      osc(
+        frequency,
+        config.arpSecondaryWave ?? 'sine',
+        config.arpSecondaryDurSec ?? 0.15,
+        config.arpSecondaryGain ?? 0.06,
+        (config.arpSecondaryDelaySec ?? 0.2) + index * (config.arpSecondaryStepSec ?? 0.21),
+      );
+    });
+
+    if (config.accentNoteProbability && Math.random() <= config.accentNoteProbability) {
+      const accentSequence = config.arpSecondary?.[chordIndex] || config.arpPrimary?.[chordIndex] || [];
+      const accentNote = accentSequence[Math.max(0, accentSequence.length - 1)];
+      if (accentNote) {
+        osc(
+          accentNote * (config.accentNoteOctaveMultiplier ?? 2),
+          'sine',
+          config.accentNoteDurSec ?? 0.14,
+          config.accentNoteGain ?? 0.04,
+          config.accentNoteDelaySec ?? 0.9,
+        );
+      }
+    }
+
+    chordIndex = (chordIndex + 1) % config.chords.length;
+    scheduleTimer(playCycle, config.cycleMs);
+  }
+
+  beatIntervalId = setInterval(() => {
+    if (!isPlayingTrack || currentTrack !== trackId) {
+      clearInterval(beatIntervalId);
+      return;
+    }
+
+    const patternStep = beatStep % 16;
+    if (config.kick?.[patternStep]) noiseHit(config.kickDurSec ?? 0.16, config.kickGain ?? 0.05, 0, config.kickFreq ?? 75);
+    if (config.snare?.[patternStep]) noiseHit(config.snareDurSec ?? 0.10, config.snareGain ?? 0.032, 0, config.snareFreq ?? 240);
+    if (config.hat?.[patternStep]) noiseHit(config.hatDurSec ?? 0.05, config.hatGain ?? 0.02, 0, config.hatFreq ?? 4800);
+    beatStep += 1;
+  }, beatStepMs);
+
+  playCycle();
+}
+
 /* ╔══════════════════════════════════════════════════════════╗
    ║  "DRIFT SIGNAL" — MENU THEME   (SACRED — DO NOT MODIFY)║
    ╚══════════════════════════════════════════════════════════╝ */
 function playMenu() {
-  if (isPlayingTrack && currentTrack === 'menu') return;
-  stopAll(); isPlayingTrack = true; currentTrack = 'menu';
-  getAudioContext(); fadeIn(2.0);
+  if (!beginTrack('menu', 2.0)) return;
 
-  const CHORDS = [[A3,C4,E4],[F3,A3,C4],[C3,E4,G4],[G3,B4,D4]];
-  const ARP_UP  = [[C4,E4,A4,C5],[F3,A3,F4,A4],[C4,E4,G4,C5],[G3,B4,G4,B4]];
+  const chords = [
+    [A3, C4, E4],
+    [F3, A3, C4],
+    [C3, E4, G4],
+    [G3, B4, D4],
+  ];
+  const arpUp = [
+    [C4, E4, A4, C5],
+    [F3, A3, F4, A4],
+    [C4, E4, G4, C5],
+    [G3, B4, G4, B4],
+  ];
+  const bpm = 78;
+  const beatMs = 60000 / bpm;
+  const stepMs = beatMs / 4;
+  const hatPattern = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
+  const kickPattern = [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
   let chordIndex = 0;
+  let beatStep = 0;
 
   function playChordCycle() {
     if (!isPlayingTrack || currentTrack !== 'menu') return;
-    const chordFrequencies = CHORDS[chordIndex];
+    const chordFrequencies = chords[chordIndex];
     osc(chordFrequencies[0] / 2, 'sine', 3.8, 0.28, 0);
     chordFrequencies.forEach((frequency, index) => {
       osc(frequency, 'triangle', 3.5, 0.10, 0.05, index * 3);
       osc(frequency, 'sine', 3.5, 0.07, 0.05, -index * 2);
     });
-    ARP_UP[chordIndex].forEach((frequency, index) => osc(frequency, 'triangle', 0.18, 0.12, index * 0.22 + 0.1));
+    arpUp[chordIndex].forEach((frequency, index) => osc(frequency, 'triangle', 0.18, 0.12, index * 0.22 + 0.1));
     chordIndex = (chordIndex + 1) % 4;
-    scheduledTimers.push(setTimeout(playChordCycle, 4000));
+    scheduleTimer(playChordCycle, 4000);
   }
 
-  const BPM=78, BEAT=60000/BPM, STEP=BEAT/4;
-  const HAT_PAT  = [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0];
-  const KICK_PAT = [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0];
-  let beatStep = 0;
   beatIntervalId = setInterval(() => {
-    if (!isPlayingTrack || currentTrack !== 'menu') { clearInterval(beatIntervalId); return; }
+    if (!isPlayingTrack || currentTrack !== 'menu') {
+      clearInterval(beatIntervalId);
+      return;
+    }
     const patternStep = beatStep % 16;
-    if (KICK_PAT[patternStep]) noiseHit(0.14, 0.06, 0, 80);
-    if (HAT_PAT[patternStep])  noiseHit(0.05, 0.025, 0, 5000);
+    if (kickPattern[patternStep]) noiseHit(0.14, 0.06, 0, 80);
+    if (hatPattern[patternStep]) noiseHit(0.05, 0.025, 0, 5000);
     beatStep += 1;
-  }, STEP);
+  }, stepMs);
 
   playChordCycle();
 }
 /* END "DRIFT SIGNAL" — SACRED ZONE ENDS HERE */
 
-/* ── "GENESIS PULSE" — World 1 Theme (82 BPM, Am→C→F→G) ── */
 function playGenesis() {
-  if (isPlayingTrack && currentTrack === 'genesis') return;
-  stopAll(); isPlayingTrack = true; currentTrack = 'genesis';
-  getAudioContext(); fadeIn(1.8);
-
-  const CHORDS = [[A3,E4,A4],[C3,G4,C5],[F3,A3,F4],[G3,D4,G4]];
-  const ARP    = [[A3,E4,A4,C5],[C4,E4,G4,C5],[F3,C4,F4,A4],[G3,D4,B4,G4]];
-  let chordIndex = 0;
-
-  function genesisCycle() {
-    if (!isPlayingTrack || currentTrack !== 'genesis') return;
-    const chordFrequencies = CHORDS[chordIndex];
-    osc(chordFrequencies[0] / 2, 'sine', 3.6, 0.24, 0);
-    chordFrequencies.forEach((frequency, index) => {
-      osc(frequency, 'triangle', 3.4, 0.09, 0.04, index * 4);
-      osc(frequency, 'sine', 3.4, 0.06, 0.04, -index * 3);
-    });
-    ARP[chordIndex].forEach((frequency, index) => osc(frequency, 'triangle', 0.20, 0.10, index * 0.28 + 0.15));
-    if (chordIndex % 2 === 0) osc(ARP[chordIndex][3] * 2, 'sine', 0.14, 0.05, 0.6);
-    chordIndex = (chordIndex + 1) % 4;
-    scheduledTimers.push(setTimeout(genesisCycle, 3700));
-  }
-
-  const BPM=82, BEAT=60000/BPM, STEP=BEAT/4;
-  const KICK = [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0];
-  const HAT  = [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1];
-  let beatStep = 0;
-  beatIntervalId = setInterval(() => {
-    if (!isPlayingTrack || currentTrack !== 'genesis') { clearInterval(beatIntervalId); return; }
-    const patternStep = beatStep % 16;
-    if (KICK[patternStep]) noiseHit(0.16, 0.055, 0, 75);
-    if (HAT[patternStep])  noiseHit(0.05, 0.022, 0, 4800);
-    beatStep += 1;
-  }, STEP);
-
-  genesisCycle();
+  playLayeredTheme('genesisPulse', {
+    fadeInDuration: 1.8,
+    bpm: 82,
+    cycleMs: 3700,
+    chords: [
+      [A3, E4, A4],
+      [C3, G4, C5],
+      [F3, A3, F4],
+      [G3, D4, G4],
+    ],
+    arpPrimary: [
+      [A3, E4, A4, C5],
+      [C4, E4, G4, C5],
+      [F3, C4, F4, A4],
+      [G3, D4, B4, G4],
+    ],
+    kick: [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+    hat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1],
+    accentNoteProbability: 0.55,
+    accentNoteDelaySec: 0.6,
+    bassGain: 0.24,
+  });
 }
 
-/* ── "HOLLOW SIGNAL" — World 2 Theme (72 BPM, Dm→Bb→F→C) ── */
+function playSiegeBloom() {
+  playLayeredTheme('siegeBloom', {
+    fadeInDuration: 1.6,
+    bpm: 86,
+    cycleMs: 3500,
+    chords: [
+      [A3, C4, E4],
+      [C4, E4, G4],
+      [F3, A3, C4],
+      [G3, B3, D4],
+    ],
+    arpPrimary: [
+      [A3, C4, E4, A4],
+      [C4, E4, G4, C5],
+      [F3, A3, C4, F4],
+      [G3, B3, D4, G4],
+    ],
+    arpSecondary: [
+      [E4, A4, C5],
+      [G4, C5, E5],
+      [C4, F4, A4],
+      [D4, G4, B4],
+    ],
+    kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0],
+    snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+    hat: [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1],
+    accentNoteProbability: 0.7,
+    accentNoteDelaySec: 0.95,
+    bassGain: 0.25,
+    arpSecondaryGain: 0.07,
+  });
+}
+
+function playEchoCore() {
+  playLayeredTheme('echoCore', {
+    fadeInDuration: 1.5,
+    bpm: 92,
+    cycleMs: 3400,
+    chords: [
+      [A3, E4, A4],
+      [F3, A3, C4],
+      [C4, E4, G4],
+      [G3, B3, D4],
+    ],
+    arpPrimary: [
+      [A3, E4, A4, C5],
+      [F3, A3, C4, F4],
+      [C4, E4, G4, C5],
+      [G3, B3, D4, G4],
+    ],
+    arpSecondary: [
+      [C5, A4],
+      [F4, C5],
+      [G4, E5],
+      [B4, D5],
+    ],
+    kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0],
+    snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+    hat: [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1],
+    bassGain: 0.28,
+    chordGainA: 0.09,
+    chordGainB: 0.06,
+    accentNoteProbability: 0.85,
+    accentNoteDelaySec: 0.8,
+  });
+}
+
 function playVoid() {
-  if (isPlayingTrack && currentTrack === 'void') return;
-  stopAll(); isPlayingTrack = true; currentTrack = 'void';
-  getAudioContext(); fadeIn(2.2);
-
-  const Dm=[D3,F3,A3], Bb=[Bb2*2,D3,F3], Fmaj=[F2*2,C3,F3], Cmaj=[C3,E3,G3];
-  const CHORDS = [Dm, Bb, Fmaj, Cmaj];
-  const ARP = [[D3,F3,A3,D4+D4],[Bb2*2,D3,F3,Bb3],[F3,A3,C4,F4],[C3,E3,G3,C4]];
-  let chordIndex = 0;
-
-  function voidCycle() {
-    if (!isPlayingTrack || currentTrack !== 'void') return;
-    const chordFrequencies = CHORDS[chordIndex];
-    osc(chordFrequencies[0] / 2, 'sine', 4.2, 0.22, 0);
-    chordFrequencies.forEach((frequency, index) => {
-      osc(frequency, 'triangle', 4.0, 0.08, 0.06 + index * 0.15, index * 5);
-      osc(frequency, 'sine', 4.0, 0.05, 0.06 + index * 0.15, -index * 4);
-    });
-    ARP[chordIndex].forEach((frequency, index) => osc(frequency, 'triangle', 0.22, 0.08, index * 0.45 + 0.2));
-    if (Math.random() > 0.45) osc(ARP[chordIndex][3] * 2, 'sine', 0.16, 0.04, 1.2 + Math.random() * 0.8);
-    chordIndex = (chordIndex + 1) % 4;
-    scheduledTimers.push(setTimeout(voidCycle, 4400));
-  }
-
-  const BPM=72, BEAT=60000/BPM, STEP=BEAT/4;
-  const KICK = [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0];
-  const HAT  = [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0];
-  let beatStep = 0;
-  beatIntervalId = setInterval(() => {
-    if (!isPlayingTrack || currentTrack !== 'void') { clearInterval(beatIntervalId); return; }
-    const patternStep = beatStep % 16;
-    if (KICK[patternStep]) noiseHit(0.18, 0.05, 0, 65);
-    if (HAT[patternStep])  noiseHit(0.06, 0.018, 0, 3500);
-    beatStep += 1;
-  }, STEP);
-
-  voidCycle();
+  playLayeredTheme('hollowSignal', {
+    fadeInDuration: 2.2,
+    bpm: 72,
+    cycleMs: 4400,
+    chords: [
+      [D3, F3, A3],
+      [Bb3, D4, F4],
+      [F3, A3, C4],
+      [C4, E4, G4],
+    ],
+    bassLine: [D3 / 2, Bb3 / 2, F3 / 2, C3 / 2],
+    arpPrimary: [
+      [D3, F3, A3, D4],
+      [Bb3, D4, F4, Bb4],
+      [F3, A3, C4, F4],
+      [C4, E4, G4, C5],
+    ],
+    kick: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+    hat: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+    kickGain: 0.05,
+    hatGain: 0.018,
+    hatFreq: 3500,
+    bassGain: 0.22,
+    chordGainA: 0.08,
+    chordGainB: 0.05,
+    accentNoteProbability: 0.5,
+    accentNoteDelaySec: 1.25,
+  });
 }
 
-/* ── "CURRENT" — World 3 Theme (88 BPM, Am→Em→F→G) ── */
+function playEntropyCurrent() {
+  playLayeredTheme('entropyCurrent', {
+    fadeInDuration: 1.9,
+    bpm: 76,
+    cycleMs: 4200,
+    chords: [
+      [D3, A3, D4],
+      [Bb3, F4, Bb4],
+      [F3, C4, F4],
+      [C4, G4, C5],
+    ],
+    bassLine: [D3 / 2, Bb3 / 2, F3 / 2, C3 / 2],
+    arpPrimary: [
+      [D3, F3, A3, D4],
+      [Bb3, D4, F4, Bb4],
+      [F3, A3, C4, F4],
+      [C4, E4, G4, C5],
+    ],
+    arpSecondary: [
+      [A4, D5],
+      [F4, Bb4],
+      [C5, F5],
+      [G4, C5],
+    ],
+    kick: [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0],
+    snare: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+    hat: [1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+    kickFreq: 70,
+    hatFreq: 3900,
+    accentNoteProbability: 0.7,
+    accentNoteDelaySec: 1.0,
+  });
+}
+
+function playOblivionGate() {
+  playLayeredTheme('oblivionGate', {
+    fadeInDuration: 1.6,
+    bpm: 80,
+    cycleMs: 4100,
+    chords: [
+      [D3, F3, A3],
+      [Bb3, D4, F4],
+      [F3, A3, C4],
+      [C4, E4, G4],
+    ],
+    bassLine: [D3 / 2, Bb3 / 2, F3 / 2, C3 / 2],
+    arpPrimary: [
+      [D3, A3, D4, F4],
+      [Bb3, F4, Bb4, D5],
+      [F3, C4, F4, A4],
+      [C4, G4, C5, E5],
+    ],
+    arpSecondary: [
+      [A4, F5],
+      [D5, Bb4],
+      [C5, A4],
+      [E5, G4],
+    ],
+    kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+    snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+    hat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+    kickGain: 0.058,
+    snareGain: 0.036,
+    hatGain: 0.019,
+    bassGain: 0.26,
+    accentNoteProbability: 0.85,
+    accentNoteDelaySec: 0.88,
+  });
+}
+
 function playNexus() {
-  if (isPlayingTrack && currentTrack === 'nexus') return;
-  stopAll(); isPlayingTrack = true; currentTrack = 'nexus';
-  getAudioContext(); fadeIn(1.4);
+  playLayeredTheme('current', {
+    fadeInDuration: 1.4,
+    bpm: 88,
+    cycleMs: 3400,
+    chords: [
+      [A3, E4, A4],
+      [E3, B3, E4],
+      [F3, A3, C4],
+      [G3, D4, G4],
+    ],
+    arpPrimary: [
+      [A3, C4, E4, A4],
+      [E3, G3, B3, E4],
+      [F3, A3, C4, F4],
+      [G3, B3, D4, G4],
+    ],
+    arpSecondary: [
+      [C4, E4, A4, C5],
+      [B3, E4, G4, B4],
+      [A3, C4, F4, A4],
+      [D4, G4, B4, D5],
+    ],
+    kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+    snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+    hat: [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1],
+    kickGain: 0.05,
+    snareGain: 0.035,
+    hatGain: 0.018,
+    hatFreq: 6000,
+    bassGain: 0.20,
+    accentNoteProbability: 0.55,
+    accentNoteDelaySec: 0.75,
+  });
+}
 
-  const CHORDS  = [[A3,E4,A4],[E3,B4,E4],[F3,A3,C4],[G3,D4,G4]];
-  const ARP_A   = [[A3,C4,E4,A4],[E3,G3,B4,E4],[F3,A3,C4,F4],[G3,B4,D4,G4]];
-  const ARP_B   = [[C4,E4,A4,C5],[B4,E4,G3,B4],[A3,C4,F4,A4],[D4,G4,B4,D4]];
-  let chordIndex = 0;
+function playSignalWar() {
+  playLayeredTheme('signalWar', {
+    fadeInDuration: 1.35,
+    bpm: 94,
+    cycleMs: 3200,
+    chords: [
+      [A3, C4, E4],
+      [E3, G3, B3],
+      [F3, A3, C4],
+      [G3, B3, D4],
+    ],
+    arpPrimary: [
+      [A3, C4, E4, A4],
+      [E3, G3, B3, E4],
+      [F3, A3, C4, F4],
+      [G3, B3, D4, G4],
+    ],
+    arpSecondary: [
+      [E4, A4, C5],
+      [B4, E5, G4],
+      [C5, F4, A4],
+      [D5, G4, B4],
+    ],
+    kick: [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+    snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+    hat: [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1],
+    kickGain: 0.055,
+    snareGain: 0.038,
+    hatGain: 0.02,
+    bassGain: 0.22,
+    arpSecondaryGain: 0.075,
+    accentNoteProbability: 0.72,
+    accentNoteDelaySec: 0.72,
+  });
+}
 
-  function nexusCycle() {
-    if (!isPlayingTrack || currentTrack !== 'nexus') return;
-    const chordFrequencies = CHORDS[chordIndex];
-    osc(chordFrequencies[0] / 2, 'sine', 3.3, 0.20, 0);
-    chordFrequencies.forEach((frequency, index) => {
-      osc(frequency, 'triangle', 3.1, 0.08, 0.03, index * 3);
-      osc(frequency, 'sine', 3.1, 0.06, 0.03, -index * 3);
-    });
-    ARP_A[chordIndex].forEach((frequency, index) => osc(frequency, 'triangle', 0.18, 0.09, index * 0.20 + 0.05));
-    ARP_B[chordIndex].forEach((frequency, index) => osc(frequency, 'sine', 0.16, 0.07, index * 0.20 + 0.15));
-    chordIndex = (chordIndex + 1) % 4;
-    scheduledTimers.push(setTimeout(nexusCycle, 3400));
+function playTranscendenceProtocol() {
+  playLayeredTheme('transcendenceProtocol', {
+    fadeInDuration: 1.2,
+    bpm: 98,
+    cycleMs: 3100,
+    chords: [
+      [A3, E4, A4],
+      [E3, B3, E4],
+      [F3, A3, C4],
+      [G3, B3, D4],
+    ],
+    arpPrimary: [
+      [A3, C4, E4, A4],
+      [E3, G3, B3, E4],
+      [F3, A3, C4, F4],
+      [G3, B3, D4, G4],
+    ],
+    arpSecondary: [
+      [C5, A4, E5],
+      [B4, G4, E5],
+      [A4, F4, C5],
+      [B4, G4, D5],
+    ],
+    kick: [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+    snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+    hat: [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1],
+    kickGain: 0.06,
+    snareGain: 0.04,
+    hatGain: 0.021,
+    bassGain: 0.24,
+    chordGainA: 0.085,
+    chordGainB: 0.06,
+    arpSecondaryGain: 0.08,
+    accentNoteProbability: 0.92,
+    accentNoteDelaySec: 0.66,
+  });
+}
+
+function playEnding() {
+  playLayeredTheme('networkAwakens', {
+    fadeInDuration: 2.0,
+    bpm: 84,
+    cycleMs: 4000,
+    chords: [
+      [A3, C4, E4],
+      [F3, A3, C4],
+      [C4, E4, G4],
+      [G3, B3, D4],
+    ],
+    arpPrimary: [
+      [A3, C4, E4, A4],
+      [F3, A3, C4, F4],
+      [C4, E4, G4, C5],
+      [G3, B3, D4, G4],
+    ],
+    arpSecondary: [
+      [A4, C5, E5],
+      [A4, C5, F5],
+      [G4, C5, E5],
+      [B4, D5, G5],
+    ],
+    kick: [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+    snare: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+    hat: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+    kickGain: 0.04,
+    snareGain: 0.02,
+    hatGain: 0.012,
+    bassGain: 0.18,
+    chordGainA: 0.10,
+    chordGainB: 0.07,
+    arpPrimaryGain: 0.10,
+    arpSecondaryGain: 0.075,
+    accentNoteProbability: 0.95,
+    accentNoteDelaySec: 1.2,
+  });
+}
+
+function playLevelTheme(levelConfig) {
+  if (!levelConfig) {
+    playMenu();
+    return;
   }
 
-  const BPM=88, BEAT=60000/BPM, STEP=BEAT/4;
-  const KICK  = [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0];
-  const SNARE = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0];
-  const HAT   = [1,0,1,0, 1,0,1,1, 1,0,1,0, 1,0,1,1];
-  let beatStep = 0;
-  beatIntervalId = setInterval(() => {
-    if (!isPlayingTrack || currentTrack !== 'nexus') { clearInterval(beatIntervalId); return; }
-    const patternStep = beatStep % 16;
-    if (KICK[patternStep])  noiseHit(0.14, 0.050, 0, 75);
-    if (SNARE[patternStep]) noiseHit(0.10, 0.035, 0, 250);
-    if (HAT[patternStep])   noiseHit(0.04, 0.018, 0, 6000);
-    beatStep += 1;
-  }, STEP);
+  const levelId = levelConfig.id;
+  const worldId = levelConfig.worldId || 1;
 
-  nexusCycle();
+  if (worldId === 1) {
+    if (levelConfig.isTutorial || levelId <= 4) playGenesis();
+    else if (levelId === 10) playEchoCore();
+    else playSiegeBloom();
+    return;
+  }
+
+  if (worldId === 2) {
+    if (levelConfig.isTutorial || levelId <= 14) playVoid();
+    else if (levelId === 21) playOblivionGate();
+    else playEntropyCurrent();
+    return;
+  }
+
+  if (worldId === 3) {
+    if (levelConfig.isTutorial || levelId <= 24) playNexus();
+    else if (levelId >= 29) playTranscendenceProtocol();
+    else playSignalWar();
+    return;
+  }
+
+  playMenu();
 }
 
 /* ── UI SOUND EFFECTS ── */
 function menuClick() {
   const activeAudioContext = getAudioContext();
   if (!activeAudioContext) return;
+
   try {
     const oscillator = activeAudioContext.createOscillator();
     const gainNode = activeAudioContext.createGain();
@@ -291,10 +803,14 @@ function menuClick() {
     gainNode.connect(activeAudioContext.destination);
     oscillator.start();
     oscillator.stop(activeAudioContext.currentTime + 0.1);
-  } catch (e) {}
+  } catch {
+    /* Audio scheduling should fail silently in unsupported contexts. */
+  }
+
   setTimeout(() => {
     const delayedAudioContext = getAudioContext();
     if (!delayedAudioContext) return;
+
     try {
       const oscillator = delayedAudioContext.createOscillator();
       const gainNode = delayedAudioContext.createGain();
@@ -306,13 +822,16 @@ function menuClick() {
       gainNode.connect(delayedAudioContext.destination);
       oscillator.start();
       oscillator.stop(delayedAudioContext.currentTime + 0.08);
-    } catch (e) {}
+    } catch {
+      /* Audio scheduling should fail silently in unsupported contexts. */
+    }
   }, 50);
 }
 
 function menuHover() {
   const activeAudioContext = getAudioContext();
   if (!activeAudioContext) return;
+
   try {
     const oscillator = activeAudioContext.createOscillator();
     const gainNode = activeAudioContext.createGain();
@@ -324,12 +843,15 @@ function menuHover() {
     gainNode.connect(activeAudioContext.destination);
     oscillator.start();
     oscillator.stop(activeAudioContext.currentTime + 0.07);
-  } catch (e) {}
+  } catch {
+    /* Audio scheduling should fail silently in unsupported contexts. */
+  }
 }
 
 function tabSwitch() {
   const activeAudioContext = getAudioContext();
   if (!activeAudioContext) return;
+
   try {
     const oscillator = activeAudioContext.createOscillator();
     const gainNode = activeAudioContext.createGain();
@@ -342,20 +864,42 @@ function tabSwitch() {
     gainNode.connect(activeAudioContext.destination);
     oscillator.start();
     oscillator.stop(activeAudioContext.currentTime + 0.13);
-  } catch (e) {}
+  } catch {
+    /* Audio scheduling should fail silently in unsupported contexts. */
+  }
 }
 
 export const Music = {
-  playMenu, playGenesis, playVoid, playNexus,
-  menuClick, menuHover, tabSwitch,
-  fadeOut, fadeIn, stopAll,
+  playMenu,
+  playGenesis,
+  playSiegeBloom,
+  playEchoCore,
+  playVoid,
+  playEntropyCurrent,
+  playOblivionGate,
+  playNexus,
+  playSignalWar,
+  playTranscendenceProtocol,
+  playEnding,
+  playLevelTheme,
+  menuClick,
+  menuHover,
+  tabSwitch,
+  fadeOut,
+  fadeIn,
+  stopAll,
   initOnGesture() {
     const activeAudioContext = getAudioContext();
     if (activeAudioContext && activeAudioContext.state === 'suspended') activeAudioContext.resume().catch(() => {});
   },
-  isPlaying:    () => isPlayingTrack,
+  isPlaying: () => isPlayingTrack,
   currentTrack: () => currentTrack,
-  setVolume:    volume => {
+  currentTrackInfo: () => getTrackInfo(currentTrack),
+  getTrackInfo,
+  setTrackChangeListener(listener) {
+    trackChangeListener = listener;
+  },
+  setVolume: volume => {
     const activeAudioContext = getAudioContext();
     if (masterGainNode && activeAudioContext) {
       masterGainNode.gain.setValueAtTime(volume * 0.35, activeAudioContext.currentTime);

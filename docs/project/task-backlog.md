@@ -13,6 +13,380 @@ The tasks below are intentionally small enough to implement, review, and validat
 - Prefer finishing one canonical rule path at a time.
 - Every task touching gameplay must update smoke checks or explain why it does not need one.
 
+## Active Operational Queue
+
+Use this section first. Older stabilization tasks remain below as historical traceability.
+
+### NOW
+
+#### TASK-025 Campaign Balance Wave B
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-03 Campaign e Level Design`
+- Suggested Agent: `docs/agents/campaign-level-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- run the next evidence-driven balance pass on the priority authored phases using the current playtest method
+
+Checks:
+
+- `npm run check:campaign`
+- `npm run check:ui` if tutorial/result flow changes
+
+Primary deliverables:
+
+- per-phase observations
+- tuning decisions
+- updated campaign balance doc
+
+#### TASK-026 Tutorial and Onboarding Playtest Sweep
+
+- Owner: `ui-owner`
+- Workstream: `WS-04 UI/UX e Render`
+- Suggested Agent: `docs/agents/ui-ux-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- review tutorial clarity, optionality, pacing, and failure recovery in World 1, 2, and 3
+
+Checks:
+
+- `npm run check:ui`
+- `npm run check:campaign`
+
+Primary deliverables:
+
+- fail cases
+- lockout review
+- copy/flow adjustments if needed
+
+#### TASK-027 Gameplay Micro-Bug Intake Wave
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-01 Gameplay Core`
+- Suggested Agent: `docs/agents/gameplay-systems-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- collect and resolve small gameplay inconsistencies discovered during live play without reopening broad refactor work
+
+Checks:
+
+- `npm run check:gameplay`
+- `npm run check:campaign` if campaign data is touched
+
+Primary deliverables:
+
+- targeted fixes
+- matching guardrails
+
+### LATER
+
+#### TASK-037 Enemy Slice Pressure Wave
+
+- Owner: `ai-owner`
+- Workstream: `WS-02 AI and Factions`
+- Suggested Agent: `docs/agents/ai-behavior-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- make enemy slicing a real tactical mechanic, centered on purple first and conserved through the canonical slice path
+
+Checks:
+
+- `npm run check:gameplay`
+- `npm run check:campaign`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- coalition slice pressure
+- configurable slice cooldowns and thresholds
+- source-side burst cuts used as a real tempo tool
+
+#### TASK-038 AI Tactical State Profiles
+
+- Owner: `ai-owner`
+- Workstream: `WS-02 AI and Factions`
+- Suggested Agent: `docs/agents/ai-behavior-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- add a lightweight tactical state layer so AI intent shifts between expand, pressure, support, finish, and recover
+
+Checks:
+
+- `npm run check:gameplay`
+- `npm run check:campaign`
+
+Primary deliverables:
+
+- explicit tactical state derivation
+- score shaping by tactical mode
+- more readable intent changes during live play
+
+#### TASK-039 AI Structural Weakness Scoring
+
+- Owner: `ai-owner`
+- Workstream: `WS-02 AI and Factions`
+- Suggested Agent: `docs/agents/ai-behavior-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- improve punishment of exposed player structure and weakly supported fronts
+
+Checks:
+
+- `npm run check:gameplay`
+- `npm run check:campaign`
+
+Primary deliverables:
+
+- isolated node pressure
+- weak support punishment
+- exposed branching punishment
+
+#### TASK-040 Purple Faction Identity Wave
+
+- Owner: `ai-owner`
+- Workstream: `WS-02 AI and Factions`
+- Suggested Agent: `docs/agents/ai-behavior-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- broaden purple identity into a more opportunistic, lethal, and slice-driven opponent without adding non-canonical mechanics
+
+Checks:
+
+- `npm run check:gameplay`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- stronger finish windows
+- more decisive slice pressure
+- clearer faction differentiation from red AI
+
+#### TASK-041 AI Playtest and Tuning Matrix
+
+- Owner: `ai-owner`
+- Workstream: `WS-02 AI and Factions`
+- Suggested Agent: `docs/agents/ai-behavior-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- capture the implemented AI wave in a structured tuning doc for later playtest review
+
+Checks:
+
+- `npm run check:gameplay`
+
+Primary deliverables:
+
+- AI wave report
+- tuning reference for follow-up playtests
+
+#### TASK-030 AI Quality and Faction Behavior Wave
+
+- Owner: `ai-owner`
+- Workstream: `WS-02 AI and Factions`
+- Suggested Agent: `docs/agents/gameplay-systems-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- improve AI quality without turning it into a heavy planner:
+  - reduce wasteful overcommit
+  - increase kill-confirm pressure
+  - improve coalition support behavior
+  - improve continuation of allied neutral captures
+
+Checks:
+
+- `npm run check:gameplay`
+- `npm run check:campaign`
+- `npm run check:full` if shared gameplay rules drift
+
+Primary deliverables:
+
+- stronger faction identity
+- less erratic target commitment
+- better coalition pressure on player and neutral fronts
+
+#### TASK-028 Deterministic Input Harness
+
+- Owner: `input-owner`
+- Workstream: `WS-04 UI/UX e Render`
+- Suggested Agent: `docs/agents/ui-ux-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- add a lightweight harness for click / drag / slice transitions beyond current source- and DOM-lite checks
+
+#### TASK-029 Release Readiness Wave
+
+- Owner: `performance-build-owner`
+- Workstream: `WS-06 Ports e Build Pipeline`
+- Suggested Agent: `docs/agents/performance-build-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- prepare the repo for Linux desktop packaging and Android packaging by turning the current reports into executable build tasks
+
+#### TASK-031 AI Scoring Module Extraction
+
+- Owner: `ai-owner`
+- Workstream: `WS-02 AI and Factions`
+- Suggested Agent: `docs/agents/gameplay-systems-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- extract move-candidate construction and target scoring into dedicated helpers/modules if AI heuristics continue to grow
+
+Checks:
+
+- `npm run check:gameplay`
+- `npm run check:campaign`
+
+Primary deliverables:
+
+- clearer AI ownership boundaries
+- easier future balance iteration
+
+#### TASK-032 Audio Scheduling and Cooldown Canonicalization
+
+- Owner: `performance-build-owner`
+- Workstream: `WS-05 Performance and Robustness`
+- Suggested Agent: `docs/agents/performance-build-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- replace the remaining ad-hoc SFX timing and cooldown scheduling with a cleaner, more portable approach
+
+Checks:
+
+- `npm run check:ui`
+- `npm run check:full` if the audio timing layer changes materially
+
+Primary deliverables:
+
+- audio cooldown timing cleanup
+- less reliance on wall-clock fallback and chained `setTimeout(...)`
+- clearer audio event scheduling ownership
+
+#### TASK-033 ScreenController Composition Split Phase 2
+
+- Owner: `ui-owner`
+- Workstream: `WS-04 UI/UX and Render`
+- Suggested Agent: `docs/agents/ui-ux-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- continue splitting large screen-composition responsibilities out of `ScreenController.js`
+
+Checks:
+
+- `npm run check:ui`
+- `npm run check:content`
+
+Primary deliverables:
+
+- smaller screen-building modules
+- less inline HTML assembly in the controller
+- lower UI regression risk in settings/story/result/ending surfaces
+
+#### TASK-034 GameState Progression Sanity Mini-Suite
+
+- Owner: `qa-owner`
+- Workstream: `WS-05 Performance and Robustness`
+- Suggested Agent: `docs/agents/qa-checks-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- add focused progression-state checks for unlock, next-level, tutorial completion, and manual world overrides
+
+Checks:
+
+- `npm run check`
+
+Primary deliverables:
+
+- a dedicated progression sanity layer
+- less reliance on broader smoke checks for meta-state regressions
+
+#### TASK-035 Tutorial State Machine Extraction Review
+
+- Owner: `ui-owner`
+- Workstream: `WS-04 UI/UX and Render`
+- Suggested Agent: `docs/agents/content-authored-levels-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- review whether the tutorial state machine should be partially extracted now that the rigid gating model is stable
+
+Checks:
+
+- `npm run check:ui`
+- `npm run check:campaign`
+
+Primary deliverables:
+
+- recommendation or extraction plan for the next tutorial refactor seam
+- clearer ownership between tutorial copy, gating, and ghost guidance
+
+#### TASK-036 Commentary and Constant-Tuning Alignment Sweep
+
+- Owner: `docs-owner`
+- Workstream: `WS-04 UI/UX and Render`
+- Suggested Agent: `docs/agents/code-commentary-agent.md`
+- Priority: `low`
+- Status: `completed`
+
+Goal:
+
+- run a focused pass on comments and tuning notes in the remaining hotspots so the current rules stay easy to read and tune
+
+Checks:
+
+- domain checks touched by the sweep
+
+Primary deliverables:
+
+- comments aligned with current implementation
+- constant blocks easier to tune without external context
+
 ## Post-Stabilization Follow-Up Tasks
 
 ### TASK-023 Campaign Progression Canonicalization
@@ -785,7 +1159,7 @@ Done criteria:
 
 - Owner: `test-owner`
 - Priority: `medium`
-- Status: `planned`
+- Status: `completed`
 - Depends on:
   - `TASK-013`
   - `TASK-014`

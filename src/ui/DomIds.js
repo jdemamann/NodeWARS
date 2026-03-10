@@ -121,6 +121,7 @@ export const DOM_IDS = Object.freeze({
   BTN_CREDITS_BACK: 'btncreditsback',
 
   /* Overlays */
+  NOTIFICATIONS:'notifications',
   TOAST:       'toast',
   FADE:        'fade',
   WORLD_BANNER:'worldBanner',

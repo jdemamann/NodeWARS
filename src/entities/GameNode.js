@@ -8,8 +8,8 @@
    'r' (RELAY) now handles both roles — isRelay is a computed getter.
    ================================================================ */
 
-import { NodeType, LVL_STEP, GAMEPLAY_RULES } from '../config/gameConfig.js';
-import { computeEnergyLevel, computeNodeRadius } from '../math/simulationMath.js';
+import { NodeType, GAMEPLAY_RULES } from '../config/gameConfig.js';
+import { computeNodeRadius, computeStableNodeLevel } from '../math/simulationMath.js';
 import { bus } from '../core/EventBus.js';
 import { computeNodeDisplayRegenRate } from '../systems/EnergyBudget.js';
 
@@ -59,18 +59,25 @@ export class GameNode {
     this.isBunker         = false;  // set by Game._applyBunkers
     this.captureThreshold = WORLD_RULES.DEFAULT_CAPTURE_THRESHOLD;
 
-    /* Level tracking for level-up event */
-    this._prevLvl   = computeEnergyLevel(energy);
+    /* Level tracking uses hysteresis so capped nodes do not thrash
+       between adjacent levels when energy hovers around a threshold. */
+    this._levelValue = computeStableNodeLevel(energy, this.maxE);
+    this._prevLvl   = this._levelValue;
     /* Owner tracking for relay/signal capture events */
     this._prevOwner = owner;
   }
 
   /* ── Computed properties ── */
   get radius()  { return computeNodeRadius(this.energy, this.maxE); }
-  get level()   { return computeEnergyLevel(this.energy); }
+  get level()   { return this._levelValue; }
   get dispE()   { return Math.floor(this.energy); }
   get isRelay() { return this.type === NodeType.RELAY; }
   get maxSlots(){ return PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[this.level]; }
+
+  syncLevelFromEnergy() {
+    this._levelValue = computeStableNodeLevel(this.energy, this.maxE, this._levelValue);
+    this._prevLvl = this._levelValue;
+  }
 
   /* ── Physics update ── */
   update(dt, frenzyActive = false) {
@@ -108,12 +115,13 @@ export class GameNode {
     this.rot += dt * 0.065 * (this.level + 1);
 
     /* Level-up event */
-    const nl = this.level;
-    if (nl > this._prevLvl) {
+    const nextLevel = computeStableNodeLevel(this.energy, this.maxE, this._levelValue);
+    if (nextLevel > this._prevLvl) {
       this.lvlFlash = 1;
       bus.emit('node:levelup', this);
     }
-    this._prevLvl = nl;
+    this._levelValue = nextLevel;
+    this._prevLvl = nextLevel;
 
     /* Auto-retract: very low energy while under attack */
     if (

@@ -5,6 +5,8 @@
 - `Task ID`:
 - `Title`:
 - `Owner`:
+- `Workstream`:
+- `Suggested Agent Doc`:
 - `Status`: `planned | in_progress | blocked | review | done`
 - `Priority`: `critical | high | medium | low`
 
@@ -60,6 +62,9 @@ Which file or module should become the single obvious owner of the rule after th
 ## Validation
 
 - smoke checks to run:
+- ui checks to run:
+- campaign checks to run:
+- soak checks to run:
 - manual sanity checks:
 - docs to update:
 

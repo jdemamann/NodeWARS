@@ -28,6 +28,13 @@ export class Tutorial {
     this.had_retract = false;
     this.had_cut     = false;
     this.needsCut    = false;
+
+    /* Step context is pinned when a step starts so expected targets do not
+       drift after ownership changes during the tutorial action itself. */
+    this.primaryPlayerNode = null;
+    this.expectedNeutralTarget = null;
+    this.expectedRelayTarget = null;
+    this._autoAdvanceTimeout = null;
   }
 
   get steps() {
@@ -38,79 +45,152 @@ export class Tutorial {
   get cur() { return this.steps[this.step]; }
 
   reset() {
+    this._clearAutoAdvance();
     this.step = 0; this.done = false; this.actionDone = false;
     this.had_sel = false; this.had_tent = false; this.had_capture = false;
     this.had_retract = false; this.had_cut = false; this.needsCut = false;
+    this.primaryPlayerNode = null;
+    this.expectedNeutralTarget = null;
+    this.expectedRelayTarget = null;
+  }
+
+  _clearAutoAdvance() {
+    if (this._autoAdvanceTimeout !== null) {
+      clearTimeout(this._autoAdvanceTimeout);
+      this._autoAdvanceTimeout = null;
+    }
+  }
+
+  _scheduleAutoAdvance() {
+    if (this._autoAdvanceTimeout !== null) return;
+    if (!this.actionDone) return;
+    if (!this.cur || this.cur.action === 'read' || this.cur.action === 'done') return;
+
+    this._autoAdvanceTimeout = setTimeout(() => {
+      this._autoAdvanceTimeout = null;
+      if (!this.done && this.actionDone) this.advance();
+    }, 450);
   }
 
   isRigid() {
     return !!this.game.cfg?.isTutorial && !this.done;
   }
 
+  hasActionGate() {
+    const currentAction = this.cur?.action;
+    return this.isRigid() && currentAction !== 'read' && currentAction !== 'done';
+  }
+
   _getPrimaryPlayerNode() {
-    return this.game.nodes.find(node => node.owner === 1 && !node.isRelay) || null;
+    if (this.primaryPlayerNode && this.game.nodes.includes(this.primaryPlayerNode)) {
+      return this.primaryPlayerNode;
+    }
+    this.primaryPlayerNode = this.game.nodes.find(node => node.owner === 1 && !node.isRelay) || null;
+    return this.primaryPlayerNode;
   }
 
   _getExpectedNeutralTarget() {
+    if (this.expectedNeutralTarget && this.game.nodes.includes(this.expectedNeutralTarget)) {
+      return this.expectedNeutralTarget;
+    }
+
     const primaryPlayerNode = this._getPrimaryPlayerNode();
     if (!primaryPlayerNode) return null;
-
     const neutralNodes = this.game.nodes.filter(node => node.owner === 0 && !node.isRelay);
-    return neutralNodes.reduce((bestNode, node) => {
+    this.expectedNeutralTarget = neutralNodes.reduce((bestNode, node) => {
       if (!bestNode) return node;
       const bestDistance = Math.hypot(bestNode.x - primaryPlayerNode.x, bestNode.y - primaryPlayerNode.y);
       const nodeDistance = Math.hypot(node.x - primaryPlayerNode.x, node.y - primaryPlayerNode.y);
       return nodeDistance < bestDistance ? node : bestNode;
     }, null);
+    return this.expectedNeutralTarget;
   }
 
   _getExpectedRelayTarget() {
-    return this.game.nodes.find(node => node.isRelay && node.owner !== 1) || null;
+    if (this.expectedRelayTarget && this.game.nodes.includes(this.expectedRelayTarget)) {
+      return this.expectedRelayTarget;
+    }
+    this.expectedRelayTarget = this.game.nodes.find(node => node.isRelay && node.owner !== 1) || null;
+    return this.expectedRelayTarget;
+  }
+
+  _isExpectedNeutralCaptured() {
+    const expectedNeutralTarget = this._getExpectedNeutralTarget();
+    return !!expectedNeutralTarget && expectedNeutralTarget.owner === 1;
+  }
+
+  _isExpectedRelayCaptured() {
+    const expectedRelayTarget = this._getExpectedRelayTarget();
+    return !!expectedRelayTarget && expectedRelayTarget.owner === 1;
   }
 
   _hasTutorialPlayerTentacle() {
     return this.game.tents.some(
       tentacle => tentacle.alive &&
         (tentacle.state === TentState.ACTIVE || tentacle.state === TentState.GROWING) &&
-        tentacle.source?.owner === 1
+        tentacle.source?.owner === 1 &&
+        !tentacle.source?.isRelay
     );
   }
 
+  _syncStepContext() {
+    const currentAction = this.cur?.action;
+    if (!currentAction) return;
+
+    if (!this.primaryPlayerNode || !this.game.nodes.includes(this.primaryPlayerNode)) {
+      this.primaryPlayerNode = this.game.nodes.find(node => node.owner === 1 && !node.isRelay) || null;
+    }
+
+    if (currentAction === 'tentacle' || currentAction === 'capture' || currentAction === 'cut') {
+      this._getExpectedNeutralTarget();
+    }
+    if (currentAction === 'capture_relay') {
+      this._getExpectedRelayTarget();
+    }
+  }
+
   allowsClickIntent(clickIntent) {
-    if (!this.isRigid()) return true;
+    if (!this.hasActionGate()) return true;
 
     const currentAction = this.cur?.action;
-    const primaryPlayerNode = this._getPrimaryPlayerNode();
-    const expectedNeutralTarget = this._getExpectedNeutralTarget();
-    const expectedRelayTarget = this._getExpectedRelayTarget();
+    const isTutorialSourceNode = clickIntent.node?.owner === 1 && !clickIntent.node?.isRelay;
+    const isTutorialBuildSource =
+      clickIntent.sourceNode?.owner === 1 &&
+      !clickIntent.sourceNode?.isRelay;
+    const isNeutralBuildTarget =
+      clickIntent.targetNode?.owner === 0 &&
+      !clickIntent.targetNode?.isRelay;
+    const isRelayBuildTarget =
+      clickIntent.targetNode?.isRelay &&
+      clickIntent.targetNode?.owner !== 1;
 
     switch (currentAction) {
       case 'read':
       case 'done':
         return false;
       case 'select':
-        return clickIntent.type === 'select_player_node' && clickIntent.node === primaryPlayerNode;
+        return clickIntent.type === 'select_player_node' && isTutorialSourceNode;
       case 'tentacle':
       case 'capture':
-        if (clickIntent.type === 'select_player_node') return clickIntent.node === primaryPlayerNode;
+        if (clickIntent.type === 'select_player_node') return isTutorialSourceNode;
         if (clickIntent.type === 'build_tentacle') {
-          return clickIntent.sourceNode === primaryPlayerNode && clickIntent.targetNode === expectedNeutralTarget;
+          return isTutorialBuildSource && isNeutralBuildTarget;
         }
         return false;
       case 'capture_relay':
-        if (clickIntent.type === 'select_player_node') return clickIntent.node === primaryPlayerNode;
+        if (clickIntent.type === 'select_player_node') return isTutorialSourceNode;
         if (clickIntent.type === 'build_tentacle') {
-          return clickIntent.sourceNode === primaryPlayerNode && clickIntent.targetNode === expectedRelayTarget;
+          return isTutorialBuildSource && isRelayBuildTarget;
         }
         return false;
       case 'retract':
-        if (clickIntent.type === 'select_player_node') return clickIntent.node === primaryPlayerNode;
-        return clickIntent.type === 'retract_node_tentacles';
+        if (clickIntent.type === 'select_player_node') return isTutorialSourceNode;
+        return clickIntent.type === 'retract_node_tentacles' && clickIntent.retractableTentacles.length > 0;
       case 'cut':
         if (!this._hasTutorialPlayerTentacle()) {
-          if (clickIntent.type === 'select_player_node') return clickIntent.node === primaryPlayerNode;
+          if (clickIntent.type === 'select_player_node') return isTutorialSourceNode;
           if (clickIntent.type === 'build_tentacle') {
-            return clickIntent.sourceNode === primaryPlayerNode && clickIntent.targetNode === expectedNeutralTarget;
+            return isTutorialBuildSource && isNeutralBuildTarget;
           }
         }
         return false;
@@ -120,46 +200,50 @@ export class Tutorial {
   }
 
   canStartDragConnect(sourceNode) {
-    if (!this.isRigid()) return true;
+    if (!this.hasActionGate()) return true;
 
     const currentAction = this.cur?.action;
-    const primaryPlayerNode = this._getPrimaryPlayerNode();
+    const isTutorialSourceNode = sourceNode?.owner === 1 && !sourceNode?.isRelay;
     return (currentAction === 'tentacle' || currentAction === 'capture' || currentAction === 'capture_relay' ||
       (currentAction === 'cut' && !this._hasTutorialPlayerTentacle())) &&
-      sourceNode === primaryPlayerNode;
+      isTutorialSourceNode;
   }
 
   filterDragConnectTarget(sourceNode, targetNode) {
-    if (!this.isRigid()) return targetNode;
+    if (!this.hasActionGate()) return targetNode;
     if (!sourceNode || !targetNode) return null;
 
     const currentAction = this.cur?.action;
     if (currentAction === 'tentacle' || currentAction === 'capture' || currentAction === 'cut') {
-      return targetNode === this._getExpectedNeutralTarget() ? targetNode : null;
+      return targetNode.owner === 0 && !targetNode.isRelay ? targetNode : null;
     }
     if (currentAction === 'capture_relay') {
-      return targetNode === this._getExpectedRelayTarget() ? targetNode : null;
+      return targetNode.isRelay && targetNode.owner !== 1 ? targetNode : null;
     }
     return null;
   }
 
   canStartSlice() {
-    if (!this.isRigid()) return true;
+    if (!this.hasActionGate()) return true;
+    this._syncStepContext();
     return this.cur?.action === 'cut' && this._hasTutorialPlayerTentacle();
   }
 
   filterSliceCuts(sliceCuts) {
-    if (!this.isRigid()) return sliceCuts;
+    if (!this.hasActionGate()) return sliceCuts;
+    this._syncStepContext();
     if (this.cur?.action !== 'cut') return [];
 
-    const playerTentacle = this.game.tents.find(
-      tentacle => tentacle.alive &&
+    const playerTentacles = new Set(
+      this.game.tents.filter(tentacle =>
+        tentacle.alive &&
         (tentacle.state === TentState.ACTIVE || tentacle.state === TentState.GROWING) &&
-        tentacle.source?.owner === 1
+        tentacle.source?.owner === 1 &&
+        !tentacle.source?.isRelay
+      )
     );
 
-    if (!playerTentacle) return [];
-    return sliceCuts.filter(sliceCut => sliceCut.tentacle === playerTentacle);
+    return sliceCuts.filter(sliceCut => playerTentacles.has(sliceCut.tentacle));
   }
 
   /* ── Called each frame by Game.update ── */
@@ -167,6 +251,7 @@ export class Tutorial {
     this.ghostAnim = (this.ghostAnim + 0.02) % 1;
     const s = this.cur;
     if (!s || this.actionDone) return;
+    this._syncStepContext();
 
     const wasActionDone = this.actionDone;
     const nodes = game.nodes, tents = game.tents;
@@ -179,22 +264,53 @@ export class Tutorial {
         if (tents.some(t => t.alive && t.source?.owner === 1)) { this.had_tent = true; this.actionDone = true; }
         break;
       case 'capture':
-        if (nodes.some(n => n.owner === 1 && n !== pNode && !n.isRelay)) { this.had_capture = true; this.actionDone = true; }
+        if (
+          this.had_capture ||
+          this._isExpectedNeutralCaptured() ||
+          tents.some(tentacle =>
+            tentacle.alive &&
+            (tentacle.state === TentState.ACTIVE || tentacle.state === TentState.GROWING) &&
+            tentacle.source?.owner === 1 &&
+            !tentacle.source?.isRelay &&
+            tentacle.target?.owner === 0 &&
+            !tentacle.target?.isRelay
+          )
+        ) {
+          this.had_capture = true;
+          this.actionDone = true;
+        }
         break;
       case 'retract':
-        if (this.had_capture && !tents.some(t => t.alive && t.source?.owner === 1)) { this.had_retract = true; this.actionDone = true; }
+        if (this.had_retract || !tents.some(t => t.alive && t.source?.owner === 1 && !t.source?.isRelay)) {
+          this.had_retract = true;
+          this.actionDone = true;
+        }
         break;
       case 'cut':
         if (!this.needsCut && tents.some(t => t.alive && t.source?.owner === 1)) this.needsCut = true;
-        if (this.needsCut && !tents.some(t => t.alive && t.source?.owner === 1) && this.had_retract) { this.had_cut = true; this.actionDone = true; }
+        if (this.needsCut && this.had_cut) { this.actionDone = true; }
         break;
       case 'done': this.actionDone = true; break;
       case 'capture_relay':
-        if (nodes.some(n => n.isRelay && n.owner === 1)) this.actionDone = true;
+        if (
+          this.actionDone ||
+          this._isExpectedRelayCaptured() ||
+          tents.some(tentacle =>
+            tentacle.alive &&
+            (tentacle.state === TentState.ACTIVE || tentacle.state === TentState.GROWING) &&
+            tentacle.source?.owner === 1 &&
+            !tentacle.source?.isRelay &&
+            tentacle.target?.isRelay &&
+            tentacle.target?.owner !== 1
+          )
+        ) {
+          this.actionDone = true;
+        }
         break;
     }
 
     if (this.actionDone && !wasActionDone) this._revealNext();
+    if (this.actionDone && !wasActionDone) this._scheduleAutoAdvance();
   }
 
   _revealNext() {
@@ -204,13 +320,17 @@ export class Tutorial {
     const tw = this.game.cfg?.tutorialWorldId || 1;
     btn.textContent = isLast
       ? (tw > 1 ? T('startWorld' + tw) || T('startCampaign') : T('startCampaign'))
-      : 'NEXT →';
+      : T('tutorialNext');
     btn.style.display = 'inline-block';
   }
 
   showStep() {
+    this._clearAutoAdvance();
     const s = this.cur; if (!s) return;
     if (s.action === 'read' || s.action === 'done') this.actionDone = true;
+    this.expectedNeutralTarget = null;
+    this.expectedRelayTarget = null;
+    this._syncStepContext();
 
     const tw = this.game.cfg?.tutorialWorldId || 1;
     const tc = ({ 1:'#00ff9d', 2:'#c040ff', 3:'#ff9020' })[tw] || '#00ff9d';
@@ -220,7 +340,7 @@ export class Tutorial {
 
     const badgeEl = document.getElementById(DOM_IDS.TUT_BADGE);
     if (badgeEl) {
-      const wn = { 1:'WORLD 1: GENESIS', 2:'WORLD 2: THE VOID', 3:'WORLD 3: NEXUS PRIME' }[tw];
+      const wn = T('tutorialWorld' + tw + 'Label') || '';
       badgeEl.textContent = wn || '';
       badgeEl.style.color = tc;
       badgeEl.style.display = tw > 1 ? 'block' : 'none';
@@ -244,7 +364,7 @@ export class Tutorial {
         btn.textContent = tw > 1 ? T('startWorld' + tw) || T('startCampaign') : T('startCampaign');
         btn.style.display = 'inline-block';
       } else if (this.actionDone) {
-        btn.textContent = 'NEXT →';
+        btn.textContent = T('tutorialNext');
         btn.style.display = 'inline-block';
       } else {
         btn.style.display = 'none';
@@ -256,6 +376,7 @@ export class Tutorial {
   }
 
   advance() {
+    this._clearAutoAdvance();
     const s = this.cur;
     if (!this.actionDone && s?.action !== 'read' && s?.action !== 'done') return;
     this.step++;
@@ -279,6 +400,7 @@ export class Tutorial {
   }
 
   exit() {
+    this._clearAutoAdvance();
     this.game._clearPendingTutorialReload();
     this.game.paused = true;
     const tutorialBox = document.getElementById(DOM_IDS.TUTBOX);
@@ -287,6 +409,56 @@ export class Tutorial {
     syncWorldTab();
     buildWorldTabs();
     showScr('levels');
+  }
+
+  onSliceCut(sliceCut) {
+    if (!this.hasActionGate() || this.cur?.action !== 'cut') return;
+    if (sliceCut.tentacle.source?.owner !== 1 || sliceCut.tentacle.source?.isRelay) return;
+    this.had_cut = true;
+    this.actionDone = true;
+    this._revealNext();
+    this._scheduleAutoAdvance();
+  }
+
+  onClickIntentApplied(clickIntent) {
+    if (!this.hasActionGate()) return;
+
+    switch (this.cur?.action) {
+      case 'select':
+        if (clickIntent.type === 'select_player_node') {
+          this.had_sel = true;
+          this.actionDone = true;
+        }
+        break;
+      case 'tentacle':
+        if (clickIntent.type === 'build_tentacle' && clickIntent.targetNode?.owner === 0 && !clickIntent.targetNode?.isRelay) {
+          this.had_tent = true;
+          this.actionDone = true;
+        }
+        break;
+      case 'capture':
+        if (clickIntent.type === 'build_tentacle' && clickIntent.targetNode?.owner === 0 && !clickIntent.targetNode?.isRelay) {
+          this.had_capture = true;
+          this.actionDone = true;
+        }
+        break;
+      case 'retract':
+        if (clickIntent.type === 'retract_node_tentacles' && clickIntent.retractableTentacles.length > 0) {
+          this.had_retract = true;
+          this.actionDone = true;
+        }
+        break;
+      case 'capture_relay':
+        if (clickIntent.type === 'build_tentacle' && clickIntent.targetNode?.isRelay && clickIntent.targetNode?.owner !== 1) {
+          this.actionDone = true;
+        }
+        break;
+      default:
+        break;
+    }
+
+    if (this.actionDone) this._revealNext();
+    if (this.actionDone) this._scheduleAutoAdvance();
   }
 
   /* ── Ghost cursor target ── */

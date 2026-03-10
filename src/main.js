@@ -10,13 +10,13 @@
    ================================================================ */
 
 import { STATE }    from './core/GameState.js';
-import { T, setLang, applyLang, toggleLang, curLang } from './localization/i18n.js';
+import { T, setLang, applyLang } from './localization/i18n.js';
 import { Music }    from './audio/Music.js';
 import { SoundEffects as SFX } from './audio/SoundEffects.js';
 import { Game }     from './core/Game.js';
 import { DOM_IDS }  from './ui/DomIds.js';
 import {
-  showScr, fadeGo, showToast, buildWorldTabs, buildStory, buildCredits,
+  showScr, fadeGo, showToast, showNotification, buildWorldTabs, buildStory, buildCredits,
   syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel, showCampaignEnding,
 } from './ui/ScreenController.js';
 import { LEVELS } from './config/gameConfig.js';
@@ -39,6 +39,21 @@ STATE.loadSettings();
 
 let game;
 
+function buildTrackNotification(trackInfo) {
+  if (!trackInfo) return null;
+
+  return {
+    kind: 'music',
+    icon: trackInfo.icon || '♪',
+    kicker: T('notifNowPlaying'),
+    title: T(trackInfo.titleKey),
+    body: T(trackInfo.roleKey),
+    meta: T('notifMusicMeta', trackInfo.bpm, trackInfo.durationLabel),
+    durationMs: 3600,
+    dedupeKey: `music:${trackInfo.id}`,
+  };
+}
+
 function initGame() {
   const canvas = $id(DOM_IDS.CANVAS);
   if (!canvas) { console.error('canvas element missing'); return; }
@@ -51,6 +66,14 @@ function initGame() {
   try {
     game = new Game(canvas);
     Screens.setGame(game);
+    if (typeof Music.setTrackChangeListener === 'function') {
+      Music.setTrackChangeListener(trackInfo => {
+        const notification = buildTrackNotification(trackInfo);
+        if (notification) showNotification(notification);
+      });
+    } else {
+      console.warn('Music track-change notifications are unavailable in this runtime.');
+    }
     wireButtons();
     applyLang();
   } catch (err) {
@@ -156,7 +179,14 @@ function wireButtons() {
     try {
       const copied = await copyTextToClipboard(snapshot);
       if (!copied) throw new Error('clipboard_copy_failed');
-      showToast(curLang() === 'pt' ? 'Snapshot de debug copiado' : 'Debug snapshot copied');
+      showNotification({
+        kind: 'debug',
+        icon: '⚙',
+        kicker: T('setDeveloper'),
+        title: T('notifDebugSnapshotCopiedTitle'),
+        body: T('notifDebugSnapshotCopiedBody'),
+        dedupeKey: 'debug:snapshot-copied',
+      });
     } catch {
       showToast(snapshot);
     }
@@ -168,7 +198,14 @@ function wireButtons() {
   $id(DOM_IDS.BTN_RESET_PROG)?.addEventListener('click', () => {
     if (!confirm('Reset all progress?')) return;
     STATE.resetProgress();
-    showToast('Progress reset');
+    showNotification({
+      kind: 'warning',
+      icon: '⚠',
+      kicker: T('settings'),
+      title: T('notifProgressResetTitle'),
+      body: T('notifProgressResetBody'),
+      dedupeKey: 'settings:progress-reset',
+    });
     refreshSettingsUI();
   });
 
@@ -205,10 +242,7 @@ function wireButtons() {
   $id(DOM_IDS.BTN_RESUME)?.addEventListener('click', () => {
     game.paused = false;
     showScr(null);
-    const w = game.cfg ? game.cfg.worldId || 1 : 1;
-    if (w === 2) Music.playVoid();
-    else if (w === 3) Music.playNexus();
-    else Music.playGenesis();
+    Music.playLevelTheme(game.cfg);
   });
   $id(DOM_IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
   $id(DOM_IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); }));
@@ -271,10 +305,6 @@ function wireButtons() {
 }
 
 function wireAudioBus() {
-  const { bus } = (() => {
-    /* Inline import — bus is a singleton, already constructed */
-    return import('./core/EventBus.js').then(m => ({ bus: m.bus }));
-  })();
   /* Async wire after module resolves */
   import('./core/EventBus.js').then(({ bus: b }) => {
     b.on('node:levelup',       ()  => SFX.levelUp());
@@ -291,10 +321,24 @@ function wireAudioBus() {
     b.on('frenzy:start',       ()  => SFX.frenzy());
     b.on('frenzy:end',         ()  => SFX.frenzyEnd());
     b.on('signal:capture',     ()  => {
-      showToast('📡 ' + (curLang() === 'pt' ? 'TORRE DE SINAL — VARREDURA TOTAL 8s' : 'SIGNAL TOWER — FULL SCAN 8s'));
+      showNotification({
+        kind: 'objective',
+        icon: '📡',
+        kicker: T('tutorialWorld3Label'),
+        title: T('notifSignalTowerTitle'),
+        body: T('notifSignalTowerBody'),
+        dedupeKey: 'objective:signal-tower',
+      });
       SFX.capture();
     });
-    b.on('ai:defensive',       ()  => showToast('🛡 ' + (curLang() === 'pt' ? 'IA RECUANDO' : 'AI RETREATING')));
+    b.on('ai:defensive',       ()  => showNotification({
+      kind: 'status',
+      icon: '🛡',
+      kicker: T('enemy'),
+      title: T('notifAiRetreatTitle'),
+      body: T('notifAiRetreatBody'),
+      dedupeKey: 'status:ai-retreat',
+    }));
     b.on('node:owner_change',  (n, prev) => {
       if (n.owner === 1)  { /* captured */ }
       if (prev === 1)     SFX.enemyAlarm();

@@ -145,6 +145,9 @@ export const PROGRESSION_RULES = {
   MAX_TENTACLE_SLOTS_PER_LEVEL: [1, 2, 3, 4, 5, 5],
   // Polygon sides used for visual silhouette per level. Purely visual.
   NODE_POLYGON_SIDES_PER_LEVEL: [0, 3, 4, 6, 8, 10],
+  // Prevents rapid level thrash when a node hovers around an energy threshold,
+  // especially on maps where nodeEnergyCap sits exactly on a level boundary.
+  LEVEL_DOWN_HYSTERESIS_ENERGY: 4,
 };
 
 export const CUT_RULES = {
@@ -187,6 +190,59 @@ export const AI_RULES = {
   STRATEGIC_CUT_RATIO: 0.15,
   // Minimum tentacle fill before purple AI considers a strategic cut worth it.
   STRATEGIC_CUT_PIPE_TARGET_RATIO: 0.65,
+  // Minimum interval between opportunistic slice attempts. Purple cuts more
+  // often because slice is part of its faction identity.
+  RED_SLICE_COOLDOWN_SEC: 2.2,
+  PURPLE_SLICE_COOLDOWN_SEC: 0.9,
+  // Slice scoring gates. Red only cuts when the lane is highly valuable;
+  // purple is allowed to threaten the player more often.
+  RED_SLICE_SCORE_THRESHOLD: 72,
+  PURPLE_SLICE_SCORE_THRESHOLD: 48,
+  // Slice scoring components for charged offensive lanes.
+  SLICE_LOW_PLAYER_ENERGY_FRACTION: 0.4,
+  SLICE_LOW_PLAYER_ENERGY_BONUS: 18,
+  SLICE_EXISTING_PRESSURE_BONUS: 16,
+  SLICE_LONG_LANE_MIN_PX: 180,
+  SLICE_LONG_LANE_BONUS: 10,
+  SLICE_CLASH_BREAK_BONUS: 14,
+  SLICE_RELAY_STRIKE_BONUS: 14,
+  SLICE_OVEREXTENDED_PLAYER_BONUS: 12,
+  SLICE_PIPE_TARGET_RATIO_BONUS: 26,
+  // Tactical state profile thresholds.
+  FINISH_PLAYER_ENERGY_FRACTION: 0.32,
+  FINISH_PRESSURE_THRESHOLD: 0.25,
+  EXPAND_NEUTRAL_RATIO_THRESHOLD: 0.28,
+  RECOVER_LOW_ENERGY_FRACTION: 0.33,
+  SUPPORT_UNDER_ATTACK_NODE_THRESHOLD: 1,
+  // Tactical state score shaping.
+  TACTICAL_EXPAND_NEUTRAL_BONUS: 12,
+  TACTICAL_PRESSURE_PLAYER_BONUS: 10,
+  TACTICAL_SUPPORT_ALLY_BONUS: 18,
+  TACTICAL_FINISH_PLAYER_BONUS: 20,
+  TACTICAL_RECOVER_PLAYER_ATTACK_DAMPENER: 0.72,
+  // Structural weakness reading for player-owned nodes.
+  PLAYER_EXPOSED_OUTCOUNT_THRESHOLD: 2,
+  PLAYER_EXPOSED_SUPPORT_PENALTY: 10,
+  PLAYER_ISOLATED_DISTANCE_PX: 170,
+  PLAYER_ISOLATED_NODE_BONUS: 12,
+  PLAYER_THIN_DEFENSE_ENERGY_FRACTION: 0.45,
+  PLAYER_THIN_DEFENSE_BONUS: 14,
+  // Bonus for continuing a neutral capture where the AI coalition already has
+  // meaningful progress invested. Higher = less abandoned neutral pressure.
+  ALLIED_CONTEST_CONTINUATION_BONUS: 0.45,
+  // Bonus for supporting an allied node that is already under visible player pressure.
+  ALLIED_SUPPORT_UNDER_ATTACK_BONUS: 26,
+  // Extra score for player nodes that are already close to collapse.
+  PLAYER_KILL_CONFIRM_BONUS: 24,
+  // Prefer lanes where the player is already pressured or overextended.
+  PLAYER_UNDER_ATTACK_PRESSURE_BONUS: 12,
+  PLAYER_HIGH_OUTCOUNT_PUNISH_BONUS: 10,
+  // Reduce waste by discouraging too many AI lanes onto the same target unless
+  // that target is a genuine kill-confirm or decisive coalition objective.
+  OVERCOMMIT_NEUTRAL_TARGET_PENALTY: 12,
+  OVERCOMMIT_PLAYER_TARGET_PENALTY: 8,
+  // Limit low-value multi-source spam onto the same target in one think wave.
+  ALLOW_MULTI_SOURCE_PLAYER_FOCUS_THRESHOLD: 82,
 };
 
 export const WORLD_RULES = {
@@ -405,16 +461,16 @@ const RAW_LEVELS = [
   { id:16, worldId:2, nodeEnergyCap:150, name:'STATIC VOID', nodes:11, enemyCount:2, enemyStartEnergy:40, playerStartEnergy:32, aiThinkIntervalSeconds:4.0, distanceCostMultiplier:0.08, neutralEnergyRange:[22,60], par:152, vortexCount:4 },
   { id:17, worldId:2, nodeEnergyCap:155, name:'PHANTOM',     nodes:11, enemyCount:3, enemyStartEnergy:42, playerStartEnergy:34, aiThinkIntervalSeconds:3.5, distanceCostMultiplier:0.08, neutralEnergyRange:[22,60], par:168, vortexCount:4, pulsingVortexPeriodSeconds:6 },
   /* W2 ── Tier 3: The Maelstrom — Moving + Pulsing Vortexes */
-  { id:18, worldId:2, nodeEnergyCap:160, name:'MAELSTROM',   nodes:12, enemyCount:3, enemyStartEnergy:46, playerStartEnergy:34, aiThinkIntervalSeconds:3.0, distanceCostMultiplier:0.09, neutralEnergyRange:[25,68], par:196, vortexCount:5, movingVortexCount:3, pulsingVortexPeriodSeconds:6 },
+  { id:18, worldId:2, nodeEnergyCap:160, name:'MAELSTROM',   nodes:12, enemyCount:3, enemyStartEnergy:44, playerStartEnergy:36, aiThinkIntervalSeconds:3.2, distanceCostMultiplier:0.09, neutralEnergyRange:[25,68], par:202, vortexCount:5, movingVortexCount:3, pulsingVortexPeriodSeconds:6 },
   { id:19, worldId:2, nodeEnergyCap:165, name:'VORTEX RING', nodes:13, enemyCount:3, enemyStartEnergy:54, playerStartEnergy:36, aiThinkIntervalSeconds:2.6, distanceCostMultiplier:0.09, neutralEnergyRange:[28,72], par:215, vortexCount:5, movingVortexCount:5 },
   { id:20, worldId:2, nodeEnergyCap:170, name:'ABYSS GATE',  nodes:14, enemyCount:4, enemyStartEnergy:60, playerStartEnergy:38, aiThinkIntervalSeconds:2.2, distanceCostMultiplier:0.10, neutralEnergyRange:[28,78], par:244, vortexCount:6, movingVortexCount:6 },
   /* W2 ── Boss: Heart of the Void — Super-Vortex + Purple Incursion */
-  { id:21, worldId:2, nodeEnergyCap:175, name:'OBLIVION', nodes:15, enemyCount:4, enemyStartEnergy:62, playerStartEnergy:40, aiThinkIntervalSeconds:1.6, distanceCostMultiplier:0.11, neutralEnergyRange:[32,88], par:274, vortexCount:6, movingVortexCount:3, pulsingVortexPeriodSeconds:5, hasSuperVortex:true, purpleEnemyCount:1, purpleEnemyStartEnergy:46, isBoss:true },
+  { id:21, worldId:2, nodeEnergyCap:175, name:'OBLIVION', nodes:15, enemyCount:4, enemyStartEnergy:60, playerStartEnergy:42, aiThinkIntervalSeconds:1.75, distanceCostMultiplier:0.11, neutralEnergyRange:[32,88], par:282, vortexCount:6, movingVortexCount:3, pulsingVortexPeriodSeconds:5, hasSuperVortex:true, purpleEnemyCount:1, purpleEnemyStartEnergy:42, isBoss:true },
   /* TUT W3 */
   { id:22, worldId:3, nodeEnergyCap:175, tutorialWorldId:3, name:'NEXUS TUTORIAL', nodes:5, enemyCount:1, enemyStartEnergy:16, playerStartEnergy:40, aiThinkIntervalSeconds:8.0, distanceCostMultiplier:0.06, neutralEnergyRange:[15,40], par:999, isTutorial:true, relayCount:1, pulsarCount:1 },
   /* W3 — NEXUS PRIME ── Tier 1: Signal Acquisition */
   { id:23, worldId:3, nodeEnergyCap:175, name:'RESONANCE',   nodes:9,  enemyCount:2, enemyStartEnergy:28, playerStartEnergy:28, aiThinkIntervalSeconds:5.5, distanceCostMultiplier:0.06, neutralEnergyRange:[18,50], par:98, relayCount:3, pulsarCount:0 },
-  { id:24, worldId:3, nodeEnergyCap:178, name:'RELAY RACE',  nodes:10, enemyCount:2, enemyStartEnergy:30, playerStartEnergy:32, aiThinkIntervalSeconds:5.0, distanceCostMultiplier:0.06, neutralEnergyRange:[20,55], par:114, relayCount:4, pulsarCount:0 },
+  { id:24, worldId:3, nodeEnergyCap:178, name:'RELAY RACE',  nodes:10, enemyCount:2, enemyStartEnergy:28, playerStartEnergy:34, aiThinkIntervalSeconds:5.3, distanceCostMultiplier:0.06, neutralEnergyRange:[20,55], par:120, relayCount:4, pulsarCount:0 },
   { id:25, worldId:3, nodeEnergyCap:182, name:'FIRST PULSE', nodes:10, enemyCount:2, enemyStartEnergy:35, playerStartEnergy:30, aiThinkIntervalSeconds:4.5, distanceCostMultiplier:0.07, neutralEnergyRange:[20,58], par:128, relayCount:3, pulsarCount:1 },
   /* W3 ── Tier 2: Frequency War — Relay Fortresses */
   { id:26, worldId:3, nodeEnergyCap:185, name:'BROADCAST', nodes:11, enemyCount:3, enemyStartEnergy:38, playerStartEnergy:32, aiThinkIntervalSeconds:4.0, distanceCostMultiplier:0.07, neutralEnergyRange:[22,60], par:146, relayCount:3, pulsarCount:2 },
@@ -422,10 +478,10 @@ const RAW_LEVELS = [
   { id:28, worldId:3, nodeEnergyCap:191, name:'FORTIFIED SIGNAL', nodes:12, enemyCount:3, enemyStartEnergy:48, playerStartEnergy:34, aiThinkIntervalSeconds:3.2, distanceCostMultiplier:0.08, neutralEnergyRange:[25,68], par:184, relayCount:3, pulsarCount:3, fortifiedRelayCount:2 },
   /* W3 ── Tier 3: Maximum Throughput — Signal Towers + Purple Threat */
   { id:29, worldId:3, nodeEnergyCap:194, name:'CASCADE', nodes:13, enemyCount:4, enemyStartEnergy:52, playerStartEnergy:36, aiThinkIntervalSeconds:2.8, distanceCostMultiplier:0.09, neutralEnergyRange:[28,72], par:204, relayCount:5, pulsarCount:3, purpleEnemyCount:1, purpleEnemyStartEnergy:42 },
-  { id:30, worldId:3, nodeEnergyCap:196, name:'SIGNAL LOCK', nodes:14, enemyCount:4, enemyStartEnergy:55, playerStartEnergy:38, aiThinkIntervalSeconds:2.4, distanceCostMultiplier:0.09, neutralEnergyRange:[30,78], par:238, relayCount:5, pulsarCount:3, signalTowerCount:1, purpleEnemyCount:1, purpleEnemyStartEnergy:44 },
+  { id:30, worldId:3, nodeEnergyCap:196, name:'SIGNAL LOCK', nodes:14, enemyCount:4, enemyStartEnergy:53, playerStartEnergy:40, aiThinkIntervalSeconds:2.55, distanceCostMultiplier:0.09, neutralEnergyRange:[30,78], par:246, relayCount:5, pulsarCount:3, signalTowerCount:1, purpleEnemyCount:1, purpleEnemyStartEnergy:42 },
   { id:31, worldId:3, nodeEnergyCap:198, name:'APEX', nodes:14, enemyCount:5, enemyStartEnergy:65, playerStartEnergy:38, aiThinkIntervalSeconds:2.0, distanceCostMultiplier:0.10, neutralEnergyRange:[32,82], par:260, relayCount:6, pulsarCount:4, signalTowerCount:1, purpleEnemyCount:1, purpleEnemyStartEnergy:55 },
   /* W3 ── Boss: Nexus Core — Super-Pulsar + Relay Fortresses + Signal Tower + Purple Dominance */
-  { id:32, worldId:3, nodeEnergyCap:200, name:'TRANSCENDENCE', nodes:15, enemyCount:5, enemyStartEnergy:68, playerStartEnergy:42, aiThinkIntervalSeconds:1.5, distanceCostMultiplier:0.11, neutralEnergyRange:[35,90], par:300, relayCount:6, pulsarCount:4, signalTowerCount:1, fortifiedRelayCount:3, hasSuperPulsar:true, purpleEnemyCount:2, purpleEnemyStartEnergy:58, isBoss:true },
+  { id:32, worldId:3, nodeEnergyCap:200, name:'TRANSCENDENCE', nodes:15, enemyCount:5, enemyStartEnergy:66, playerStartEnergy:44, aiThinkIntervalSeconds:1.6, distanceCostMultiplier:0.11, neutralEnergyRange:[35,90], par:308, relayCount:6, pulsarCount:4, signalTowerCount:1, fortifiedRelayCount:3, hasSuperPulsar:true, purpleEnemyCount:2, purpleEnemyStartEnergy:55, isBoss:true },
 ];
 
 export const LEVELS = RAW_LEVELS;

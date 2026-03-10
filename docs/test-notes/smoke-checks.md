@@ -36,12 +36,15 @@ Current coverage:
 - tutorial exit and mouse-gesture cleanup guards stay present
 - primary-button slice keeps its distinct visual and drag targeting behavior
 - frenzy only triggers from the same continuous slice gesture
+- capped nodes use hysteresis so they do not thrash level-up feedback at a max-energy threshold
 - touch-promoted slice stays on the canonical slice init path
 - input timing stays monotonic instead of relying on `Date.now()`
 - slice-path append stays in-place instead of reallocating each move
 - tutorial defeat delayed reload stays guarded against stale callbacks
 - package.json exposes the validation scripts directly
 - gameplay input bindings remain disposable/unbindable
+- grouped notifications keep their dedupe and priority behavior
+- music boot now guards the track-notification contract before using it
 
 ## Run
 
@@ -67,6 +70,30 @@ or:
 
 ```bash
 node scripts/campaign-sanity.mjs
+```
+
+For focused progression-state validation, also run:
+
+```bash
+npm run progression-sanity
+```
+
+or:
+
+```bash
+node scripts/game-state-progression-sanity.mjs
+```
+
+For deterministic input-side validation, also run:
+
+```bash
+npm run input-harness
+```
+
+or:
+
+```bash
+node scripts/input-harness.mjs
 ```
 
 For critical button, menu, and screen wiring integrity, also run:
@@ -103,6 +130,18 @@ or:
 
 ```bash
 node scripts/simulation-soak.mjs
+```
+
+For lightweight release precondition validation, also run:
+
+```bash
+npm run release-readiness
+```
+
+or:
+
+```bash
+node scripts/release-readiness.mjs
 ```
 
 For the standard full local validation pass:

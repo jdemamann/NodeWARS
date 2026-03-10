@@ -88,6 +88,15 @@ async function testSettingsControlsHaveI18nCoverage() {
     'setViewEnding', 'setViewEndingDesc',
     'setReset', 'setResetDesc',
     'viewEnding',
+    'notifNowPlaying', 'notifMusicMeta',
+    'notifSignalTowerTitle', 'notifSignalTowerBody',
+    'notifAiRetreatTitle', 'notifAiRetreatBody',
+    'notifDebugSnapshotCopiedTitle', 'notifDebugSnapshotCopiedBody',
+    'notifProgressResetTitle', 'notifProgressResetBody',
+    'trackDriftSignal', 'trackGenesisPulse', 'trackSiegeBloom',
+    'trackEchoCore', 'trackHollowSignal', 'trackEntropyCurrent',
+    'trackOblivionGate', 'trackCurrent', 'trackSignalWar',
+    'trackTranscendenceProtocol', 'trackNetworkAwakens',
   ];
 
   for (const key of requiredKeys) {
@@ -121,6 +130,21 @@ async function testClipboardAndDebugPreviewFallbacksExist() {
   assert.ok(mainSource.includes('navigator.clipboard?.writeText'), 'clipboard helper should try the modern API first');
   assert.match(mainSource, /document\.execCommand\('copy'\)/, 'clipboard helper should preserve the fallback copy path');
   assert.match(mainSource, /showCampaignEnding\(debugPreviewGame, \{ debugPreview: true \}\)/, 'debug preview button should open the campaign ending');
+}
+
+async function testMusicNotificationWiringStaysPresent() {
+  const html = await read('index.html');
+  const mainSource = await read('src/main.js');
+  const musicSource = await read('src/audio/Music.js');
+  const screenControllerSource = await read('src/ui/ScreenController.js');
+
+  assert.match(html, /id="notifications"/, 'the notification stack should exist in index.html');
+  assert.match(screenControllerSource, /export function showNotification\(/, 'ScreenController should expose the structured notification entry point');
+  assert.match(mainSource, /Music\.setTrackChangeListener\(/, 'main.js should wire a music track-change listener');
+  assert.match(mainSource, /notifNowPlaying/, 'music notifications should go through i18n');
+  assert.match(musicSource, /playLevelTheme\(levelConfig\)/, 'Music should expose grouped level-theme playback');
+  assert.match(musicSource, /playEnding\(\)/, 'Music should expose a dedicated ending theme');
+  assert.match(musicSource, /setTrackChangeListener\(listener\)/, 'Music should expose a track-change listener registration API');
 }
 
 async function testSettingsWorldTogglesAndMenuFeedbackStayRobust() {
@@ -218,6 +242,7 @@ async function main() {
     ['settings controls have i18n coverage', testSettingsControlsHaveI18nCoverage],
     ['screen transitions use named screens', testScreenTransitionsUseNamedScreens],
     ['clipboard and debug preview fallbacks exist', testClipboardAndDebugPreviewFallbacksExist],
+    ['music notification wiring stays present', testMusicNotificationWiringStaysPresent],
     ['settings world toggles and menu feedback stay robust', testSettingsWorldTogglesAndMenuFeedbackStayRobust],
     ['font selection stays UI-wide', testFontSelectionStaysUiWide],
   ];

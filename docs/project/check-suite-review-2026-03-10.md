@@ -2,20 +2,26 @@
 
 ## Current status
 
-The repository now has four lightweight validation layers:
+The repository now has lightweight validation layers for gameplay, UI, progression, campaign data, release readiness, and soak stability:
 
 - `smoke-checks.mjs`
 - `ui-actions-sanity.mjs`
 - `ui-dom-sanity.mjs`
+- `game-state-progression-sanity.mjs`
+- `input-harness.mjs`
 - `campaign-sanity.mjs`
+- `release-readiness.mjs`
 - `simulation-soak.mjs`
 
 Current results:
 
-- `51/51 smoke checks passed`
-- `6/6 UI action sanity checks passed`
-- `4/4 UI DOM sanity checks passed`
+- `58/58 smoke checks passed`
+- `9/9 UI action sanity checks passed`
+- `6/6 UI DOM sanity checks passed`
+- `5/5 GameState progression sanity checks passed`
+- `4/4 input harness checks passed`
 - `7/7 campaign sanity checks passed`
+- `3/3 release readiness checks passed`
 - `1/1 simulation soak checks passed`
 
 Aggregate local command:
@@ -27,13 +33,17 @@ npm run check
 That command now runs:
 
 ```bash
-npm run smoke && npm run ui-sanity && npm run campaign-sanity && npm run soak
+npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run progression-sanity && npm run input-harness && npm run campaign-sanity && npm run release-readiness && npm run soak
 ```
 
-It now runs:
+Domain commands now also exist:
 
 ```bash
-npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run campaign-sanity && npm run soak
+npm run check:gameplay
+npm run check:ui
+npm run check:campaign
+npm run check:content
+npm run check:release
 ```
 
 ## What is covered well
@@ -50,6 +60,8 @@ npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run campaign-
 - tutorial gating
 - progression / skip / unlock guardrails
 - render-profile and content-alignment guards
+- stable node-level hysteresis at capped thresholds
+- grouped notification dedupe and priority behavior
 
 This is the most important suite and it is doing real work.
 
@@ -95,10 +107,31 @@ This is small, but high-value.
 - `refreshSettingsUI()` mutating controls and debug rows
 - campaign-ending screen content population
 - world-tab visibility reacting to progression, manual overrides, and debug mode
+- structured notification dedupe and priority eviction behavior
 
 This is the first suite in the project that executes real screen-manager behavior instead of only inspecting source.
 
 This directly addresses a recurring class of regressions that gameplay smoke checks were only partially covering.
+
+### 6. Focused progression and input coverage
+
+Two new targeted suites now cover seams that had previously been guarded only
+indirectly by smoke tests:
+
+- `game-state-progression-sanity.mjs`
+- `input-harness.mjs`
+
+This makes tutorial optionality, next-level routing, and deterministic input
+behavior easier to validate without broadening the smoke suite even further.
+
+### 7. Release portability guard
+
+`release-readiness.mjs` adds a lightweight portability layer:
+
+- bundled font presence
+- no remote font dependency
+- release-domain package scripts
+- packaging-report presence
 
 ## Is the check system organized?
 
@@ -108,6 +141,7 @@ The current separation is sensible:
 
 - `smoke`: gameplay + cross-system invariants
 - `ui-sanity`: menu/screen/button wiring
+- `ui-dom-sanity`: DOM-lite screen-state behavior
 - `campaign-sanity`: static campaign metadata rules
 - `soak`: long-run numeric stability
 

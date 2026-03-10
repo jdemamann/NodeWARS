@@ -1,245 +1,157 @@
-# Relatório — Modelo de Desenvolvimento e Continuidade
+# Development Operating Model Report
 
-## Visão geral
+## Overview
 
-O projeto está no caminho certo.
+The project is on the right path.
 
-Ele já saiu de um estado experimental e entrou em um estado de engenharia com base real:
+It has already moved beyond an experimental state and into a real engineering state with:
 
-- arquitetura mais clara
-- documentação viva
-- guardrails automatizados
-- backlog e revisões técnicas
-- separação entre mecânica, UI, campanha e checks
+- clearer architecture
+- living documentation
+- automated guardrails
+- backlog and technical reviews
+- explicit separation between gameplay, UI, campaign, and checks
 
-Mas ainda existe espaço importante para profissionalizar o processo sem criar burocracia excessiva.
+There is still meaningful room to professionalize the process without adding heavy bureaucracy.
 
-O ganho principal daqui para frente não vem só de mais código. Vem de melhorar:
+The next gain does not come only from more code. It comes from improving:
 
-- gerenciamento do trabalho
-- continuidade entre sessões
-- clareza de ownership
-- previsibilidade do processo
-- rastreabilidade das decisões
+- work management
+- continuity between sessions
+- ownership clarity
+- process predictability
+- traceability of decisions
 
----
+## Current Diagnosis
 
-## Diagnóstico atual
+### Existing strengths
 
-### Pontos fortes já existentes
-
-- Existe documentação operacional:
+- Operational documentation already exists:
   - `AGENTS.md`
   - `README.md`
-  - documentação de implementação por sistema
-- Existe uma suíte de checks em múltiplas camadas:
+  - subsystem implementation docs
+- The project already has a multi-layered check suite:
   - `smoke`
   - `ui-sanity`
   - `ui-dom-sanity`
   - `campaign-sanity`
   - `soak`
-- Já existe no projeto a noção de:
-  - entry points canônicos
-  - baseline de gameplay
-  - backlog
-  - priorização por criticidade
-- O desenvolvimento já está sendo feito em waves pequenas, o que é correto.
+- The repo already works with:
+  - canonical entry points
+  - a gameplay baseline
+  - a backlog
+  - severity-based prioritization
+- Development is already happening in small waves, which is the correct model.
 
-### Pontos fracos atuais
+### Current weaknesses
 
-- O processo ainda depende demais de memória de sessão.
-- O backlog existe, mas ainda não opera plenamente como sistema contínuo de execução.
-- Os checks estão bons, mas ainda têm uma manutenção relativamente artesanal.
-- Ainda não existe uma trilha totalmente formal entre:
-  - descoberta
-  - task
-  - implementação
-  - validação
-  - documentação
-  - fechamento
+- The process still depends too much on session memory.
+- The backlog exists, but it is not yet a fully continuous execution system.
+- The check layer is strong, but still maintained in a somewhat artisanal way.
+- There is still no fully explicit chain between:
+  - discovery
+  - task creation
+  - implementation
+  - validation
+  - documentation
+  - closure
 
-Conclusão: o projeto está tecnicamente muito melhor, mas a gerência de desenvolvimento ainda pode amadurecer bastante.
+## Recommended Direction
 
----
+The next improvement should not be a heavyweight process.
 
-## Direção geral recomendada
+It should be a lightweight, disciplined, modular operating model with:
 
-A melhor evolução agora não é adotar um processo pesado.
+- a living roadmap
+- an executable backlog
+- short task specs
+- checks by surface
+- clear session handoff
 
-A melhor evolução é um modelo leve, disciplinado e modular, com:
+## Recommended Management Model
 
-- roadmap vivo
-- backlog executável
-- task specs curtas
-- checks por superfície
-- handoff claro para próximas sessões
+### 1. Product roadmap
 
-Esse modelo já é suficiente para tornar o desenvolvimento muito mais profissional sem matar a velocidade.
+A higher-level document with a longer horizon.
 
----
+It should answer:
 
-## Modelo de gerenciamento recomendado
+- where the project is
+- what the current phase is
+- what the 3 to 5 real priorities are
+- what is explicitly out of focus
 
-### 1. Roadmap de produto
+Suggested macro-phases:
 
-Documento macro com horizonte mais longo.
+- Phase 1: stabilization and robustness
+- Phase 2: balance and campaign polish
+- Phase 3: Tentacle Wars fidelity
+- Phase 4: desktop/mobile ports
 
-Ele deve responder:
+### 2. Executable backlog
 
-- onde o projeto está
-- qual é a fase atual
-- quais são as 3 a 5 prioridades reais
-- o que não está em foco agora
+A list of small tasks with real status.
 
-Exemplo de macrofases:
-
-- Fase 1: estabilização e robustez
-- Fase 2: balance e campaign polish
-- Fase 3: fidelidade Tentacle Wars
-- Fase 4: ports desktop/mobile
-
-Parte disso já existe, mas ainda vale consolidar melhor como painel principal.
-
-### 2. Backlog executável
-
-Lista de tasks pequenas, com estado real.
-
-Cada task deveria ter:
+Each task should contain:
 
 - ID
-- título
-- objetivo
-- criticidade
+- title
+- objective
+- severity
 - owner/workstream
-- dependências
-- critérios de pronto
-- check obrigatório
-- docs a atualizar
+- dependencies
+- done criteria
+- required check
+- docs to update
 
-Formato ideal:
+### 3. Short task spec
 
-- curto
-- objetivo
-- sem texto longo demais
+Every medium or risky task should have a small spec before implementation.
 
-### 3. Task spec curta
+Minimum template:
 
-Toda task média ou arriscada deveria ter uma spec pequena antes da implementação.
+- problem
+- desired rule
+- likely files
+- risk
+- checks to pass
+- expected impact
 
-Template mínimo:
+### 4. Mandatory closure
 
-- problema
-- regra desejada
-- arquivos prováveis
-- risco
-- checks que precisam passar
-- impacto esperado
+When any relevant task is completed:
 
-Isso reduz retrabalho e mudanças impulsivas.
+- run checks
+- update the relevant docs
+- update backlog/status
+- record likely follow-ups
 
-### 4. Fechamento obrigatório
+## Recommended Workstreams
 
-Ao concluir qualquer task relevante:
+- `WS-01 Gameplay Core`
+- `WS-02 AI and Factions`
+- `WS-03 Campaign and Level Design`
+- `WS-04 UI/UX and Render`
+- `WS-05 Performance and Robustness`
+- `WS-06 Ports and Build Pipeline`
 
-- rodar checks
-- atualizar doc relevante
-- atualizar backlog/status
-- registrar possíveis follow-ups
+## Recommended Tools
 
-Isso já acontece parcialmente. A recomendação é tornar isso um padrão explícito.
+### Lightweight kanban
 
----
-
-## Workstreams recomendados
-
-### WS-01 Gameplay Core
-
-Escopo:
-
-- energia
-- tentáculos
-- slice
-- clash
-- captura
-- ownership
-
-### WS-02 AI e Fações
-
-Escopo:
-
-- target selection
-- relay use
-- roxa/vermelha
-- comportamento tático
-- dificuldade comportamental
-
-### WS-03 Campaign e Level Design
-
-Escopo:
-
-- layouts fixos
-- pacing
-- tutoriais
-- progressão
-- bosses
-- abertura estrutural
-
-### WS-04 UI/UX e Render
-
-Escopo:
-
-- menus
-- HUD
-- feedback visual
-- tutorial UI
-- fontes
-- telas de resultado/final
-
-### WS-05 Performance e Robustez
-
-Escopo:
-
-- render perf
-- soak
-- persistência
-- lifecycle
-- instrumentação
-- checks
-
-### WS-06 Ports e Build Pipeline
-
-Escopo:
-
-- Linux
-- Android
-- packaging
-- assets locais
-- fontes
-- release pipeline
-
-Esses workstreams ajudam muito a decidir onde cada task entra.
-
----
-
-## Ferramentas recomendadas
-
-### 1. Kanban simples
-
-Vale muito a pena usar um board visual leve.
-
-Boas opções:
+Good options:
 
 - GitHub Projects
 - Linear
 - Trello
 - Notion database
 
-Recomendação:
+Recommendation:
 
-- GitHub Projects se quiser integração direta com o repositório
-- Trello se quiser simplicidade máxima
+- GitHub Projects for direct repository integration
+- Trello for maximum simplicity
 
-Colunas sugeridas:
+Suggested columns:
 
 - Inbox
 - Planned
@@ -247,245 +159,125 @@ Colunas sugeridas:
 - Needs Validation
 - Done
 
-### 2. Issue tracker real
+### Real issue tracker
 
-Vale a pena transformar bugs e melhorias em issues curtas.
+It is worth turning bugs and improvements into short issues.
 
-Categorias sugeridas:
+Suggested categories:
 
 - bug
 - design
 - tech-debt
 - balance
-- ui
-- performance
+- UI
 - port
 
-Isso evita perda de contexto entre sessões.
+### Consolidated check runner
 
-### 3. Check runner consolidado
+`npm run check` is already a strong entry point.
 
-Hoje `npm run check` já é um ótimo ponto de entrada.
-
-No futuro, faz sentido separar também:
+It also makes sense to keep domain commands visible and consistent:
 
 - `npm run check:gameplay`
 - `npm run check:ui`
 - `npm run check:campaign`
+- `npm run check:content`
 - `npm run check:full`
 
-Isso ajuda bastante nos ciclos curtos.
+### Lightweight release notes
 
-### 4. Release notes leves
+This does not need to be heavy.
 
-Não precisa ser algo pesado.
+But it is worth having:
 
-Mas vale ter:
+- a small release-notes doc
+- or future GitHub Releases
 
-- `docs/project/release-notes.md`
+## Should We Create Domain Agents?
 
-ou usar GitHub Releases, mais à frente.
+Yes, but in a small number around critical domains.
 
-Isso é especialmente útil porque o projeto já teve muitas mudanças relevantes de mecânica.
+The right model is a small mesh of agents, each with:
 
----
-
-## Devemos criar agentes específicos?
-
-Sim, faz sentido.
-
-Mas em número pequeno e por domínio crítico.
-
-Não vale criar agentes demais.
-
-### Agentes que fazem sentido
-
-#### 1. Gameplay Systems Agent
-
-Responsável por:
-
-- energia
-- tentáculos
-- clash
-- refund
-- slice
-- captura
-
-Checklist:
-
-- conservação de energia
-- entry points canônicos
-- smoke gameplay
-- comentários e docs de mecânica
-
-#### 2. Campaign & Level Agent
-
-Responsável por:
-
-- fases
-- pacing
-- tutoriais
-- bosses
-- balance estrutural
-
-Checklist:
-
-- dificuldade
-- opening pressure
-- tutorial optionality
-- campaign sanity
-- layouts authored
-
-#### 3. UI/UX Agent
-
-Responsável por:
-
-- menus
-- HUD
-- fonte
-- i18n
-- feedback visual
-- ending screen
-
-Checklist:
-
-- i18n PT/EN
-- resposta visual/sonora
-- cobertura da fonte
-- usabilidade mobile
-- `ui-sanity` e `ui-dom-sanity`
-
-#### 4. Performance & Build Agent
-
-Responsável por:
-
-- render perf
-- soak
-- profile HIGH/LOW
-- packaging Linux/Android
-- assets e fontes locais
-
-Checklist:
-
-- fps/debug
-- instrumentação
-- lifecycle
-- assets embutidos
-- viabilidade de build
-
-### Como criar esses agentes
-
-Usar `AGENTS.md` como hub principal e criar documentos complementares, por exemplo:
-
-- `docs/agents/gameplay-systems-agent.md`
-- `docs/agents/campaign-level-agent.md`
-- `docs/agents/ui-ux-agent.md`
-- `docs/agents/performance-build-agent.md`
-
-Cada um deveria conter:
-
-- escopo
-- arquivos críticos
-- checks obrigatórios
-- docs a atualizar
+- scope
+- critical files
+- required checks
+- docs to update
 - anti-patterns
-- definition of done
+- done criteria
 
----
+## How To Continue From Here
 
-## Como prosseguir quando quisermos continuar daqui
+### Step 1. Read the right files
 
-### Passo 1. Ler os arquivos certos
-
-Ordem recomendada:
+Start with:
 
 1. `AGENTS.md`
-2. `README.md`
-3. `docs/implementation/current-gameplay-baseline.md`
-4. `docs/project/task-backlog.md`
-5. `docs/project/stabilization-status.md`
+2. `docs/project/stabilization-status.md`
+3. `docs/project/task-backlog.md`
+4. `docs/implementation/current-gameplay-baseline.md`
+5. `docs/project/check-matrix.md`
 
-### Passo 2. Rodar validação
+### Step 2. Run validation
 
 ```bash
 npm run check
 ```
 
-### Passo 3. Escolher a próxima wave
+### Step 3. Choose the next wave
 
-Sempre em formato:
+Use a small-wave model:
 
-- problema
-- impacto
-- escopo pequeno
-- checks esperados
+- one problem
+- one clear objective
+- one bounded surface
+- expected checks
 
-### Passo 4. Implementar
+### Step 4. Implement
 
-- mexer só no necessário
-- atualizar docs relevantes
-- atualizar checks se a regra mudou
+- touch only what is necessary
+- preserve canonical owners
+- update checks if the rule changed
 
-### Passo 5. Fechar
+### Step 5. Close
 
-- rodar checks
-- atualizar backlog/status
-- registrar follow-ups
+- run checks
+- update docs
+- update backlog/status
+- record follow-ups
 
----
+## What Still Needs To Happen
 
-## O que ainda falta para o desenvolvimento ficar mais profissional
+### Short term
 
-### Curto prazo
+- keep the domain-agent set current
+- keep the backlog operational
+- keep the check matrix explicit
+- continue playtest/balance waves through this model
 
-- consolidar roadmap/backlog/status
-- criar agentes por domínio
-- formalizar template de task
-- separar melhor tipos de check por comando
+### Medium term
 
-### Médio prazo
-
-- board real
-- issues por categoria
+- external board or issue tracker
 - release notes
-- matriz de checks por sistema
+- deeper input/gameplay harnesses
 
-### Longo prazo
+### Longer term
 
-- pipeline de build Linux/Android
-- harnesses mais profundos de input/gameplay
-- telemetria simples de playtest
-- suporte melhor a release management
+- Linux/Android build pipeline
+- richer playtest and telemetry support
 
----
+## Conclusion
 
-## O que eu faria agora, em ordem
+The project is already in a strong technical state.
 
-1. Criar o conjunto de agentes por domínio
-2. Consolidar um board operacional leve
-3. Organizar um template único de task
-4. Criar uma matriz de checks por sistema
-5. Entrar em wave de playtest/balance com esse processo novo
+What is missing now is not another large restructuring.
+What is missing is a lightweight, consistent, repeatable operating model.
 
----
+The right next move is to keep organizing what already exists into:
 
-## Conclusão
-
-Sim, o projeto está no caminho certo.
-
-O que falta agora não é mais uma reestruturação técnica grande.
-O que falta é processo leve, consistente e repetível.
-
-Recomendação final:
-
-- não adotar ferramenta pesada demais
-- não criar burocracia artificial
-- organizar o que já existe em:
-  - roadmap
-  - backlog
-  - task spec
-  - agents por domínio
-  - check matrix
-  - fluxo padrão de retomada
-
-Isso deixará a continuidade muito mais previsível e muito menos dependente de memória de sessão.
+- roadmap
+- backlog
+- task specs
+- domain agents
+- check matrix
+- standard handoff flow

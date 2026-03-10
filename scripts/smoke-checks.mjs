@@ -172,6 +172,27 @@ async function testGrowingTentacleRetractRefundsFullPaidCost() {
   assert.equal(tent.state, TentState.RETRACTING, 'cancelled growing tentacles should still visually retract');
 }
 
+async function testStableNodeLevelHysteresisPreventsCapThrash() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+
+  const node = new GameNode(0, 0, 0, 200, 1);
+  node.maxE = 200;
+  node.syncLevelFromEnergy();
+  assert.equal(node.level, 4, 'node should reach the max attainable level at a 200 energy cap');
+
+  node.energy = 199;
+  node.update(0);
+  assert.equal(node.level, 4, 'node should not immediately demote after a tiny dip below the capped threshold');
+
+  node.energy = 196;
+  node.update(0);
+  assert.equal(node.level, 4, 'node should hold its level until the hysteresis boundary is crossed');
+
+  node.energy = 195.9;
+  node.update(0);
+  assert.equal(node.level, 3, 'node should demote once it falls below the hysteresis boundary');
+}
+
 async function testReversedRetractRefundsEffectiveSource() {
   const { GameNode } = await load('src/entities/GameNode.js');
   const { Tent } = await load('src/entities/Tent.js');
@@ -400,6 +421,91 @@ async function testAIRelayOriginsCanBeUsedWhenBudgeted() {
   assert.ok(game.tents.some(t => t.source === relay && t.target === target), 'AI should be able to launch a tentacle from an owned relay with real buffered budget');
 }
 
+async function testAiQualityWaveImprovesSupportAndKillConfirm() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { AI } = await load('src/systems/AI.js');
+  const { buildMoveScore } = await load('src/systems/AIScoring.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+  const { GAMEPLAY_RULES } = await load('src/config/gameConfig.js');
+
+  const sourceNode = new GameNode(0, 0, 0, 80, 2);
+  const alliedNode = new GameNode(1, 90, 0, 16, 3);
+  const healthyPlayerNode = new GameNode(2, 110, 0, 48, 1);
+  const weakPlayerNode = new GameNode(3, 110, 0, 10, 1);
+  sourceNode.maxE = alliedNode.maxE = healthyPlayerNode.maxE = weakPlayerNode.maxE = 100;
+  alliedNode.underAttack = 0.4;
+  weakPlayerNode.underAttack = 0.35;
+  weakPlayerNode.outCount = 2;
+
+  const personality = { expansionBonus: 0, attackBonus: 20, siegeBonus: 0, defensiveDampener: 0.5, energyThreshold: 22 };
+  const game = { nodes: [sourceNode, alliedNode, healthyPlayerNode, weakPlayerNode], tents: [], aiDefensive: 0 };
+  const ai = new AI(game, { aiThinkIntervalSeconds: 1, distanceCostMultiplier: 0.01, id: 30 }, 2);
+
+  const buildScore = targetNode => buildMoveScore({
+    game,
+    owner: ai.owner,
+    sourceNode,
+    targetNode,
+    proximityScore: 2,
+    isDefensive: false,
+    personality,
+    totalBuildCost: 8,
+    aiRules: GAMEPLAY_RULES.ai,
+    tentState: TentState,
+  });
+
+  const supportScore = buildScore(alliedNode);
+  const healthyPlayerScore = buildScore(healthyPlayerNode);
+  const weakPlayerScore = buildScore(weakPlayerNode);
+
+  assert.ok(supportScore >= 80, 'AI should strongly support allied nodes that are already under player pressure');
+  assert.ok(weakPlayerScore > healthyPlayerScore, 'AI should prioritize weaker overextended player nodes as kill-confirm targets');
+}
+
+async function testAiAvoidsLowValueOvercommit() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+  const { AI } = await load('src/systems/AI.js');
+  const { buildMoveScore } = await load('src/systems/AIScoring.js');
+  const { GAMEPLAY_RULES } = await load('src/config/gameConfig.js');
+
+  const sourceA = new GameNode(0, 0, 0, 70, 2);
+  const sourceB = new GameNode(1, 20, 0, 70, 2);
+  const sourceC = new GameNode(2, 40, 0, 70, 2);
+  const neutralNode = new GameNode(3, 100, 0, 18, 0);
+  sourceA.maxE = sourceB.maxE = sourceC.maxE = neutralNode.maxE = 100;
+  neutralNode.captureThreshold = 20;
+  neutralNode.contest = { 2: 11 };
+
+  const laneA = new Tent(sourceA, neutralNode, 0);
+  laneA.state = TentState.ACTIVE;
+  const laneB = new Tent(sourceB, neutralNode, 0);
+  laneB.state = TentState.ACTIVE;
+
+  const personality = { expansionBonus: 22, attackBonus: 0, siegeBonus: 0, defensiveDampener: 0.5, energyThreshold: 22 };
+  const coveredGame = { nodes: [sourceA, sourceB, sourceC, neutralNode], tents: [laneA, laneB], aiDefensive: 0 };
+  const uncoveredGame = { nodes: [sourceA, sourceB, sourceC, neutralNode], tents: [], aiDefensive: 0 };
+  const coveredAi = new AI(coveredGame, { aiThinkIntervalSeconds: 1, distanceCostMultiplier: 0.01, id: 24 }, 2);
+  const uncoveredAi = new AI(uncoveredGame, { aiThinkIntervalSeconds: 1, distanceCostMultiplier: 0.01, id: 24 }, 2);
+
+  const buildScore = (aiInstance, game) => buildMoveScore({
+    game,
+    owner: aiInstance.owner,
+    sourceNode: sourceC,
+    targetNode: neutralNode,
+    proximityScore: 2,
+    isDefensive: false,
+    personality,
+    totalBuildCost: 8,
+    aiRules: GAMEPLAY_RULES.ai,
+    tentState: TentState,
+  });
+  const coveredScore = buildScore(coveredAi, coveredGame);
+  const uncoveredScore = buildScore(uncoveredAi, uncoveredGame);
+  assert.ok(coveredScore < uncoveredScore, 'AI should penalize piling extra low-value lanes onto a neutral already covered by allied pressure');
+}
+
 async function testSharedBurstEntryPoint() {
   const { TentState } = await load('src/config/gameConfig.js');
   const { AI } = await load('src/systems/AI.js');
@@ -413,9 +519,10 @@ async function testSharedBurstEntryPoint() {
   const fakeTent = {
     alive: true,
     state: TentState.ACTIVE,
-    effectiveSourceNode: { owner: 3 },
-    effectiveTargetNode: { owner: 1, energy: 10 },
+    effectiveSourceNode: { owner: 3, isRelay: false },
+    effectiveTargetNode: { owner: 1, energy: 10, maxE: 20, underAttack: 0.3, outCount: 3 },
     energyInPipe: 8,
+    distance: 220,
     applySliceCut(ratio) { cutRatio = ratio; },
   };
 
@@ -430,7 +537,7 @@ async function testSharedBurstEntryPoint() {
   assert.match(gameSource, /applyPlayerSliceCut\(sliceCut,\s*\{/, 'player game-side applicator should delegate to the shared slice-effects helper');
   assert.match(sliceEffectsSource, /sliceCut\.tentacle\.applySliceCut\(sliceCut\.effectiveCutRatio\)/, 'shared player slice-effects helper should call the canonical slice helper');
   assert.match(sliceSource, /scanPlayerSliceCuts/, 'slice scan helper should own slice hit detection');
-  assert.match(aiSource, /if \(this\.owner === 3\) this\._checkStrategicCuts\(this\.game\);/, 'purple AI should check strategic cuts outside the think-interval early return');
+  assert.match(aiSource, /this\._checkStrategicCuts\(this\.game\);/, 'AI should check strategic cuts outside the think-interval early return');
 }
 
 async function testOwnershipAndContestCanonicalization() {
@@ -477,8 +584,14 @@ async function testTutorialCopyMatchesCurrentControlsAndRules() {
   assert.match(i18nSource, /drag from your cell and release on it/, 'english tutorial should teach drag-release tentacle creation');
   assert.match(i18nSource, /arraste da sua célula e solte sobre ela/, 'portuguese tutorial should teach drag-release tentacle creation');
   assert.match(i18nSource, /tutorialStepsWorld1/, 'tutorial copy should be grouped by explicit world keys');
+  assert.match(i18nSource, /tutorialNext:/, 'tutorial copy should expose the localized next-button label');
+  assert.match(i18nSource, /tutorialWorld1Label:/, 'tutorial copy should expose the localized World 1 tutorial label');
+  assert.match(i18nSource, /tutorialWorld2Label:/, 'tutorial copy should expose the localized World 2 tutorial label');
+  assert.match(i18nSource, /tutorialWorld3Label:/, 'tutorial copy should expose the localized World 3 tutorial label');
   assert.match(i18nSource, /export function getTutorialSteps\(/, 'i18n should expose an explicit tutorial step helper');
   assert.match(tutorialSource, /getTutorialSteps\(STATE\.curLang, tutorialWorldId\)/, 'tutorial flow should consume the explicit tutorial helper');
+  assert.match(tutorialSource, /T\('tutorialNext'\)/, 'tutorial UI should use the localized next-button label');
+  assert.match(tutorialSource, /T\('tutorialWorld' \+ tw \+ 'Label'\)/, 'tutorial badge should use localized world labels');
 }
 
 async function testVisualPolishPathsStayPresent() {
@@ -502,6 +615,7 @@ async function testGraphicsProfilesAreExplicitAndBackwardCompatible() {
   const gameStateSource = await fs.readFile(path.join(ROOT, 'src/core/GameState.js'), 'utf8');
   const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
   const screensSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const settingsViewSource = await fs.readFile(path.join(ROOT, 'src/ui/settingsView.js'), 'utf8');
   const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
   const tentRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/TentRenderer.js'), 'utf8');
   const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
@@ -512,7 +626,7 @@ async function testGraphicsProfilesAreExplicitAndBackwardCompatible() {
   assert.match(gameStateSource, /graphicsMode: 'low'/, 'settings should persist an explicit graphics profile');
   assert.match(gameStateSource, /_normalizeGraphicsSettings\(/, 'game state should normalize old and new graphics settings');
   assert.match(mainSource, /cycleGraphicsMode\(/, 'main settings flow should cycle between explicit graphics profiles');
-  assert.match(screensSource, /togGraphicsMode/, 'settings UI should expose the graphics mode toggle');
+  assert.match(screensSource + settingsViewSource, /togGraphicsMode/, 'settings UI should expose the graphics mode toggle');
   assert.match(indexSource, /id="togGraphicsMode"/, 'settings HTML should use the explicit graphics mode button');
   assert.match(tentRendererSource, /const highGraphics = STATE\.settings\.graphicsMode === 'high'/, 'tent renderer should branch on the explicit graphics profile');
   assert.match(nodeRendererSource, /const highGraphics = STATE\.settings\.graphicsMode === 'high'/, 'node renderer should branch on the explicit graphics profile');
@@ -634,6 +748,8 @@ async function testSettingsTutorialAndStoryStayInSync() {
   const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
   const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
   const screenControllerSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const storyViewSource = await fs.readFile(path.join(ROOT, 'src/ui/storyScreenView.js'), 'utf8');
+  const creditsViewSource = await fs.readFile(path.join(ROOT, 'src/ui/creditsView.js'), 'utf8');
 
   const requiredSettingsKeys = [
     'setGraphicsMode', 'setGraphicsModeDesc', 'setShowFps', 'setShowFpsDesc',
@@ -655,9 +771,9 @@ async function testSettingsTutorialAndStoryStayInSync() {
   assert.match(i18nSource, /owned non-relay cells within its radius/, 'world 3 tutorial/story should describe the real pulsar rule in English');
   assert.match(i18nSource, /células próprias que não sejam retransmissores dentro do raio/, 'world 3 tutorial/story should describe the real pulsar rule in Portuguese');
 
-  assert.match(screenControllerSource, /story-strip/, 'story screen should keep lightweight visual chapter navigation');
-  assert.match(screenControllerSource, /stchap-card/, 'story screen should keep chapter cards');
-  assert.match(screenControllerSource, /ESSENTIAL INFORMATION|INFORMAÇÃO ESSENCIAL/, 'credits should stay concise and relevant');
+  assert.match(screenControllerSource + storyViewSource, /story-strip/, 'story screen should keep lightweight visual chapter navigation');
+  assert.match(screenControllerSource + storyViewSource, /stchap-card/, 'story screen should keep chapter cards');
+  assert.match(screenControllerSource + creditsViewSource, /ESSENTIAL INFORMATION|INFORMAÇÃO ESSENCIAL/, 'credits should stay concise and relevant');
 }
 
 async function testProgressAndSettingsPersistenceGuardrailsStayPresent() {
@@ -901,16 +1017,63 @@ async function testFreshClashUsesApproachVisualFront() {
 
 async function testPurpleAiDifferentiationAndFrameDrivenCoreVisuals() {
   const aiSource = await fs.readFile(path.join(ROOT, 'src/systems/AI.js'), 'utf8');
+  const aiScoringSource = await fs.readFile(path.join(ROOT, 'src/systems/AIScoring.js'), 'utf8');
   const tentSource = await fs.readFile(path.join(ROOT, 'src/entities/Tent.js'), 'utf8');
   const tentRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/TentRenderer.js'), 'utf8');
   const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
   const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
 
-  assert.match(aiSource, /if \(this\.owner === 3\) \{[\s\S]*targetNode\.energy < targetNode\.maxE \* 0\.35[\s\S]*targetNode\.underAttack > 0\.2[\s\S]*existingPressureBonus > 0/s, 'purple AI should favor kill-confirm and existing pressure more strongly than red AI');
+  assert.match(aiScoringSource, /if \(owner === 3\) \{[\s\S]*targetNode\.energy < targetNode\.maxE \* 0\.35[\s\S]*targetNode\.underAttack > 0\.2[\s\S]*existingPressureBonus > 0/s, 'purple AI should favor kill-confirm and existing pressure more strongly than red AI');
+  assert.match(aiSource, /buildMoveScore\(/, 'AI orchestrator should delegate move scoring to the extracted scoring module');
+  assert.match(aiSource, /buildAiTacticalState\(/, 'AI should derive a lightweight tactical state profile before scoring moves');
+  assert.match(aiSource, /scoreSliceOpportunity\(/, 'AI should evaluate charged slice opportunities through the scoring module');
+  assert.match(aiSource, /_sliceCooldown/, 'AI should throttle repeated tactical cuts with an explicit cooldown');
+  assert.match(aiScoringSource, /export function buildAiTacticalState/, 'AI scoring should expose tactical state derivation');
+  assert.match(aiScoringSource, /export function scoreStructuralWeakness/, 'AI scoring should expose explicit player-structure punishment');
+  assert.match(aiScoringSource, /export function scoreSliceOpportunity/, 'AI scoring should expose explicit slice opportunity scoring');
   assert.doesNotMatch(tentSource, /Date\.now\(/, 'tent core visuals should no longer use wall-clock time directly');
   assert.doesNotMatch(tentRendererSource, /Date\.now\(/, 'tent renderer should use frame-driven time for its core animations');
   assert.doesNotMatch(nodeRendererSource, /Date\.now\(/, 'node renderer should use frame-driven time for frenzy tint animation');
   assert.doesNotMatch(uiRendererSource, /Date\.now\(/, 'UI renderer should use game time for phase outcome and frenzy pulses');
+}
+
+async function testAiTacticalStateAndSlicePressureStayActive() {
+  const { buildAiTacticalState, scoreSliceOpportunity } = await load('src/systems/AIScoring.js');
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { AI_RULES, TentState } = await load('src/config/gameConfig.js');
+
+  const aiNode = new GameNode(0, 0, 0, 60, 3);
+  const playerNode = new GameNode(1, 160, 0, 18, 1);
+  const neutralNode = new GameNode(2, 320, 0, 20, 0);
+  aiNode.maxE = 200;
+  playerNode.maxE = 100;
+  neutralNode.maxE = 100;
+  playerNode.underAttack = 0.3;
+  playerNode.outCount = 3;
+
+  const game = {
+    nodes: [aiNode, playerNode, neutralNode],
+    tents: [],
+  };
+
+  const tacticalState = buildAiTacticalState(game, 3, AI_RULES);
+  assert.equal(tacticalState, 'finish', 'AI tactical state should switch into finish when the player is weak and already pressured');
+
+  const tentacle = new Tent(aiNode, playerNode, 18);
+  tentacle.state = TentState.ACTIVE;
+  tentacle.energyInPipe = 16;
+  tentacle.reachT = 1;
+  game.tents.push(tentacle);
+
+  const sliceScore = scoreSliceOpportunity({
+    game,
+    owner: 3,
+    tentacle,
+    tacticalState,
+    aiRules: AI_RULES,
+  });
+  assert.ok(sliceScore >= AI_RULES.PURPLE_SLICE_SCORE_THRESHOLD, 'purple AI should still recognize a strong charged slice opportunity on a pressured weak node');
 }
 
 async function testTutorialStepsStayRigidAndGated() {
@@ -918,14 +1081,26 @@ async function testTutorialStepsStayRigidAndGated() {
   const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
 
   assert.match(tutorialSource, /isRigid\(\)/, 'tutorial should expose a rigid-step gate for gameplay actions');
+  assert.match(tutorialSource, /hasActionGate\(\)/, 'tutorial should distinguish action-gated steps from informational read steps');
+  assert.match(tutorialSource, /currentAction !== 'read' && currentAction !== 'done'/, 'tutorial should leave controls enabled during read-only steps');
+  assert.match(tutorialSource, /this\.expectedNeutralTarget = null;/, 'tutorial should reset pinned neutral targets when a new step starts');
+  assert.match(tutorialSource, /this\.expectedRelayTarget = null;/, 'tutorial should reset pinned relay targets when a new step starts');
+  assert.match(tutorialSource, /_syncStepContext\(\)/, 'tutorial should synchronize step context before gating tutorial actions');
   assert.match(tutorialSource, /allowsClickIntent\(clickIntent\)/, 'tutorial should gate click intents by the current step');
   assert.match(tutorialSource, /canStartDragConnect\(sourceNode\)/, 'tutorial should gate drag-connect starts by the current step');
-  assert.match(tutorialSource, /filterDragConnectTarget\(sourceNode, targetNode\)/, 'tutorial should restrict drag targets to the expected node');
+  assert.match(tutorialSource, /filterDragConnectTarget\(sourceNode, targetNode\)/, 'tutorial should filter drag targets by the current step action');
   assert.match(tutorialSource, /canStartSlice\(\)/, 'tutorial should gate slice start by the current step');
   assert.match(tutorialSource, /filterSliceCuts\(sliceCuts\)/, 'tutorial should reject off-step slice cuts');
+  assert.match(tutorialSource, /onSliceCut\(sliceCut\)/, 'tutorial should own explicit cut-step completion handling');
+  assert.match(tutorialSource, /onClickIntentApplied\(clickIntent\)/, 'tutorial should mark steps complete as soon as a valid click intent is applied');
+  assert.match(tutorialSource, /this\.actionDone = true;/, 'tutorial should explicitly mark valid actions as completed');
+  assert.match(tutorialSource, /_scheduleAutoAdvance\(\)/, 'tutorial should auto-advance action steps after completion');
+  assert.match(tutorialSource, /_clearAutoAdvance\(\)/, 'tutorial should clear auto-advance timers when the step changes or the tutorial exits');
   assert.match(gameSource, /if \(this\.cfg\?\.isTutorial && !this\.tut\.allowsClickIntent\(clickIntent\)\) return;/, 'game click path should reject tutorial-disallowed actions');
   assert.match(gameSource, /if \(this\.cfg\?\.isTutorial\) \{\s*sliceCuts = this\.tut\.filterSliceCuts\(sliceCuts\);/s, 'slice scan should be filtered through the tutorial gate');
   assert.match(gameSource, /if \(this\.cfg\?\.isTutorial && !this\.tut\.canStartSlice\(\)\) return;/, 'slice begin should be blocked outside the cut step');
+  assert.match(gameSource, /this\.tut\.onClickIntentApplied\(clickIntent\)/, 'game click path should notify tutorial completion when a valid action is applied');
+  assert.match(gameSource, /this\.tut\.onSliceCut\(currentSliceCut\)/, 'game slice application should notify tutorial cut completion through the explicit hook');
 }
 
 async function testLoadLevelFinalizationAndInvalidActionUxStayAligned() {
@@ -973,9 +1148,12 @@ async function testInputWaveV2GuardrailsStayPresent() {
   assert.equal(packageJson.scripts.smoke, 'node scripts/smoke-checks.mjs', 'package.json should expose the smoke script');
   assert.equal(packageJson.scripts['ui-sanity'], 'node scripts/ui-actions-sanity.mjs', 'package.json should expose the UI sanity script');
   assert.equal(packageJson.scripts['campaign-sanity'], 'node scripts/campaign-sanity.mjs', 'package.json should expose the campaign sanity script');
+  assert.equal(packageJson.scripts['progression-sanity'], 'node scripts/game-state-progression-sanity.mjs', 'package.json should expose the progression sanity script');
+  assert.equal(packageJson.scripts['input-harness'], 'node scripts/input-harness.mjs', 'package.json should expose the input harness script');
+  assert.equal(packageJson.scripts['release-readiness'], 'node scripts/release-readiness.mjs', 'package.json should expose the release readiness script');
   assert.equal(packageJson.scripts.soak, 'node scripts/simulation-soak.mjs', 'package.json should expose the soak script');
   assert.equal(packageJson.scripts['ui-dom-sanity'], 'node scripts/ui-dom-sanity.mjs', 'package.json should expose the UI DOM sanity script');
-  assert.equal(packageJson.scripts.check, 'npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run campaign-sanity && npm run soak', 'package.json should expose an aggregate check script');
+  assert.equal(packageJson.scripts.check, 'npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run progression-sanity && npm run input-harness && npm run campaign-sanity && npm run release-readiness && npm run soak', 'package.json should expose an aggregate check script');
 }
 
 async function testRegenDisplayAndFlowTooltipStayCanonical() {
@@ -1007,11 +1185,40 @@ async function testAllianceUiAndOwnershipStayCoalitionAware() {
   const ownershipSource = await fs.readFile(path.join(ROOT, 'src/systems/Ownership.js'), 'utf8');
   const tentCombatSource = await fs.readFile(path.join(ROOT, 'src/entities/TentCombat.js'), 'utf8');
   const autoRetractSource = await fs.readFile(path.join(ROOT, 'src/systems/world/AutoRetractSystem.js'), 'utf8');
+  const { retractInvalidTentaclesAfterOwnershipChange } = await load('src/systems/Ownership.js');
+  const { GameNode } = await load('src/entities/GameNode.js');
 
   assert.match(uiRendererSource, /areAlliedOwners\(t2\.source\.owner, n\.owner\)/, 'node info panel should count coalition support as allied incoming flow');
-  assert.match(ownershipSource, /!areAlliedOwners\(tent\.effectiveTargetNode\.owner, newOwner\)/, 'ownership cleanup should preserve allied links after a capture');
+  assert.match(ownershipSource, /tent\.effectiveSourceNode === node/, 'ownership cleanup should always retract outgoing commitments rooted at the captured node');
   assert.match(tentCombatSource, /areAlliedOwners\(targetNode\.owner, sourceNode\.owner\)/, 'tentacle combat should route coalition links through the friendly flow path');
   assert.match(autoRetractSource, /areHostileOwners\(tentacle\.target\.owner, node\.owner\)/, 'auto-retract should only retract hostile outgoing tentacles');
+
+  const capturedNode = new GameNode(10, 0, 0, 30, 2);
+  const alliedTarget = new GameNode(11, 0, 0, 30, 1);
+  const hostileSource = new GameNode(12, 0, 0, 30, 2);
+  const outgoingTentacle = {
+    alive: true,
+    effectiveSourceNode: capturedNode,
+    effectiveTargetNode: alliedTarget,
+    killCalls: 0,
+    kill() { this.killCalls += 1; },
+  };
+  const incomingHostileTentacle = {
+    alive: true,
+    effectiveSourceNode: hostileSource,
+    effectiveTargetNode: capturedNode,
+    killCalls: 0,
+    kill() { this.killCalls += 1; },
+  };
+
+  retractInvalidTentaclesAfterOwnershipChange(
+    { tents: [outgoingTentacle, incomingHostileTentacle] },
+    capturedNode,
+    1,
+  );
+
+  assert.equal(outgoingTentacle.killCalls, 1, 'capturing a node should retract its old outgoing tentacles instead of preserving them as allied support');
+  assert.equal(incomingHostileTentacle.killCalls, 0, 'capturing a node should not erase incoming pressure from other hostile sources');
 }
 
 async function testNeutralContestAllianceModesStayParametrizable() {
@@ -1050,9 +1257,11 @@ async function testCampaignEndingFlowAndDebugPreviewStayPresent() {
   const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
   const domIdsSource = await fs.readFile(path.join(ROOT, 'src/ui/DomIds.js'), 'utf8');
   const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
+  const musicSource = await fs.readFile(path.join(ROOT, 'src/audio/Music.js'), 'utf8');
 
   assert.match(screenControllerSource, /if \(win && levelId === 32\) \{\s*showCampaignEnding\(game\);/s, 'winning the final phase should route to the dedicated campaign ending screen');
   assert.match(screenControllerSource, /export function showCampaignEnding\(/, 'screen controller should expose a dedicated campaign ending entry point');
+  assert.match(screenControllerSource, /Music\.playEnding\(\);/, 'campaign ending should play a dedicated ending theme instead of falling back to menu music');
   assert.match(mainSource, /BTN_VIEW_ENDING/, 'debug mode should expose a button to preview the campaign ending');
   assert.match(mainSource, /showCampaignEnding\(debugPreviewGame, \{ debugPreview: true \}\)/, 'debug ending preview should open the ending screen in preview mode');
   assert.match(indexSource, /id="sce"/, 'campaign ending screen should exist in the HTML with a unique DOM id');
@@ -1062,6 +1271,49 @@ async function testCampaignEndingFlowAndDebugPreviewStayPresent() {
   assert.match(i18nSource, /endingTitle:/, 'localization should provide the campaign ending title');
   assert.match(i18nSource, /setViewEnding:/, 'settings copy should expose the campaign ending preview label in i18n');
   assert.match(i18nSource, /viewEnding:/, 'button copy should expose the campaign ending preview CTA in i18n');
+  assert.match(musicSource, /networkAwakens/, 'music system should expose a dedicated ending theme definition');
+}
+
+async function testGroupedMusicAndNotificationFlowStayCanonical() {
+  const musicSource = await fs.readFile(path.join(ROOT, 'src/audio/Music.js'), 'utf8');
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const screenControllerSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
+
+  assert.match(musicSource, /const TRACKS = Object\.freeze\(/, 'music should centralize track metadata in a canonical track table');
+  assert.match(musicSource, /function playLevelTheme\(levelConfig\)/, 'music should resolve gameplay themes by grouped phase context');
+  assert.match(musicSource, /function playEnding\(\)/, 'music should expose a dedicated epilogue theme');
+  assert.match(musicSource, /setTrackChangeListener\(listener\)/, 'music should support structured track-change notifications');
+  assert.match(mainSource, /Music\.setTrackChangeListener\(/, 'main should subscribe to music track changes');
+  assert.match(mainSource, /notifNowPlaying/, 'music notifications should stay localized through i18n');
+  assert.match(mainSource, /dedupeKey:\s*`music:\$\{trackInfo\.id\}`/, 'music notifications should dedupe by canonical track id');
+  assert.match(gameSource, /Music\.playLevelTheme\(cfg\)/, 'level loading should use grouped level themes');
+  assert.match(gameSource, /Music\.playLevelTheme\(this\.cfg\)/, 'pause resume should restore grouped level themes');
+  assert.match(screenControllerSource, /export function showNotification\(/, 'screen controller should expose the structured notification surface');
+  assert.match(screenControllerSource, /const _notificationPriority = \{[\s\S]*warning:\s*4[\s\S]*objective:\s*3/s, 'notification stack should define explicit priority tiers');
+  assert.match(screenControllerSource, /if \(dedupeKey\) \{[\s\S]*_notificationRecent\.set\(dedupeKey, now\)/s, 'notification stack should dedupe repeat events');
+  assert.match(i18nSource, /trackSignalWar:/, 'localization should expose grouped soundtrack names');
+  assert.match(i18nSource, /notifMusicMeta:/, 'localization should expose the music popup metadata formatter');
+}
+
+async function testMusicBootContractStaysRuntimeSafe() {
+  const musicModule = await load('src/audio/Music.js');
+  const { Music } = musicModule;
+
+  assert.equal(typeof Music?.setTrackChangeListener, 'function', 'Music runtime contract should expose setTrackChangeListener for boot wiring');
+
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+  assert.match(
+    mainSource,
+    /if \(typeof Music\.setTrackChangeListener === 'function'\) \{[\s\S]*Music\.setTrackChangeListener\(/,
+    'game boot should guard the optional track-change listener contract before using it',
+  );
+}
+
+async function testUiDomainCheckAggregationStaysPresent() {
+  const packageSource = await fs.readFile(path.join(ROOT, 'package.json'), 'utf8');
+  assert.match(packageSource, /"check:ui":\s*"npm run ui-sanity && npm run ui-dom-sanity"/, 'UI domain check should aggregate action and DOM-lite suites');
 }
 
 async function testCanvasFontSelectionStaysCanonical() {
@@ -1085,6 +1337,16 @@ async function testCanvasFontSelectionStaysCanonical() {
   }
 }
 
+async function testCampaignBalanceWaveBValuesStayApplied() {
+  const { getLevelConfig } = await load('src/config/gameConfig.js');
+
+  assert.equal(getLevelConfig(18).playerStartEnergy, 36, 'Wave B should keep the gentler player opening on MAELSTROM');
+  assert.equal(getLevelConfig(21).purpleEnemyStartEnergy, 42, 'Wave B should keep the softer purple pressure on OBLIVION');
+  assert.equal(getLevelConfig(24).playerStartEnergy, 34, 'Wave B should keep the stronger relay-race opening for the player');
+  assert.equal(getLevelConfig(30).playerStartEnergy, 40, 'Wave B should keep the clearer SIGNAL LOCK opening');
+  assert.equal(getLevelConfig(32).aiThinkIntervalSeconds, 1.6, 'Wave B should keep the slightly less oppressive final-phase think rate');
+}
+
 async function main() {
   const tests = [
     ['relay nodes do not create free energy', testRelayNoFreeEnergy],
@@ -1094,6 +1356,7 @@ async function main() {
     ['instant activation only tracks actually paid build cost', testImmediateActivationTracksPaidCostCorrectly],
     ['growing tentacles cannot advance without source budget', testGrowingTentacleCannotAdvanceWithoutBudget],
     ['growing retract refunds full paid construction cost', testGrowingTentacleRetractRefundsFullPaidCost],
+    ['stable node level hysteresis prevents cap-threshold thrash', testStableNodeLevelHysteresisPreventsCapThrash],
     ['reversed retract refunds the effective source node', testReversedRetractRefundsEffectiveSource],
     ['middle cut conserves payload across refund and impact', testMiddleCutConservesPayloadAcrossRefundAndImpact],
     ['build cost tuning stays playable', testBuildCostTuningStaysPlayable],
@@ -1106,6 +1369,8 @@ async function main() {
     ['owner-3 palette selection is correct', testOwner3PaletteSelection],
     ['AI can evaluate relays as targets', testAIRelayTargeting],
     ['AI can use relays as origins when they have real budget', testAIRelayOriginsCanBeUsedWhenBudgeted],
+    ['AI quality wave improves support and kill-confirm pressure', testAiQualityWaveImprovesSupportAndKillConfirm],
+    ['AI avoids low-value overcommit', testAiAvoidsLowValueOvercommit],
     ['shared burst mechanic is used by both player and AI paths', testSharedBurstEntryPoint],
     ['ownership and contest logic use canonical shared paths', testOwnershipAndContestCanonicalization],
     ['player relay interaction paths stay enabled', testRelayPlayerInteractionPaths],
@@ -1130,6 +1395,7 @@ async function main() {
     ['Frenzy requires the same continuous slice gesture', testFrenzyRequiresSameContinuousSliceGesture],
     ['Fresh clashes use an approach visual front instead of popping to mid-lane', testFreshClashUsesApproachVisualFront],
     ['Purple AI differentiation and frame-driven core visuals stay present', testPurpleAiDifferentiationAndFrameDrivenCoreVisuals],
+    ['AI tactical state and slice pressure stay active', testAiTacticalStateAndSlicePressureStayActive],
     ['Tutorial steps stay rigid and gated', testTutorialStepsStayRigidAndGated],
     ['loadLevel finalization and invalid-action UX stay aligned', testLoadLevelFinalizationAndInvalidActionUxStayAligned],
     ['Input wave V2 guardrails stay present', testInputWaveV2GuardrailsStayPresent],
@@ -1138,7 +1404,11 @@ async function main() {
     ['Alliance-aware UI and ownership rules stay present', testAllianceUiAndOwnershipStayCoalitionAware],
     ['Neutral contest alliance modes stay parametrizable', testNeutralContestAllianceModesStayParametrizable],
     ['Campaign ending flow and debug preview stay present', testCampaignEndingFlowAndDebugPreviewStayPresent],
+    ['Grouped music and notification flow stay canonical', testGroupedMusicAndNotificationFlowStayCanonical],
+    ['Music boot contract stays runtime-safe', testMusicBootContractStaysRuntimeSafe],
+    ['UI domain check aggregation stays present', testUiDomainCheckAggregationStaysPresent],
     ['Canvas font selection stays canonical', testCanvasFontSelectionStaysCanonical],
+    ['Campaign balance wave B values stay applied', testCampaignBalanceWaveBValuesStayApplied],
   ];
 
   let passed = 0;

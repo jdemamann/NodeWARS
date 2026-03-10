@@ -18,6 +18,8 @@ See also:
 - owned non-relay cells regenerate energy by tier
 - level-0 cells now start at `1.0 e/s`
 - growth level is derived from current energy
+- capped nodes use a small level-down hysteresis so they do not spam level-up /
+  level-down feedback when energy hovers around a threshold
 - higher levels increase slots and offensive throughput
 - cells retain a reduced fraction of self-regeneration while feeding allies
 
@@ -42,7 +44,7 @@ See also:
 - neutral capture visuals now surface coalition contribution explicitly instead of pretending summed red+purple pressure came from one owner only
 - neutral capture pacing is kept close to the prior opening tempo by a lower `CAPTURE_SPEED_MULT` after the tier-0 regen increase
 - enemy targets lose energy until ownership flips
-- ownership changes retract invalid opposing links
+- ownership changes always retract tentacles rooted at the captured node, while incoming lanes from other nodes keep resolving naturally
 
 ### Slicing
 
@@ -65,9 +67,11 @@ See also:
 
 - AI remains heuristic-based
 - owners 2 and 3 are one hostile coalition against the player and no longer attack each other
-- owner 3 uses the same shared burst path as the player
-- owner 3 checks strategic burst cuts every update tick
+- enemy slice pressure now exists as a real coalition mechanic, still routed through the same shared burst path as the player
+- owner 3 keeps more permissive slice thresholds and cooldowns than owner 2
+- AI derives a lightweight tactical state (`expand`, `pressure`, `support`, `finish`, `recover`) before scoring moves
 - owner 3 is more biased toward kill-confirm pressure on weak player cells
+- AI now scores player structural weakness, including isolated fronts, weak support, and overextended branch pressure
 - AI can evaluate relay targets and can launch from relays when real pass-through budget exists
 
 ### Timing and Visual Motion
@@ -75,12 +79,19 @@ See also:
 - core simulation-adjacent tentacle and node motion now follows `game.time`, not wall-clock timing
 - this keeps clash approach, pulse motion, and related visual state deterministic with the simulation step
 
+### Notifications
+
+- bottom-right notifications are the canonical short-form runtime feedback channel
+- duplicate notifications are suppressed inside a short dedupe window
+- high-priority warnings and objectives can evict lower-priority informational cards
+
 ### Campaign / Meta Rules
 
 - world tutorials are optional onboarding content
 - when a new world unlocks, both its tutorial and its first real phase become available immediately
 - normal campaign progression can still flow into the next world's tutorial when crossing world boundaries
 - tutorial completion and next-phase resolution now go through canonical campaign-state helpers
+- tutorial UI labels are localized through `i18n`, and tutorial progress only advances when the expected node or cut action is completed
 - late high-pressure authored phases can give the player more than one starting node
 - phase skip only unlocks after repeated defeats and stays blocked on tutorial, boss, and final phases
 

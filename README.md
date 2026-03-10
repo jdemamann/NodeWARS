@@ -116,7 +116,9 @@ The current implementation deliberately preserves these rules:
 - **Persistent local save**
   - progress and settings stored in `localStorage`
 - **Procedural audio**
-  - music and SFX generated with Web Audio
+  - grouped soundtrack themes and SFX generated with Web Audio
+- **Context notifications**
+  - bottom-right popups for soundtrack changes and key gameplay events
 - **Graphics profiles**
   - `HIGH` and `LOW`
 - **Theme system**

@@ -29,13 +29,20 @@ The repository is no longer in the high-risk drift phase for core gameplay. Stru
 - simulation soak-check baseline and run notes
 - debug-facing render performance instrumentation
 - conservative campaign balance wave A on the priority authored phases
+- conservative campaign balance wave B on the highest-pressure authored phases
 - audio event density audit with cooldown-based de-duplication for high-chaos SFX
+- audio cooldown timing canonicalization through a dedicated helper module
 - final render palette canonicalization through shared owner-palette helpers
 - screen composition split for world metadata, level-select badges, and result summaries
+- screen composition split phase 2 for story, credits, and settings-state helpers
 - tentacle lifecycle split and final tentacle decomposition
 - purple AI strategic-cut scheduling outside the build-think interval
 - immediate clash creation now commits full tentacle build cost
 - core simulation-adjacent visuals moved off `Date.now()` onto frame-driven `game.time`
+- deterministic input harness and focused progression sanity suites
+- release-readiness validation for local fonts and packaging preconditions
+- AI move scoring extracted into a dedicated scoring module
+- tutorial extraction review completed with a documented next seam
 - primary documentation for relay, burst, ownership, AI relay targeting, energy, tentacle lifecycle, input flow, config taxonomy, and naming
 - roadmap/backlog/workstream reconciliation
 
@@ -47,6 +54,8 @@ The repository is no longer in the high-risk drift phase for core gameplay. Stru
 - world-mechanics boundary extraction into dedicated setup and runtime modules
 - world-layer runtime split into dedicated `src/systems/world/*` modules under `WorldSystems`
 - owner 3 faction differentiation, with stronger kill-confirm and pressure-follow scoring
+- AI coalition behavior now better supports allied pressure, continues invested neutral captures, and reduces low-value overcommit
+- tutorial onboarding now uses localized UI labels and explicit capture/cut completion gates
 
 ### Remaining
 

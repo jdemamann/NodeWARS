@@ -1,15 +1,16 @@
 import { bus } from '../core/EventBus.js';
-import { areAlliedOwners, isPlayerEnemyOwner } from './OwnerTeams.js';
+import { isPlayerEnemyOwner } from './OwnerTeams.js';
 
 export function retractInvalidTentaclesAfterOwnershipChange(game, node, newOwner) {
   if (!game) return;
 
+  /* Ownership changes do not inherit the old owner's outgoing commitments.
+     Any tentacle whose effective source was the captured node must collapse,
+     even if the target is now allied with the new owner. Incoming lanes from
+     other nodes stay alive and are re-evaluated naturally by tentacle combat
+     on the next update tick. */
   game.tents
-    .filter(tent => tent.alive && tent.effectiveSourceNode === node && !areAlliedOwners(tent.effectiveTargetNode.owner, newOwner))
-    .forEach(tent => tent.kill());
-
-  game.tents
-    .filter(tent => tent.alive && tent.effectiveTargetNode === node && !areAlliedOwners(tent.effectiveSourceNode.owner, newOwner))
+    .filter(tent => tent.alive && tent.effectiveSourceNode === node)
     .forEach(tent => tent.kill());
 }
 
@@ -28,6 +29,7 @@ export function applyOwnershipChange({
   node.cFlash = 1;
   node.contest = null;
   node.shieldFlash = 0;
+  node.syncLevelFromEnergy?.();
 
   if (game) game.fogDirty = true;
 

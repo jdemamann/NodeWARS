@@ -141,31 +141,36 @@ export class NodeRenderer {
         ? Math.min(1, leadingEntry.score / captureThreshold)
         : 0;
 
+      const captureRingRadius = r + 6.5;
+
       ctx.save();
       ctx.beginPath();
-      ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-      ctx.lineWidth   = 3;
+      ctx.arc(n.x, n.y, captureRingRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.09)';
+      ctx.lineWidth   = 3.25;
       ctx.stroke();
 
       if (leadingEntry) {
+        const leadColor = contestColor(leadingEntry.owner, leadingEntry.score);
         ctx.beginPath();
-        ctx.arc(n.x, n.y, r + 5, -Math.PI / 2, -Math.PI / 2 + leadingFraction * Math.PI * 2);
-        ctx.strokeStyle = contestColor(leadingEntry.owner, leadingEntry.score);
-        ctx.lineWidth   = 3.5;
+        ctx.arc(n.x, n.y, captureRingRadius, -Math.PI / 2, -Math.PI / 2 + leadingFraction * Math.PI * 2);
+        ctx.strokeStyle = leadColor;
+        ctx.lineWidth   = 4.8;
+        ctx.lineCap     = 'round';
         sg(ctx, ctx.strokeStyle, 8);
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.98;
         ctx.stroke();
+        ctx.lineCap = 'butt';
 
         const contributorOwners = getContestContributorOwners(leadingEntry);
         if (contributorOwners.length > 1) {
           const secondaryOwner = contributorOwners.find(owner => owner !== leadingEntry.owner);
           if (secondaryOwner != null) {
             ctx.beginPath();
-            ctx.arc(n.x, n.y, r + 2, -Math.PI / 2, -Math.PI / 2 + leadingFraction * Math.PI * 2);
+            ctx.arc(n.x, n.y, captureRingRadius - 3.25, -Math.PI / 2, -Math.PI / 2 + leadingFraction * Math.PI * 2);
             ctx.strokeStyle = ownerColor(secondaryOwner, Math.min(n.level, 4), '#c040ff');
-            ctx.lineWidth = 1.25;
-            ctx.globalAlpha = 0.85;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.92;
             ctx.setLineDash([2.5, 4.5]);
             sg(ctx, ctx.strokeStyle, 5);
             ctx.stroke();
@@ -179,17 +184,17 @@ export class NodeRenderer {
         const startAngle = -Math.PI / 2 + index * 0.28;
         const color = contestColor(entry.owner, entry.score);
         ctx.beginPath();
-        ctx.arc(n.x, n.y, r + 9, startAngle, startAngle + rivalFraction * Math.PI * 1.4);
+        ctx.arc(n.x, n.y, captureRingRadius + 3.5, startAngle, startAngle + rivalFraction * Math.PI * 1.4);
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.globalAlpha = 0.7;
+        ctx.lineWidth = 1.8;
+        ctx.globalAlpha = 0.82;
         sg(ctx, color, 5);
         ctx.stroke();
       });
 
       if (contestEntries.length > 1) {
         ctx.beginPath();
-        ctx.arc(n.x, n.y, r + 11.5, 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, captureRingRadius + 6, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(245,197,24,0.65)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);

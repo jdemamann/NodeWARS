@@ -20,7 +20,7 @@ import { WorldSystems } from '../systems/WorldSystems.js';
 import { applyFixedWorldFeatures, applyNeutralBunkers, populateFixedNodes, populateWorldFeatures } from '../systems/WorldSetup.js';
 import { Renderer }     from '../rendering/Renderer.js';
 import { HUD }          from '../ui/HUD.js';
-import { showScr, showToast, showWorldBanner, endLevel } from '../ui/ScreenController.js';
+import { showScr, showToast, showWorldBanner, endLevel, showNotification } from '../ui/ScreenController.js';
 import { SoundEffects as SFX } from '../audio/SoundEffects.js';
 import { Music }        from '../audio/Music.js';
 import { DOM_IDS }      from '../ui/DomIds.js';
@@ -133,6 +133,8 @@ export class Game {
     this._levelLoadGeneration = 0;
     this._disposeInputBindings = null;
     this._uiEventsBound = false;
+    this._shownGameplayHints = new Set();
+    this._nextGameplayHintAt = 0;
 
     this._utils     = makeUtils(this);
     this._lang      = STATE.curLang;
@@ -290,6 +292,8 @@ export class Game {
     this.hoverNode = null; this.hoverPin = false;
     this.orbPool   = new OrbPool(150);
     this.visualEvents = [];
+    this._shownGameplayHints.clear();
+    this._nextGameplayHintAt = 10;
     this.phaseOutcome = null;
 
     const { W, H } = this;
@@ -314,17 +318,17 @@ export class Game {
 
     /* Apply per-level energy cap to every node */
     const nodeEnergyCap = cfg.nodeEnergyCap || 200;
-    for (let i = 0; i < this.nodes.length; i++) this.nodes[i].maxE = nodeEnergyCap;
+    for (let i = 0; i < this.nodes.length; i++) {
+      this.nodes[i].maxE = nodeEnergyCap;
+      this.nodes[i].syncLevelFromEnergy?.();
+    }
 
     this.ai    = new AI(this, cfg);          // owner 2 — red AI
     this.ai3   = cfg.purpleEnemyCount > 0 ? new AI(this, cfg, 3) : null; // owner 3 — purple AI
     this.state = 'playing';
 
-    /* World music */
-    const worldId = cfg.worldId || 1;
-    if (worldId === 2) Music.playVoid();
-    else if (worldId === 3) Music.playNexus();
-    else Music.playGenesis();
+    /* Campaign music is grouped by phase bands, not only by world. */
+    Music.playLevelTheme(cfg);
 
     this.hud.setLevel(cfg);
     this.hud.update(this);
@@ -533,6 +537,7 @@ export class Game {
 
     /* HUD */
     this.hud.update(this);
+    this._updateGameplayHints();
 
     /* Debug info + energy validation logs (once per second in debug mode) */
     if (STATE.settings.debug && Math.floor(this.time) !== Math.floor(this.time - dt)) {
@@ -580,6 +585,90 @@ export class Game {
       this.phaseOutcome = 'lose';
       endLevel(false, this);
     }
+  }
+
+  _showGameplayHint(titleKey, bodyKey, dedupeKey) {
+    showNotification({
+      kind: 'objective',
+      icon: '✦',
+      kicker: T('notifHintKicker'),
+      title: T(titleKey),
+      body: T(bodyKey),
+      durationMs: 5200,
+      dedupeKey: `hint:${dedupeKey}`,
+      dedupeMs: 12000,
+    });
+  }
+
+  _updateGameplayHints() {
+    if (!this.cfg || this.cfg.isTutorial || this.done) return;
+    if (this.scoreTime < this._nextGameplayHintAt) return;
+
+    const playerNodes = this.nodes.filter(node => node.owner === 1 && !node.isRelay);
+    const neutralNodes = this.nodes.filter(node => node.owner === 0 && !node.isRelay);
+    const enemyNodes = this.nodes.filter(node => areHostileOwners(node.owner, 1) && !node.isRelay);
+    const relayNodes = this.nodes.filter(node => node.isRelay);
+    const playerTentacles = this.tents.filter(tentacle => tentacle.alive && tentacle.effectiveSourceNode?.owner === 1);
+    const attackingEnemyTentacles = this.tents.filter(tentacle =>
+      tentacle.alive &&
+      tentacle.effectiveTargetNode?.owner === 1 &&
+      areHostileOwners(tentacle.effectiveSourceNode?.owner, 1)
+    );
+    const lowEnergyEnemyNode = enemyNodes.find(node => node.energy < 24);
+    const playerUnderPressure = playerNodes.find(node => node.underAttack > 0.2);
+    const relayOwnedByPlayer = relayNodes.some(node => node.owner === 1);
+    const pulsarCoversPlayer = this.pulsars.some(pulsar =>
+      playerNodes.some(node => computeDistance(node.x, node.y, pulsar.x, pulsar.y) <= pulsar.r)
+    );
+
+    const hintQueue = [
+      {
+        id: 'expand',
+        when: playerNodes.length <= 1 && neutralNodes.length > 0 && this.scoreTime >= 8,
+        titleKey: 'hintExpandTitle',
+        bodyKey: 'hintExpandBody',
+      },
+      {
+        id: 'slice',
+        when: this.cutsTotal === 0 && playerTentacles.length >= 2 && this.scoreTime >= 24,
+        titleKey: 'hintSliceTitle',
+        bodyKey: 'hintSliceBody',
+      },
+      {
+        id: 'support',
+        when: !!playerUnderPressure && playerNodes.length >= 2 && attackingEnemyTentacles.length > 0,
+        titleKey: 'hintSupportTitle',
+        bodyKey: 'hintSupportBody',
+      },
+      {
+        id: 'relay',
+        when: relayNodes.length > 0 && !relayOwnedByPlayer && this.scoreTime >= 20,
+        titleKey: 'hintRelayTitle',
+        bodyKey: 'hintRelayBody',
+      },
+      {
+        id: 'pulsar',
+        when: this.pulsars.length > 0 && !pulsarCoversPlayer && this.scoreTime >= 28,
+        titleKey: 'hintPulsarTitle',
+        bodyKey: 'hintPulsarBody',
+      },
+      {
+        id: 'pressure',
+        when: !!lowEnergyEnemyNode && playerTentacles.length >= 2 && this.scoreTime >= 18,
+        titleKey: 'hintPressureTitle',
+        bodyKey: 'hintPressureBody',
+      },
+    ];
+
+    const nextHint = hintQueue.find(hint => hint.when && !this._shownGameplayHints.has(hint.id));
+    if (!nextHint) {
+      this._nextGameplayHintAt = this.scoreTime + 8;
+      return;
+    }
+
+    this._shownGameplayHints.add(nextHint.id);
+    this._showGameplayHint(nextHint.titleKey, nextHint.bodyKey, nextHint.id);
+    this._nextGameplayHintAt = this.scoreTime + 16;
   }
 
   dispose() {
@@ -694,12 +783,14 @@ export class Game {
         this.sel = clickIntent.node;
         this.sel.selected = true;
         SFX.select();
+        if (this.cfg?.isTutorial) this.tut.onClickIntentApplied(clickIntent);
         return;
       case 'retract_node_tentacles':
         clickIntent.retractableTentacles.forEach(tentacle => {
           tentacle.playerRetract = true;
           tentacle.kill();
         });
+        if (this.cfg?.isTutorial) this.tut.onClickIntentApplied(clickIntent);
         this.clearSel();
         if (clickIntent.retractableTentacles.length) SFX.retract();
         showToast(clickIntent.retractableTentacles.length ? T('tentRetracted') : T('noLinks'));
@@ -734,6 +825,7 @@ export class Game {
         return;
       case 'build_tentacle':
         this._createPlayerTentacle(clickIntent.sourceNode, clickIntent.targetNode, clickIntent.buildCost.totalBuildCost);
+        if (this.cfg?.isTutorial) this.tut.onClickIntentApplied(clickIntent);
         this.clearSel();
         return;
       case 'no_action':
@@ -776,6 +868,7 @@ export class Game {
         SFX.cut();
         currentSliceCut.effectiveSourceNode.cFlash = (currentSliceCut.effectiveSourceNode.cFlash || 0) + 0.6;
         this.cutsTotal = (this.cutsTotal || 0) + 1;
+        if (this.cfg?.isTutorial) this.tut.onSliceCut(currentSliceCut);
       },
       onReactiveDefenseCut: currentSliceCut => this._recordReactiveDefenseCut(currentSliceCut),
       onPlayerFrenzyCut: currentSliceCut => this._recordPlayerFrenzyCut(currentSliceCut),
@@ -1054,10 +1147,7 @@ export class Game {
       Music.playMenu();
     } else {
       showScr(null);
-      const w = this.cfg ? this.cfg.worldId || 1 : 1;
-      if (w === 2) Music.playVoid();
-      else if (w === 3) Music.playNexus();
-      else Music.playGenesis();
+      Music.playLevelTheme(this.cfg);
     }
   }
 

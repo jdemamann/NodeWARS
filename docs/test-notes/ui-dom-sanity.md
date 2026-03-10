@@ -16,6 +16,7 @@ What it checks:
 - `refreshSettingsUI()` reflects effective state, not just raw persisted settings
 - debug-only rows appear/disappear in response to `debug`
 - campaign ending populates its target nodes and hides HUD/tutorial overlays
+- structured notifications append cards, dedupe repeat events, and prioritize warnings over low-priority cards
 - world tabs respond to natural unlocks, manual world toggles, and debug mode
 
 Notes:

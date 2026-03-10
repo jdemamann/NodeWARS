@@ -83,6 +83,12 @@ class FakeElement {
     return child;
   }
 
+  remove() {
+    if (!this.parentNode) return;
+    this.parentNode.children = this.parentNode.children.filter(child => child !== this);
+    this.parentNode = null;
+  }
+
   addEventListener(type, handler) {
     if (!this._listeners.has(type)) this._listeners.set(type, []);
     this._listeners.get(type).push(handler);
@@ -185,6 +191,7 @@ async function setupUiDomHarness() {
     DOM_IDS.ENDING_BODY,
     DOM_IDS.ENDING_STATS,
     DOM_IDS.ENDING_QUOTE,
+    DOM_IDS.NOTIFICATIONS,
     DOM_IDS.DEBUG_RESET_ROW,
     DOM_IDS.DEBUG_COPY_ROW,
     DOM_IDS.DEBUG_ENDING_ROW,
@@ -285,6 +292,55 @@ async function testShowCampaignEndingPopulatesAndHidesHudSurfaces() {
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_ENDING).classList.contains('off'), false, 'campaign ending should show the dedicated ending screen');
 }
 
+async function testShowNotificationAppendsStructuredCards() {
+  const { DOM_IDS, screenController, fakeDocument } = await setupUiDomHarness();
+  const notificationStack = fakeDocument.getElementById(DOM_IDS.NOTIFICATIONS);
+
+  screenController.showNotification({
+    kind: 'music',
+    kicker: 'NOW PLAYING',
+    title: 'GENESIS PULSE',
+    body: 'World 1 opening cadence',
+    meta: '82 BPM · LOOP 0:15',
+    icon: '◈',
+    durationMs: 1200,
+  });
+
+  assert.equal(notificationStack.children.length, 1, 'structured notifications should append a card into the notification stack');
+  assert.match(notificationStack.children[0].innerHTML, /GENESIS PULSE/, 'notification cards should render the provided title');
+  assert.match(notificationStack.children[0].className, /kind-music/, 'notification cards should preserve their visual kind');
+}
+
+async function testShowNotificationDedupesAndPrioritizesCards() {
+  const { DOM_IDS, screenController, fakeDocument } = await setupUiDomHarness();
+  const notificationStack = fakeDocument.getElementById(DOM_IDS.NOTIFICATIONS);
+
+  screenController.showNotification({
+    kind: 'status',
+    title: 'Low Priority',
+    dedupeKey: 'repeat:event',
+    durationMs: 1200,
+  });
+  screenController.showNotification({
+    kind: 'status',
+    title: 'Low Priority Duplicate',
+    dedupeKey: 'repeat:event',
+    durationMs: 1200,
+  });
+
+  assert.equal(notificationStack.children.length, 1, 'duplicate notifications should be suppressed during the dedupe window');
+
+  screenController.showNotification({
+    kind: 'warning',
+    title: 'Critical Warning',
+    dedupeKey: 'warning:event',
+    durationMs: 1200,
+  });
+
+  assert.equal(notificationStack.children.length, 1, 'high-priority warnings should evict lower-priority cards');
+  assert.match(notificationStack.children[0].innerHTML, /Critical Warning/, 'warning card should remain visible after priority eviction');
+}
+
 async function testBuildWorldTabsRespectsEffectiveVisibility() {
   const { DOM_IDS, STATE, screenController, fakeDocument } = await setupUiDomHarness();
   const originalCompleted = STATE.completed;
@@ -319,6 +375,8 @@ async function main() {
     ['showScr toggles a single visible screen', testShowScrTogglesSingleVisibleScreen],
     ['refreshSettingsUI reflects effective state', testRefreshSettingsUiReflectsEffectiveState],
     ['showCampaignEnding populates and hides HUD surfaces', testShowCampaignEndingPopulatesAndHidesHudSurfaces],
+    ['showNotification appends structured cards', testShowNotificationAppendsStructuredCards],
+    ['showNotification dedupes and prioritizes cards', testShowNotificationDedupesAndPrioritizesCards],
     ['buildWorldTabs respects effective visibility', testBuildWorldTabsRespectsEffectiveVisibility],
   ];
 

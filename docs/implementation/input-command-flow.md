@@ -94,6 +94,8 @@ Owns rigid tutorial-step gating on top of the normal player interaction flow:
 - whitelists drag-connect starts and targets per tutorial step
 - only allows slice gestures during the explicit cut step
 - only allows slice hits against the currently demonstrated tentacle
+- only advances `capture` and `capture_relay` steps when the expected target is actually captured
+- advances the `cut` step through an explicit slice-completion hook instead of indirect retract inference
 
 ### `src/input/SliceCutting.js`
 
