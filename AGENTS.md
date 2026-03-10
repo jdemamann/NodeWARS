@@ -75,6 +75,7 @@ Do not break these:
 - player and purple AI use the same canonical slice path
 - frenzy only triggers from `3` active cuts inside the same continuous slice gesture
 - owner `3` is supported symmetrically in gameplay and rendering
+- red and purple are one hostile coalition; neutral capture between them is controlled by `GAME_BALANCE.NEUTRAL_CAPTURE_ALLIANCE_MODE`
 - tutorials are optional for unlocks in every world, but normal campaign progression can still flow into the next world's tutorial
 - fixed campaign layouts must match configured level metadata
 - late high-pressure authored phases keep structural player opening support

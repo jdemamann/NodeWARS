@@ -63,6 +63,13 @@ export const GAME_BALANCE = {
   // after raising tier-0 regen from 0.5 e/s to 1.0 e/s.
   CAPTURE_SPEED_MULT: 2.0,
 
+  // How allied owners interact while racing for a neutral node:
+  // - 'sum': allied red/purple contributions add together toward one threshold
+  // - 'lockout': once one allied owner starts the capture, the other stays out
+  // This is intentionally parametrized so coalition difficulty can be tuned
+  // without rewriting neutral-capture combat logic later.
+  NEUTRAL_CAPTURE_ALLIANCE_MODE: 'sum',
+
   // Multiplier applied to damage dealt to enemy nodes.
   // Raise to create more aggressive combat; lower for defensive games.
   ATTACK_DAMAGE_MULT: 1.0,
@@ -110,66 +117,94 @@ export const GAME_BALANCE = {
 };
 
 export const BUILD_RULES = {
+  // Flat cost applied to every new tentacle. Raise to make all expansion more
+  // deliberate; lower to make spam openings easier.
   BASE_COST: 3,
+  // Distance component of build cost in energy per pixel. This is the global
+  // "long links are expensive" knob, before per-level distance multipliers.
   COST_PER_PIXEL: 0.028,
 };
 
 export const TENTACLE_RULES = {
+  // Body growth speed from source to target. Raising this shortens the window
+  // where a tentacle is vulnerable during construction.
   GROW_SPEED_PX_PER_SEC: 220,
+  // Speed used by burst / advancing states once the tentacle is already built.
   ADVANCE_SPEED_PX_PER_SEC: 300,
+  // Visual flow speed for orb/pulse motion along the lane.
   FLOW_SPEED_PX_PER_SEC: 160,
   TENTACLE_SPEED: GAME_BALANCE.TENTACLE_SPEED,
   CLASH_VOLATILITY: GAME_BALANCE.CLASH_VOLATILITY,
   SLICE_BURST_MULT: GAME_BALANCE.SLICE_BURST_MULT,
+  // Lower = more frequent decorative orb spawns on saturated friendly lanes.
   ORB_BASE_INTERVAL_SEC: 0.55,
 };
 
 export const PROGRESSION_RULES = {
+  // Slot count by node level. This is one of the strongest macro-pressure knobs.
   MAX_TENTACLE_SLOTS_PER_LEVEL: [1, 2, 3, 4, 5, 5],
+  // Polygon sides used for visual silhouette per level. Purely visual.
   NODE_POLYGON_SIDES_PER_LEVEL: [0, 3, 4, 6, 8, 10],
 };
 
 export const CUT_RULES = {
+  // Cut ratios below this use the burst path (source-side kamikaze payload).
   BURST_MAX_RATIO: 0.3,
+  // Cut ratios above this refund back to the source side.
   REFUND_MIN_RATIO: 0.7,
 };
 
 export const INPUT_TUNING = {
+  // Mouse/touch forgiveness around nodes.
   HOVER_HIT_PADDING_PX: 14,
   CLICK_HIT_PADDING_PX: 12,
+  // Snap radius used by drag-and-release targeting.
   NODE_SNAP_DISTANCE_PX: 60,
+  // Movement threshold before left-drag is treated as drag-connect or slice.
   DRAG_CONNECT_THRESHOLD_PX: 18,
+  // Touch-specific threshold before a tap becomes a slice gesture.
   TOUCH_SLICE_DRAG_THRESHOLD_PX: 20,
+  // Tap classification tolerances.
   TAP_MAX_DISTANCE_PX: 22,
   TAP_MAX_DURATION_MS: 600,
+  // Hold time before the hover pin helper appears on touch.
   LONG_PRESS_DURATION_MS: 400,
 };
 
 export const AI_RULES = {
+  // Adaptive think-speed envelope. Lower interval = faster reaction.
   SPEED_MULT_MIN: 0.45,
   SPEED_MULT_MAX: 1.65,
   PLAYER_ADVANTAGE_SPEED_FACTOR: 0.5,
   INTERVAL_JITTER_BASE: 0.76,
   INTERVAL_JITTER_RANGE: 0.48,
+  // Reduces aggressive expansion when an AI source is already low.
   DEFENSIVE_ENERGY_THRESHOLD: 32,
+  // Radius for relay route-value estimation.
   RELAY_CONTEXT_RADIUS_PX: 320,
   // Purple AI must cut inside the source-side burst zone so its strategic
   // cuts still create pressure under the canonical slice rules.
   STRATEGIC_CUT_RATIO: 0.15,
+  // Minimum tentacle fill before purple AI considers a strategic cut worth it.
   STRATEGIC_CUT_PIPE_TARGET_RATIO: 0.65,
 };
 
 export const WORLD_RULES = {
+  // Fog and signal tower tuning.
   FOG_VISION_RADIUS_PX: 240,
   FOG_RECALC_INTERVAL_SEC: 0.5,
   SIGNAL_REVEAL_DURATION_SEC: 8.0,
+  // Pulsar UX timing.
   PULSAR_CHARGE_WARNING_SEC: 1.2,
   PULSAR_CHARGE_COOLDOWN_SEC: 0.8,
+  // Camera follow for dramatic pressure moments.
   CAMERA_MAX_OFFSET_PX: 60,
   CAMERA_FOLLOW_STRENGTH: 0.18,
   CAMERA_SMOOTHING: 1.8,
+  // Auto-retract safety net for near-dead owned nodes under heavy pressure.
   AUTO_RETRACT_ATTACK_THRESHOLD: 0.88,
   AUTO_RETRACT_ENERGY_FRACTION: 0.08,
+  // Default capture thresholds for neutral objectives.
   DEFAULT_CAPTURE_THRESHOLD: 20,
   BUNKER_CAPTURE_THRESHOLD: 60,
 };
@@ -298,8 +333,9 @@ export const WORLDS = [
 /* ── DIFFICULTY PRESETS ── */
 /*
   Reusable spread objects for level config — apply with { ...DIFFICULTY.EASY, ...overrides }.
-  Tune aiMs (AI think interval in seconds) and dm (distance-cost multiplier per pixel).
-  Lower aiMs = faster AI decisions; higher dm = more expensive long-range tentacles.
+  Tune `aiThinkIntervalSeconds` and `distanceCostMultiplier`.
+  Lower think interval = faster AI decisions.
+  Higher distance multiplier = more expensive long-range tentacles.
 */
 export const DIFFICULTY = {
   EASY:   { aiThinkIntervalSeconds: 9.0, distanceCostMultiplier: 0.04 },
@@ -309,6 +345,38 @@ export const DIFFICULTY = {
 };
 
 /* ── LEVEL DATA ── */
+/*
+  Level config field guide:
+
+  Core pacing:
+  - `nodeEnergyCap`: max energy for nodes in the phase
+  - `playerStartEnergy`: initial energy of player-owned start nodes
+  - `enemyStartEnergy`: initial energy of red AI start nodes
+  - `purpleEnemyStartEnergy`: initial energy of purple AI start nodes
+  - `aiThinkIntervalSeconds`: baseline AI reaction interval
+  - `distanceCostMultiplier`: extra per-pixel tentacle tax for this phase
+  - `neutralEnergyRange`: [min,max] starting energy for procedurally seeded neutrals
+  - `par`: score pacing reference
+
+  Structure counts:
+  - `enemyCount`: red AI starting nodes
+  - `purpleEnemyCount`: purple AI starting nodes
+  - `relayCount`, `fortifiedRelayCount`
+  - `pulsarCount`, `signalTowerCount`
+  - `vortexCount`, `movingVortexCount`
+
+  Special flags:
+  - `isTutorial`: rigid onboarding level
+  - `isBoss`: cannot be skipped and should feel like a world climax
+  - `isSymmetricLayout`: authored mirrored layout
+  - `hasSuperVortex`, `hasSuperPulsar`
+
+  Tuning rule of thumb:
+  - if a phase feels too snowbally, first adjust starting energy or starting-node
+    structure in the authored layout
+  - if a phase feels too cheap/too expensive to route, adjust `distanceCostMultiplier`
+  - if AI feels oppressive, slow `aiThinkIntervalSeconds` before inflating player stats
+*/
 const RAW_LEVELS = [
   /* TUT W1 */
   { id:0,  worldId:0, nodeEnergyCap:100, tutorialWorldId:1, name:'TUTORIAL', nodes:5, enemyCount:0, enemyStartEnergy:0, playerStartEnergy:40, aiThinkIntervalSeconds:99, distanceCostMultiplier:0.05, neutralEnergyRange:[20,45], par:999, isTutorial:true },

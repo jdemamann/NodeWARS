@@ -16,6 +16,7 @@ import { SoundEffects as SFX } from '../audio/SoundEffects.js';
 import { getLevelSelectWorldMeta, getLevelGridWorldAccent, getWorldBannerMeta } from './screenWorldMeta.js';
 import { buildLevelMechanicBadge, buildPurpleEnemyBadge } from './levelSelectView.js';
 import { buildResultInfoMarkup } from './resultScreenView.js';
+import { buildCampaignEndingMarkup } from './campaignEndingView.js';
 
 function $(id) { return document.getElementById(id); }
 
@@ -25,6 +26,7 @@ const SCR = {
   levels:   DOM_IDS.SCREEN_LEVELS,
   story:    DOM_IDS.SCREEN_STORY,
   result:   DOM_IDS.SCREEN_RESULT,
+  ending:   DOM_IDS.SCREEN_ENDING,
   pause:    DOM_IDS.SCREEN_PAUSE,
   settings: DOM_IDS.SCREEN_SETTINGS,
   credits:  DOM_IDS.SCREEN_CREDITS,
@@ -102,7 +104,6 @@ export function buildWorldTabs() {
       ? '◈ TUTORIAL'
       : `${meta.icon} W${w}: ${meta.name}`;
     tab.addEventListener('click', () => {
-      Music.tabSwitch();
       _activeWorldTab = w;
       STATE.setActiveWorldTab(w);
       buildWorldTabs();
@@ -286,6 +287,11 @@ export function endLevel(win, game) {
   else     { SFX.lose(); setTimeout(() => Music.playMenu(), 1200); }
 
   setTimeout(() => {
+    if (win && levelId === 32) {
+      showCampaignEnding(game);
+      return;
+    }
+
     const rtitle = $(DOM_IDS.RTITLE);
     rtitle.textContent = win ? T('phaseClear') : T('annihilated');
     rtitle.className   = 'rt ' + (win ? 'win' : 'lose');
@@ -356,14 +362,43 @@ export function endLevel(win, game) {
   }, 500);
 }
 
+export function showCampaignEnding(game, { debugPreview = false } = {}) {
+  const endingModel = buildCampaignEndingMarkup(game, T, curLang(), { debugPreview });
+  const titleElement = $(DOM_IDS.ENDING_TITLE);
+  const subtitleElement = $(DOM_IDS.ENDING_SUB);
+  const bodyElement = $(DOM_IDS.ENDING_BODY);
+  const statsElement = $(DOM_IDS.ENDING_STATS);
+  const quoteElement = $(DOM_IDS.ENDING_QUOTE);
+
+  if (titleElement) titleElement.textContent = endingModel.title;
+  if (subtitleElement) subtitleElement.textContent = endingModel.subtitle;
+  if (bodyElement) bodyElement.innerHTML = endingModel.bodyMarkup;
+  if (statsElement) statsElement.innerHTML = endingModel.statsMarkup;
+  if (quoteElement) quoteElement.textContent = endingModel.quote;
+
+  const tutbox = $(DOM_IDS.TUTBOX);
+  if (tutbox) tutbox.style.display = 'none';
+  const scoreHudElement = $(DOM_IDS.HSCORE);
+  if (scoreHudElement) scoreHudElement.style.display = 'none';
+  const quickTipElement = $(DOM_IDS.DC);
+  if (quickTipElement) quickTipElement.classList.remove('on');
+
+  showScr('ending');
+}
+
 /* ── Settings UI ── */
 export function refreshSettingsUI() {
   ['w2','w3','debug','sound','music','showFps'].forEach(k => {
     const id  = 'tog' + k.charAt(0).toUpperCase() + k.slice(1);
     const btn = $(id);
     if (!btn) return;
-    btn.textContent = STATE.settings[k] ? 'ON' : 'OFF';
-    btn.classList.toggle('on', STATE.settings[k]);
+    const isEnabled = k === 'w2'
+      ? STATE.isWorldUnlocked(2)
+      : k === 'w3'
+        ? STATE.isWorldUnlocked(3)
+        : !!STATE.settings[k];
+    btn.textContent = isEnabled ? 'ON' : 'OFF';
+    btn.classList.toggle('on', isEnabled);
   });
   const graphicsBtn = $('togGraphicsMode');
   if (graphicsBtn) {
@@ -381,6 +416,8 @@ export function refreshSettingsUI() {
   if (debugResetRow) debugResetRow.style.display = STATE.settings.debug ? '' : 'none';
   const debugCopyRow = $(DOM_IDS.DEBUG_COPY_ROW);
   if (debugCopyRow) debugCopyRow.style.display = STATE.settings.debug ? '' : 'none';
+  const debugEndingRow = $(DOM_IDS.DEBUG_ENDING_ROW);
+  if (debugEndingRow) debugEndingRow.style.display = STATE.settings.debug ? '' : 'none';
   const debugPanel = $(DOM_IDS.DEBUG_INFO_PANEL);
   if (debugPanel) debugPanel.style.display = STATE.settings.debug ? '' : 'none';
 }

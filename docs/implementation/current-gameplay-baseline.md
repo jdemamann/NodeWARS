@@ -36,6 +36,10 @@ See also:
 
 - allied targets receive energy
 - neutral targets accumulate contest progress until captured
+- neutral capture between red and purple is coalition-aware and parameterized:
+  - `sum` combines both hostile AIs toward one neutral-capture threshold
+  - `lockout` lets the first allied captor keep the lane uncontested by the other
+- neutral capture visuals now surface coalition contribution explicitly instead of pretending summed red+purple pressure came from one owner only
 - neutral capture pacing is kept close to the prior opening tempo by a lower `CAPTURE_SPEED_MULT` after the tier-0 regen increase
 - enemy targets lose energy until ownership flips
 - ownership changes retract invalid opposing links
@@ -60,6 +64,7 @@ See also:
 ### AI
 
 - AI remains heuristic-based
+- owners 2 and 3 are one hostile coalition against the player and no longer attack each other
 - owner 3 uses the same shared burst path as the player
 - owner 3 checks strategic burst cuts every update tick
 - owner 3 is more biased toward kill-confirm pressure on weak player cells

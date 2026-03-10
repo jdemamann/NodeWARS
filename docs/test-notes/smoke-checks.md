@@ -28,6 +28,7 @@ Current coverage:
 - canvas feedback for capture, structures, and pre-result outcome overlays remains active
 - background, hazards, and particles continue respecting explicit graphics profiles
 - menu logo, FPS toggle, themes, and debug snapshot controls remain wired
+- campaign-ending preview/debug controls and screen routing remain wired
 - cooldown guards remain wired for high-density combat and world SFX
 - settings labels, tutorial copy, and story content stay aligned with current mechanics and localization
 - local progress and settings persistence guardrails stay intact
@@ -68,6 +69,30 @@ or:
 node scripts/campaign-sanity.mjs
 ```
 
+For critical button, menu, and screen wiring integrity, also run:
+
+```bash
+npm run ui-sanity
+```
+
+or:
+
+```bash
+node scripts/ui-actions-sanity.mjs
+```
+
+For DOM-lite screen/state integrity, also run:
+
+```bash
+npm run ui-dom-sanity
+```
+
+or:
+
+```bash
+node scripts/ui-dom-sanity.mjs
+```
+
 For a lightweight long-run confidence pass, also run:
 
 ```bash
@@ -92,3 +117,5 @@ npm run check
 - Source inspection is used only where a full interactive gameplay harness would be too heavy for the repository.
 - The checks are designed as fast sanity guards, not exhaustive gameplay tests.
 - Use `campaign-sanity.mjs` alongside this script when changing level definitions or campaign pacing.
+- Use `ui-actions-sanity.mjs` alongside this script when changing menus, screen routing, debug tooling, or PT/EN settings copy.
+- Use `ui-dom-sanity.mjs` alongside this script when changing `ScreenController`, `showScr(...)`, `refreshSettingsUI()`, campaign ending UI, or world-tab visibility rules.

@@ -17,6 +17,7 @@ import {
 } from '../math/simulationMath.js';
 import { bus } from '../core/EventBus.js';
 import { classifyTentacleCut, resolveGrowingTentacleCollision } from './TentRules.js';
+import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
 import {
   applyTentaclePayloadToTarget,
   applyTentacleFriendlyFlow,
@@ -136,7 +137,11 @@ export class Tent {
 
     const rivalEntries = Object.keys(targetNode.contest)
       .map(Number)
-      .filter(owner => owner !== attackingOwner && (targetNode.contest[owner] || 0) > 0)
+      .filter(owner =>
+        owner !== attackingOwner &&
+        !areAlliedOwners(owner, attackingOwner) &&
+        (targetNode.contest[owner] || 0) > 0
+      )
       .map(owner => ({ owner, score: targetNode.contest[owner] || 0 }));
 
     if (!rivalEntries.length || cancelAmount <= 0) return;
@@ -418,7 +423,7 @@ export class Tent {
 
     /* Race condition: virgin captured by AI while tentacle was growing toward it */
     const effectiveTarget = this.effectiveTargetNode;
-    if (effectiveTarget.owner !== 0 && effectiveTarget.owner !== sourceNode.owner && this._previousTargetOwner === 0) {
+    if (areHostileOwners(effectiveTarget.owner, sourceNode.owner) && this._previousTargetOwner === 0) {
       this.state = TentState.RETRACTING;
       this._previousTargetOwner = effectiveTarget.owner;
       return;
@@ -512,7 +517,7 @@ export class Tent {
     const relayFlowMultiplier = this._getRelayFlowMultiplier(sourceNode);
     let deliveredAmount = 0;
 
-    if (targetNode.owner === sourceNode.owner) {
+    if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
       deliveredAmount = this._applyFriendlyFlow(targetNode, feedRate, relayFlowMultiplier, dt);
 
     } else if (targetNode.owner === 0) {

@@ -9,6 +9,7 @@ import { computeBezierPoint } from '../math/bezierGeometry.js';
 import { GAMEPLAY_RULES, NodeType, TentState } from '../config/gameConfig.js';
 import { DOM_IDS } from '../ui/DomIds.js';
 import { fadeGo, showScr, buildWorldTabs, syncWorldTab } from '../ui/ScreenController.js';
+import { getCanvasCopyFont } from '../theme/uiFonts.js';
 
 const { render: RENDER_RULES } = GAMEPLAY_RULES;
 
@@ -458,7 +459,7 @@ export class Tutorial {
     /* Hint label */
     if (g.label) {
       const ly = useAbove ? gy + gr + 14 : gy - gr - 26;
-      ctx.font = 'bold 10px "Share Tech Mono"'; ctx.textAlign = 'center';
+      ctx.font = getCanvasCopyFont(10, 'bold'); ctx.textAlign = 'center';
       ctx.textBaseline = useAbove ? 'top' : 'bottom';
       ctx.fillStyle = '#00ff9d'; ctx.globalAlpha = 0.82 + pulse * 0.16; ctx.shadowBlur = 10;
       ctx.fillText(g.label, gx, ly);

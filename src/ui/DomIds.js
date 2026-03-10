@@ -40,6 +40,7 @@ export const DOM_IDS = Object.freeze({
   SCREEN_LEVELS:   'sl',
   SCREEN_STORY:    'ss',
   SCREEN_RESULT:   'sr',
+  SCREEN_ENDING:   'sce',
   SCREEN_PAUSE:    'pm',
   SCREEN_SETTINGS: 'sq',
 
@@ -72,6 +73,16 @@ export const DOM_IDS = Object.freeze({
   BTN_RR:    'btnrr',
   BTN_RN:    'btnrn',
 
+  /* Campaign ending screen */
+  ENDING_TITLE: 'endingTitle',
+  ENDING_SUB:   'endingSub',
+  ENDING_BODY:  'endingBody',
+  ENDING_STATS: 'endingStats',
+  ENDING_QUOTE: 'endingQuote',
+  BTN_ENDING_LEVELS: 'btnEndingLevels',
+  BTN_ENDING_REPLAY: 'btnEndingReplay',
+  BTN_ENDING_MENU:   'btnEndingMenu',
+
   /* Pause screen */
   PINFO:     'pinfo',
   BTN_RESUME:'btnresume',
@@ -90,8 +101,10 @@ export const DOM_IDS = Object.freeze({
   TOG_MUSIC:        'togMusic',
   DEBUG_RESET_ROW:  'debugResetRow',
   DEBUG_COPY_ROW:   'debugCopyRow',
+  DEBUG_ENDING_ROW: 'debugEndingRow',
   BTN_RESET_PROG:   'btnResetProg',
   BTN_COPY_DEBUG:   'btnCopyDebug',
+  BTN_VIEW_ENDING:  'btnViewEnding',
   BTN_SETTINGS_BACK:'btnSettingsBack',
   DEBUG_INFO_PANEL: 'debugInfoPanel',
   DEBUG_INFO_TEXT:  'debugInfoText',

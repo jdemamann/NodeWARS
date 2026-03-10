@@ -8,6 +8,8 @@
 import { GAMEPLAY_RULES, NodeType, TentState } from '../config/gameConfig.js';
 import { computeBuildCost, computeDistance } from '../math/simulationMath.js';
 import { Tent } from '../entities/Tent.js';
+import { getContestCaptureScore } from './NeutralContest.js';
+import { areAlliedOwners, areHostileOwners } from './OwnerTeams.js';
 
 const { progression: PROGRESSION_RULES, ai: AI_RULES } = GAMEPLAY_RULES;
 
@@ -160,8 +162,9 @@ export class AI {
     } else if (targetNode.owner === 1) {
       score += 26 + personality.attackBonus;
       score -= targetNode.energy * 0.35;
-    } else if (targetNode.owner === this.owner) {
+    } else if (areAlliedOwners(targetNode.owner, this.owner)) {
       score = 12 + proximityScore + personality.siegeBonus + relayContext.playerRouteValue * 4;
+      if (targetNode.owner !== this.owner) score += 10;
       if (targetNode.energy < captureRequirement * 0.4) score += 10;
     }
 
@@ -186,7 +189,14 @@ export class AI {
 
     if (targetNode.owner === 0) {
       const playerContestProgress = targetNode.contest?.[1] || 0;
-      let score = 72 + proximityScore + personality.expansionBonus - targetNode.energy * 0.2 - playerContestProgress * 1.8;
+      const alliedContestProgress = getContestCaptureScore(targetNode, this.owner);
+      let score =
+        72 +
+        proximityScore +
+        personality.expansionBonus +
+        alliedContestProgress * 0.35 -
+        targetNode.energy * 0.2 -
+        playerContestProgress * 1.8;
       if (isDefensive) score *= personality.defensiveDampener;
       return score;
     }
@@ -210,9 +220,13 @@ export class AI {
       return score;
     }
 
-    if (targetNode.owner === this.owner) {
-      if (targetNode.energy < targetNode.maxE * 0.5) return 22 + proximityScore + personality.siegeBonus;
-      if (isDefensive && targetNode.energy < targetNode.maxE * 0.4) return 55 + proximityScore;
+    if (areAlliedOwners(targetNode.owner, this.owner)) {
+      const alliedSupportBonus = targetNode.owner !== this.owner ? 10 : 0;
+      if (targetNode.energy < targetNode.maxE * 0.5) return 22 + proximityScore + personality.siegeBonus + alliedSupportBonus;
+      if (isDefensive && targetNode.energy < targetNode.maxE * 0.4) return 55 + proximityScore + alliedSupportBonus;
+      if (targetNode.owner !== this.owner && targetNode.energy < targetNode.maxE * 0.75) {
+        return 16 + proximityScore + alliedSupportBonus;
+      }
     }
 
     return 0;
@@ -232,7 +246,9 @@ export class AI {
       existingTentacle.effectiveSourceNode === targetNode &&
       existingTentacle.effectiveTargetNode === sourceNode
     );
-    if (opposingTentacle) tentacle.activateImmediate();
+    if (opposingTentacle && areHostileOwners(opposingTentacle.effectiveSourceNode.owner, sourceNode.owner)) {
+      tentacle.activateImmediate();
+    }
 
     this.game.tents.push(tentacle);
   }

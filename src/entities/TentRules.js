@@ -1,4 +1,5 @@
 import { TentState } from '../config/gameConfig.js';
+import { areAlliedOwners } from '../systems/OwnerTeams.js';
 
 export function classifyTentacleCut(cutRatio, cutRules) {
   return {
@@ -16,7 +17,7 @@ export function resolveGrowingTentacleCollision(tentacle, tents) {
     const opposingTentacle = tents[i];
     if (opposingTentacle === tentacle || opposingTentacle.state !== TentState.GROWING) continue;
     if (opposingTentacle.source !== tentacle.target || opposingTentacle.target !== tentacle.source) continue;
-    if (opposingTentacle.effectiveSourceNode.owner === tentacle.effectiveSourceNode.owner) continue;
+    if (areAlliedOwners(opposingTentacle.effectiveSourceNode.owner, tentacle.effectiveSourceNode.owner)) continue;
     if (tentacle.reachT + opposingTentacle.reachT < 1.0) continue;
 
     opposingTentacle.reachT = 1.0 - tentacle.reachT;

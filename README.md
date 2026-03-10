@@ -99,6 +99,7 @@ The current implementation deliberately preserves these rules:
 - level-0 cells now start at `1.0 e/s`, with higher levels preserving the same step pattern as the previous tuning
 - relay nodes act as pass-through infrastructure, not energy sources
 - player and purple AI use the same shared slice / burst path
+- red and purple are one hostile coalition and can capture neutral nodes cooperatively
 - frenzy only counts cuts from one continuous slice gesture
 - owner `3` is supported in both gameplay and rendering
 - tutorials are optional in every world and do not block the first real phase

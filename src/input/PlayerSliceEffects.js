@@ -1,3 +1,5 @@
+import { isPlayerEnemyOwner } from '../systems/OwnerTeams.js';
+
 export function applyPlayerSliceCut(sliceCut, handlers) {
   /* Canonical slice/burst entry point: player and AI strategic cuts must both
      route through Tent.applySliceCut() so burst behavior stays shared. */
@@ -9,7 +11,7 @@ export function applyPlayerSliceCut(sliceCut, handlers) {
 }
 
 export function recordReactiveDefenseCut(sliceCut, state, onTrigger) {
-  if (sliceCut.effectiveSourceNode.owner !== 1 || sliceCut.tentacle.source.owner !== 2) return;
+  if (sliceCut.effectiveSourceNode.owner !== 1 || !isPlayerEnemyOwner(sliceCut.tentacle.source.owner)) return;
 
   const now = state.now;
   state.aiCutLog.push(now);

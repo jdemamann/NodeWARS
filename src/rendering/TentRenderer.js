@@ -8,8 +8,10 @@
 
 import { GAMEPLAY_RULES, TentState } from '../config/gameConfig.js';
 import { ownerColor } from '../theme/ownerPalette.js';
+import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
 import { computeBezierPoint, drawBezierSegment } from '../math/bezierGeometry.js';
 import { STATE } from '../core/GameState.js';
+import { getCanvasCopyFont } from '../theme/uiFonts.js';
 
 const { render: RENDER_RULES } = GAMEPLAY_RULES;
 
@@ -116,9 +118,9 @@ function drawTargetGrip(ctx, x, y, color, radius, time, highGraphics) {
 function drawTransferSignature(ctx, tentacle, x, y, color, time, highGraphics) {
   const targetNode = tentacle.effectiveTargetNode;
   const sourceNode = tentacle.effectiveSourceNode;
-  const isFriendlyTransfer = targetNode.owner === sourceNode.owner;
+  const isFriendlyTransfer = areAlliedOwners(targetNode.owner, sourceNode.owner);
   const isNeutralTransfer = targetNode.owner === 0;
-  const isAttackTransfer = targetNode.owner !== 0 && targetNode.owner !== sourceNode.owner;
+  const isAttackTransfer = areHostileOwners(targetNode.owner, sourceNode.owner);
   const isRelaySurge = sourceNode.isRelay && sourceNode.owner !== 0;
   const baseRadius = Math.max(8, targetNode.radius * RENDER_RULES.TENTACLE.TARGET_IMPACT_RING_SCALE);
 
@@ -413,7 +415,7 @@ export class TentRenderer {
         sg(ctx, '#ffffff', 8);
         ctx.stroke();
         ctx.restore();
-      } else if (targetNode.owner === sourceNode.owner && visEnd - sT > 0.25) {
+      } else if (areAlliedOwners(targetNode.owner, sourceNode.owner) && visEnd - sT > 0.25) {
         ctx.save();
         ctx.beginPath();
         drawBezierSegment(ctx, esx, esy, cp.x, cp.y, etx, ety, sT + 0.18, Math.min(visEnd, sT + 0.34));
@@ -479,7 +481,7 @@ export class TentRenderer {
       ctx.fill();
       if (isRev) {
         const mid = computeBezierPoint(0.5, esx, esy, cp.x, cp.y, etx, ety);
-        ctx.font          = '8px "Share Tech Mono"';
+        ctx.font          = getCanvasCopyFont(8);
         ctx.fillStyle     = '#f5c518';
         ctx.globalAlpha   = 0.78;
         ctx.textAlign     = 'center';
@@ -549,7 +551,7 @@ export class TentRenderer {
 
       /* CLASH label (only from one side to avoid duplicate — draw from non-reversed only) */
       if (!isRev) {
-        ctx.font = '7px "Share Tech Mono"';
+        ctx.font = getCanvasCopyFont(7);
         ctx.fillStyle = '#f5c518';
         ctx.globalAlpha = 0.78 + Math.sin(now * 0.006) * 0.22;
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
@@ -563,7 +565,7 @@ export class TentRenderer {
     /* Overflow cascade indicator */
     if (t.state === TentState.ACTIVE && !isClash && t.effectiveSourceNode.energy >= t.effectiveSourceNode.maxE * 0.93) {
       const mp = computeBezierPoint(0.5, esx, esy, cp.x, cp.y, etx, ety);
-      ctx.font         = '9px "Share Tech Mono"';
+      ctx.font         = getCanvasCopyFont(9);
       ctx.fillStyle    = '#f5c518';
       ctx.globalAlpha  = 0.52 + Math.sin(renderNow * 0.005) * 0.3;
       ctx.textAlign    = 'center';

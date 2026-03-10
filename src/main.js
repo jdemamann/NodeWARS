@@ -17,11 +17,14 @@ import { Game }     from './core/Game.js';
 import { DOM_IDS }  from './ui/DomIds.js';
 import {
   showScr, fadeGo, showToast, buildWorldTabs, buildStory, buildCredits,
-  syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel,
+  syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel, showCampaignEnding,
 } from './ui/ScreenController.js';
 import { LEVELS } from './config/gameConfig.js';
 
 function $id(id) { return document.getElementById(id); }
+
+const MENU_CONTROL_SELECTOR = '.btn,.btn.sec,.wtab,.stoggle,.lb2,.btn-lang,.zoom-ctrl,.font-cycle-btn';
+const MENU_CLICK_CONTROL_SELECTOR = '.btn,.btn.sec,.wtab,.stoggle,.lb2,.btn-lang,.zoom-ctrl,.font-cycle-btn';
 
 /* ── Bootstrap ── */
 STATE.load();
@@ -81,33 +84,64 @@ function initGame() {
   requestAnimationFrame(() => requestAnimationFrame(reveal));
 }
 
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* Fall back to the legacy selection-based copy path below. */
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  } finally {
+    textarea.remove();
+  }
+
+  return copied;
+}
+
 /* ── Wire all button listeners ── */
 function wireButtons() {
   /* Main menu */
   $id(DOM_IDS.BTN_PLAY)?.addEventListener('click', () => {
-    Music.menuClick();
     fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); });
   });
   $id(DOM_IDS.BTN_STORY)?.addEventListener('click', () => { buildStory(); fadeGo(() => showScr('story')); });
   $id(DOM_IDS.BTN_SETTINGS)?.addEventListener('click', () => {
-    Music.menuClick();
     refreshSettingsUI();
     refreshDisplayUI();
     if (STATE.settings.debug) updateDebugInfo();
     fadeGo(() => showScr('settings'));
   });
   $id(DOM_IDS.BTN_CREDITS)?.addEventListener('click', () => {
-    Music.menuClick();
     buildCredits();
     fadeGo(() => showScr('credits'));
   });
 
   /* Settings */
   $id(DOM_IDS.BTN_SETTINGS_BACK)?.addEventListener('click', () => {
-    Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu'));
+    Music.playMenu(); fadeGo(() => showScr('menu'));
   });
   $id(DOM_IDS.BTN_CREDITS_BACK)?.addEventListener('click', () => {
-    Music.menuClick(); fadeGo(() => showScr('menu'));
+    fadeGo(() => showScr('menu'));
   });
   ['w2','w3','debug','sound','music','showFps'].forEach(key => {
     const id  = 'tog' + key.charAt(0).toUpperCase() + key.slice(1);
@@ -120,11 +154,16 @@ function wireButtons() {
   $id(DOM_IDS.BTN_COPY_DEBUG)?.addEventListener('click', async () => {
     const snapshot = buildDebugSnapshot();
     try {
-      await navigator.clipboard.writeText(snapshot);
+      const copied = await copyTextToClipboard(snapshot);
+      if (!copied) throw new Error('clipboard_copy_failed');
       showToast(curLang() === 'pt' ? 'Snapshot de debug copiado' : 'Debug snapshot copied');
     } catch {
       showToast(snapshot);
     }
+  });
+  $id(DOM_IDS.BTN_VIEW_ENDING)?.addEventListener('click', () => {
+    const debugPreviewGame = game || Screens._game;
+    fadeGo(() => showCampaignEnding(debugPreviewGame, { debugPreview: true }));
   });
   $id(DOM_IDS.BTN_RESET_PROG)?.addEventListener('click', () => {
     if (!confirm('Reset all progress?')) return;
@@ -138,7 +177,7 @@ function wireButtons() {
   $id(DOM_IDS.BTN_STORY_BACK2)?.addEventListener('click', () => fadeGo(() => showScr('menu')));
 
   /* Level select */
-  $id(DOM_IDS.BTN_BACK)?.addEventListener('click', () => { Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu')); });
+  $id(DOM_IDS.BTN_BACK)?.addEventListener('click', () => { Music.playMenu(); fadeGo(() => showScr('menu')); });
 
   /* Result */
   $id(DOM_IDS.BTN_RL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
@@ -150,6 +189,16 @@ function wireButtons() {
       STATE.save();
       fadeGo(() => { showScr(null); game.loadLevel(STATE.curLvl); });
     }
+  });
+  $id(DOM_IDS.BTN_ENDING_LEVELS)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
+  $id(DOM_IDS.BTN_ENDING_REPLAY)?.addEventListener('click', () => fadeGo(() => {
+    STATE.setCurrentLevel(32);
+    STATE.save();
+    showScr(null);
+    game.loadLevel(32);
+  }));
+  $id(DOM_IDS.BTN_ENDING_MENU)?.addEventListener('click', () => {
+    Music.playMenu(); fadeGo(() => showScr('menu'));
   });
 
   /* Pause */
@@ -182,7 +231,7 @@ function wireButtons() {
     }
   });
   $id(DOM_IDS.BTN_PMENU)?.addEventListener('click', () => {
-    Music.menuClick(); Music.playMenu(); fadeGo(() => showScr('menu'));
+    Music.playMenu(); fadeGo(() => showScr('menu'));
   });
 
   /* Language buttons (now in settings) */
@@ -215,14 +264,7 @@ function wireButtons() {
     STATE.saveSettings(); applyZoom(); refreshDisplayUI();
   });
 
-  /* Hover / click sound for menu elements */
-  document.querySelectorAll('.btn,.btn.sec,.wtab,.stoggle,.lb2').forEach(el => {
-    el.addEventListener('mouseenter', () => Music.menuHover(), { passive: true });
-    el.addEventListener('touchstart', () => Music.menuHover(), { passive: true });
-  });
-  document.querySelectorAll('.btn,.btn.sec').forEach(el => {
-    el.addEventListener('click', () => Music.menuClick());
-  });
+  bindMenuControlFeedback();
 
   /* EventBus → audio wiring */
   wireAudioBus();
@@ -262,16 +304,30 @@ function wireAudioBus() {
 
 /* ── Settings toggle ── */
 function toggleSetting(key) {
-  STATE.settings[key] = !STATE.settings[key];
+  if (key === 'w2' || key === 'w3') {
+    const worldId = key === 'w2' ? 2 : 3;
+    const currentEffectiveVisibility = STATE.isWorldUnlocked(worldId);
+    const currentManualVisibility = STATE.settings[key];
+    /* World toggles behave as explicit visibility overrides. If the world is
+       currently visible only because campaign progress unlocked it, the first
+       click should disable it instead of converting that state into another ON. */
+    STATE.settings[key] = typeof currentManualVisibility === 'boolean'
+      ? !currentManualVisibility
+      : !currentEffectiveVisibility;
+  } else {
+    STATE.settings[key] = !STATE.settings[key];
+  }
   STATE.saveSettings();
   refreshSettingsUI();
 
   if (key === 'debug') {
     const row = $id(DOM_IDS.DEBUG_RESET_ROW);
     const copyRow = $id(DOM_IDS.DEBUG_COPY_ROW);
+    const endingRow = $id(DOM_IDS.DEBUG_ENDING_ROW);
     const panel = $id(DOM_IDS.DEBUG_INFO_PANEL);
     if (row)  row.style.display  = STATE.settings.debug ? '' : 'none';
     if (copyRow) copyRow.style.display = STATE.settings.debug ? '' : 'none';
+    if (endingRow) endingRow.style.display = STATE.settings.debug ? '' : 'none';
     if (panel) panel.style.display = STATE.settings.debug ? '' : 'none';
     if (STATE.settings.debug) updateDebugInfo();
   }
@@ -287,7 +343,6 @@ function toggleSetting(key) {
   }
 
   if (key === 'w2' || key === 'w3' || key === 'debug') {
-    Music.menuClick();
     buildWorldTabs();
   }
 }
@@ -297,7 +352,6 @@ function cycleGraphicsMode() {
   STATE.settings.highGraphics = STATE.settings.graphicsMode === 'high';
   STATE.saveSettings();
   refreshSettingsUI();
-  Music.menuClick();
 }
 
 const THEME_ORDER = ['AURORA', 'SOLAR', 'GLACIER'];
@@ -314,7 +368,48 @@ function cycleTheme() {
   STATE.saveSettings();
   applyTheme();
   refreshSettingsUI();
-  Music.menuClick();
+}
+
+function getMenuControlElement(target) {
+  return target instanceof Element ? target.closest(MENU_CONTROL_SELECTOR) : null;
+}
+
+function flashMenuControl(controlElement) {
+  if (!controlElement) return;
+  controlElement.classList.remove('menu-press');
+  void controlElement.offsetWidth;
+  controlElement.classList.add('menu-press');
+  window.setTimeout(() => controlElement.classList.remove('menu-press'), 140);
+}
+
+function bindMenuControlFeedback() {
+  /* Use delegated feedback so controls rebuilt at runtime (world tabs, level
+     cards, debug rows) still get the same hover/click behavior. */
+  document.addEventListener('pointerover', event => {
+    if (event.pointerType !== 'mouse') return;
+    const hoveredControl = getMenuControlElement(event.target);
+    const previousControl = getMenuControlElement(event.relatedTarget);
+    if (hoveredControl && hoveredControl !== previousControl) {
+      Music.menuHover();
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchstart', event => {
+    const touchedControl = getMenuControlElement(event.target);
+    if (!touchedControl) return;
+    Music.menuHover();
+    flashMenuControl(touchedControl);
+  }, { passive: true });
+
+  document.addEventListener('click', event => {
+    const clickedControl = event.target instanceof Element
+      ? event.target.closest(MENU_CLICK_CONTROL_SELECTOR)
+      : null;
+    if (!clickedControl) return;
+    if (clickedControl.matches('.wtab')) Music.tabSwitch();
+    else Music.menuClick();
+    flashMenuControl(clickedControl);
+  });
 }
 
 function buildDebugSnapshot() {

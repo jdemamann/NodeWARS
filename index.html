@@ -5,17 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>NODE WARS</title>
 <link rel="icon" href="data:,">
-<!-- Fonts loaded async to avoid blocking in local-file contexts -->
-<script>
-(function(){
-  try{
-    var l=document.createElement('link');
-    l.rel='stylesheet';
-    l.href='https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&family=Exo+2:wght@400;600;700&display=swap';
-    document.head.appendChild(l);
-  }catch(e){}
-})();
-</script>
 <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
@@ -203,6 +192,13 @@
         </div>
         <button class="stoggle" id="btnCopyDebug">COPY</button>
       </div>
+      <div class="srow" id="debugEndingRow">
+        <div class="slabel">
+          <span class="copy-label" data-t="setViewEnding">VIEW CAMPAIGN ENDING</span>
+          <span class="sdesc" data-t="setViewEndingDesc">Preview the final epilogue screen without beating the campaign</span>
+        </div>
+        <button class="stoggle" id="btnViewEnding" data-t="viewEnding">VIEW</button>
+      </div>
     </div>
     <div class="debug-info" id="debugInfoPanel">
       <div class="debug-info-title">DEBUG INFO</div>
@@ -244,6 +240,26 @@
     <button class="btn sec sm" id="btnrl">PHASES</button>
     <button class="btn warn sm" id="btnrr">RETRY</button>
     <button class="btn sm" id="btnrn">NEXT ▶</button>
+  </div>
+</div>
+
+<!-- Campaign Ending Screen -->
+<div class="scr off" id="sce">
+  <div class="ending-kicker" data-t="endingKicker">CAMPAIGN COMPLETE</div>
+  <div class="ending-title" id="endingTitle"></div>
+  <div class="ending-sub" id="endingSub"></div>
+  <div class="ending-world-strip">
+    <div class="story-chip story-accent-genesis"><span class="story-chip-icon">◈</span><span>GENESIS</span></div>
+    <div class="story-chip story-accent-void"><span class="story-chip-icon">⊗</span><span>VOID</span></div>
+    <div class="story-chip story-accent-nexus"><span class="story-chip-icon">⚡</span><span>NEXUS PRIME</span></div>
+  </div>
+  <div class="ending-body" id="endingBody"></div>
+  <div class="ending-stats" id="endingStats"></div>
+  <div class="ending-quote" id="endingQuote"></div>
+  <div class="rbs">
+    <button class="btn sec sm" id="btnEndingLevels" data-t="phases">PHASES</button>
+    <button class="btn warn sm" id="btnEndingReplay" data-t="restart">RESTART PHASE</button>
+    <button class="btn sm" id="btnEndingMenu" data-t="mainMenu">☰ MAIN MENU</button>
   </div>
 </div>
 

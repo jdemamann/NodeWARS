@@ -14,7 +14,10 @@ import { GAMEPLAY_RULES, MAX_SLOTS } from '../config/gameConfig.js';
 import { ownerColor, ownerPanelTheme } from '../theme/ownerPalette.js';
 import { computeBuildCost, maxRange } from '../math/simulationMath.js';
 import { computeNodeDisplayRegenRate } from '../systems/EnergyBudget.js';
+import { getContestContributorOwners, getDisplayContestEntries } from '../systems/NeutralContest.js';
+import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
 import { drawRoundedRect } from './canvasPrimitives.js';
+import { getCanvasCopyFont, getCanvasDisplayFont } from '../theme/uiFonts.js';
 
 const { input: INPUT_TUNING, progression: PROGRESSION_RULES, render: RENDER_RULES } = GAMEPLAY_RULES;
 
@@ -64,7 +67,7 @@ export class UIRenderer {
       }
 
       if (event.label) {
-        ctx.font = 'bold 8px "Orbitron",sans-serif';
+        ctx.font = getCanvasDisplayFont(8, 'bold');
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = colorWithAlpha(color, 0.9 * alpha);
@@ -85,12 +88,12 @@ export class UIRenderer {
     ctx.save();
     ctx.fillStyle = win ? `rgba(0,255,157,${0.045 + pulse * 0.04})` : `rgba(255,77,116,${0.05 + pulse * 0.04})`;
     ctx.fillRect(0, 0, W, H);
-    ctx.font = 'bold 28px "Orbitron",sans-serif';
+    ctx.font = getCanvasDisplayFont(28, 'bold');
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = colorWithAlpha(color, 0.75 + pulse * 0.18);
     ctx.fillText(label, W / 2, H * 0.34);
-    ctx.font = 'bold 10px "Share Tech Mono",monospace';
+    ctx.font = getCanvasCopyFont(10, 'bold');
     ctx.fillStyle = colorWithAlpha('#ffffff', 0.55 + pulse * 0.18);
     ctx.fillText(game.cfg?.name || '', W / 2, H * 0.34 + 26);
     ctx.restore();
@@ -167,7 +170,7 @@ export class UIRenderer {
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    ctx.font = 'bold 8px "Orbitron",sans-serif';
+    ctx.font = getCanvasDisplayFont(8, 'bold');
     ctx.fillStyle = accent;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -176,11 +179,11 @@ export class UIRenderer {
       : `${lang === 'pt' ? 'FASE' : 'PHASE'} ${cfg.id}`;
     ctx.fillText(phasePrefix, panelX + 10, panelY + 12);
 
-    ctx.font = 'bold 11px "Orbitron",sans-serif';
+    ctx.font = getCanvasDisplayFont(11, 'bold');
     ctx.fillStyle = 'rgba(235,245,255,0.96)';
     ctx.fillText(cfg.name, panelX + 10, panelY + 28);
 
-    ctx.font = '7px "Share Tech Mono",monospace';
+    ctx.font = getCanvasCopyFont(7);
     ctx.fillStyle = 'rgba(173,193,215,0.82)';
     ctx.fillText(`${playerStatus}   ${enemyStatus}`, panelX + 10, panelY + 42);
 
@@ -206,7 +209,7 @@ export class UIRenderer {
       ctx.beginPath();
       drawRoundedRect(ctx, chipX, chipY, 60, 12, 6);
       ctx.stroke();
-      ctx.font = 'bold 6px "Share Tech Mono",monospace';
+      ctx.font = getCanvasCopyFont(6, 'bold');
       ctx.fillStyle = chip.color;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -278,15 +281,10 @@ export class UIRenderer {
     const incomingAtk  = game.tents.filter(t2 =>
       t2.alive && t2.source && t2.target &&
       (t2.state === 'active' || t2.state === 'advancing') &&
-      t2.target === n && t2.source.owner !== n.owner
+      t2.target === n && areHostileOwners(t2.source.owner, n.owner)
     ).length;
     const captureThreshold = Math.max(1, n.captureThreshold || 10);
-    const contestEntries = isNeutral && n.contest
-      ? [1, 2, 3]
-        .map(owner => ({ owner, score: n.contest[owner] || 0 }))
-        .filter(entry => entry.score > 0)
-        .sort((left, right) => right.score - left.score)
-      : [];
+    const contestEntries = isNeutral ? getDisplayContestEntries(n) : [];
     const leadingContest = contestEntries[0] || null;
     const contestPct = leadingContest
       ? Math.round((leadingContest.score / captureThreshold) * 100)
@@ -315,9 +313,19 @@ export class UIRenderer {
     } else if (!isNeutral) {
       const regenVal = '+' + regen + ' e/s';
       rows.push({ label: LABEL.regen, value: regenVal });
-      const eIn  = +(game.tents.filter(t2 => t2.alive && t2.state === 'active' && t2.target === n && t2.source.owner === n.owner)
+      const eIn  = +(game.tents.filter(t2 =>
+        t2.alive &&
+        t2.state === 'active' &&
+        t2.target === n &&
+        areAlliedOwners(t2.source.owner, n.owner)
+      )
         .reduce((s, t2) => s + (t2.flowRate || 0), 0)).toFixed(1);
-      const eOut = +(game.tents.filter(t2 => t2.alive && t2.state === 'active' && t2.source === n && t2.target.owner !== n.owner)
+      const eOut = +(game.tents.filter(t2 =>
+        t2.alive &&
+        t2.state === 'active' &&
+        t2.source === n &&
+        !areAlliedOwners(t2.target.owner, n.owner)
+      )
         .reduce((s, t2) => s + (t2.flowRate || 0), 0)).toFixed(1);
       if (eIn  > 0) rows.push({ label: LABEL.flow_in,  value: '+' + eIn  + ' e/s', accentCol:'#00ff9d' });
       if (eOut > 0) rows.push({ label: LABEL.flow_out, value: '-' + eOut + ' e/s', accentCol:'#ff7090' });
@@ -343,12 +351,14 @@ export class UIRenderer {
         accentCol: leadingContest ? contestColor : undefined,
       });
       if (leadingContest) {
+        const contributorOwners = getContestContributorOwners(leadingContest);
+        const contributorLabel = contributorOwners.map(ownerLabel).join(' + ');
         rows.push({
           label: LABEL.contest_leader,
           value: ownerLabel(leadingContest.owner),
           accent: true,
           accentCol: contestColor,
-          sub: `${Math.round(leadingContest.score)} / ${captureThreshold}`,
+          sub: `${Math.round(leadingContest.score)} / ${captureThreshold}${contributorOwners.length > 1 ? ` • ${contributorLabel}` : ''}`,
         });
       } else {
         rows.push({ label: LABEL.contest_target, value: captureThreshold.toString() });
@@ -391,17 +401,17 @@ export class UIRenderer {
     ctx.beginPath(); drawRoundedRect(ctx, px, py, PW, 3, { tl:7, tr:7, bl:0, br:0 }); ctx.fill();
     ctx.globalAlpha = 1;
     const title = isRelay ? LABEL.title_relay : isPlayer ? LABEL.title_player : isNeutral ? LABEL.title_neutral : LABEL.title_enemy;
-    ctx.font = 'bold 8.5px "Orbitron",sans-serif';
+    ctx.font = getCanvasDisplayFont(8.5, 'bold');
     ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.shadowColor = col; ctx.shadowBlur = 6;
     ctx.fillText(title, px + PAD, py + 3 + titleH / 2);
     ctx.shadowBlur = 0;
     if (!game.hoverPin) {
-      ctx.font = '7px "Share Tech Mono",monospace';
+      ctx.font = getCanvasCopyFont(7);
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.textAlign = 'right';
       ctx.fillText(LABEL.pin, px + PW - PAD, py + 3 + titleH / 2);
     } else {
-      ctx.font = 'bold 7px "Share Tech Mono",monospace';
+      ctx.font = getCanvasCopyFont(7, 'bold');
       ctx.fillStyle = col; ctx.globalAlpha = 0.7; ctx.textAlign = 'right';
       ctx.fillText('◈ PINNED', px + PW - PAD, py + 3 + titleH / 2);
       ctx.globalAlpha = 1;
@@ -411,15 +421,15 @@ export class UIRenderer {
 
     rows.forEach((row, ri) => {
       const ry = py + titleH + PAD + ri * ROW + ROW / 2;
-      ctx.font = '7px "Share Tech Mono",monospace';
+      ctx.font = getCanvasCopyFont(7);
       ctx.fillStyle = 'rgba(180,200,220,0.55)'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillText(row.label, px + PAD, ry);
-      ctx.font = 'bold 9px "Share Tech Mono",monospace';
+      ctx.font = getCanvasCopyFont(9, 'bold');
       ctx.fillStyle = row.accentCol || (row.accent ? col : 'rgba(220,235,255,0.92)');
       ctx.textAlign = 'right';
       ctx.fillText(row.value || '', px + PW - PAD, ry);
       if (row.sub) {
-        ctx.font = '7px "Share Tech Mono",monospace';
+        ctx.font = getCanvasCopyFont(7);
         ctx.fillStyle = 'rgba(0,229,255,0.45)'; ctx.textAlign = 'right';
         ctx.fillText(row.sub, px + PW - PAD, ry + 9);
       }
@@ -456,7 +466,7 @@ export class UIRenderer {
     ctx.fillStyle = 'rgba(245,197,24,' + (0.7 * pulse) + ')';
     ctx.shadowColor = '#f5c518'; ctx.shadowBlur = 10;
     ctx.fillRect(0, H + 50 - 6, W * t, 5);
-    ctx.font = 'bold 11px "Orbitron",sans-serif';
+    ctx.font = getCanvasDisplayFont(11, 'bold');
     ctx.fillStyle = 'rgba(245,197,24,' + (0.9 * pulse) + ')';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.shadowBlur = 16;
     ctx.fillText('⚡ FRENZY  ' + game.frenzyTimer.toFixed(1) + 's', W / 2, H + 50 - 18);
@@ -543,11 +553,11 @@ export class UIRenderer {
     }
     const buildCost = computeBuildCost(distanceToCursor) + distanceToCursor * distanceCostMultiplier;
     ctx.setLineDash([]); ctx.shadowBlur = 0; ctx.globalAlpha = 0.8;
-    ctx.font = '8px "Share Tech Mono",monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = getCanvasCopyFont(8); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillStyle = canFire ? '#00e5ff' : '#ff3d5a';
     ctx.fillText(Math.ceil(buildCost) + 'e', targetScreenX + 14, targetScreenY - 8);
     if (!canFire && distanceToCursor > maxReach + 5) {
-      ctx.fillStyle = 'rgba(255,61,90,0.6)'; ctx.font = '7px "Share Tech Mono",monospace';
+      ctx.fillStyle = 'rgba(255,61,90,0.6)'; ctx.font = getCanvasCopyFont(7);
       ctx.fillText('-' + Math.ceil(distanceToCursor - maxReach) + 'px', targetScreenX + 14, targetScreenY + 3);
     }
     ctx.restore();

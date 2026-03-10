@@ -2,8 +2,10 @@
   "type": "module",
   "scripts": {
     "smoke": "node scripts/smoke-checks.mjs",
+    "ui-sanity": "node scripts/ui-actions-sanity.mjs",
+    "ui-dom-sanity": "node scripts/ui-dom-sanity.mjs",
     "campaign-sanity": "node scripts/campaign-sanity.mjs",
     "soak": "node scripts/simulation-soak.mjs",
-    "check": "npm run smoke && npm run campaign-sanity && npm run soak"
+    "check": "npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run campaign-sanity && npm run soak"
   }
 }

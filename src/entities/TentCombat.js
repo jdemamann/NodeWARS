@@ -3,6 +3,12 @@ import {
   computeAttackLevelMultiplier,
   computeDefenseLevelMultiplier,
 } from '../math/simulationMath.js';
+import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
+import {
+  getContestCaptureOwner,
+  getContestCaptureScore,
+  shouldIgnoreAlliedContestContribution,
+} from '../systems/NeutralContest.js';
 
 export function applyTentaclePayloadToTarget({
   tentacle,
@@ -15,18 +21,29 @@ export function applyTentaclePayloadToTarget({
 }) {
   const directDamage = payloadAmount * computeAttackLevelMultiplier(sourceNode.level) * damageMultiplier;
 
-  if (targetNode.owner === sourceNode.owner) {
+  if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
     targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + payloadAmount);
     return;
   }
 
   if (targetNode.owner === 0) {
+    /* Neutral capture can be coalition-aware. In 'sum' mode red + purple raw
+       contributions stay separate for ownership identity, but threshold checks
+       are evaluated on the combined coalition pressure. In 'lockout' mode the
+       second allied owner simply stays out of the capture race. */
+    if (shouldIgnoreAlliedContestContribution(targetNode, sourceNode.owner)) return;
+
     tentacle._applyNeutralContestContribution(targetNode, sourceNode.owner, directDamage);
     targetNode.cFlash = (targetNode.cFlash || 0) + contestFlash;
     if (burstPulse > 0) targetNode.burstPulse = Math.max(targetNode.burstPulse || 0, burstPulse);
 
-    if ((targetNode.contest[sourceNode.owner] || 0) >= (targetNode.captureThreshold || EMBRYO)) {
-      tentacle._captureNeutralTarget(targetNode, sourceNode.owner, targetNode.contest[sourceNode.owner]);
+    const captureScore = getContestCaptureScore(targetNode, sourceNode.owner);
+    if (captureScore >= (targetNode.captureThreshold || EMBRYO)) {
+      tentacle._captureNeutralTarget(
+        targetNode,
+        getContestCaptureOwner(targetNode, sourceNode.owner),
+        captureScore,
+      );
     }
     return;
   }
@@ -51,20 +68,33 @@ export function applyTentacleFriendlyFlow(targetNode, feedRate, relayFlowMultipl
 }
 
 export function applyTentacleNeutralCaptureFlow(tentacle, targetNode, sourceNode, feedRate, relayFlowMultiplier, dt) {
+  /* Keep the same coalition rule in the sustained-flow path as in burst/split
+     payload application so neutral capture behavior stays consistent. */
+  if (shouldIgnoreAlliedContestContribution(targetNode, sourceNode.owner)) return 0;
+
   const contestContribution =
     feedRate * computeAttackLevelMultiplier(sourceNode.level) * GAME_BALANCE.CAPTURE_SPEED_MULT * relayFlowMultiplier * dt;
 
   tentacle._applyNeutralContestContribution(targetNode, sourceNode.owner, contestContribution);
   tentacle._cancelRivalContestProgress(targetNode, sourceNode.owner, contestContribution * 0.9);
 
-  if ((targetNode.contest[sourceNode.owner] || 0) >= (targetNode.captureThreshold || EMBRYO)) {
-    tentacle._captureNeutralTarget(targetNode, sourceNode.owner, targetNode.contest[sourceNode.owner]);
+  const captureScore = getContestCaptureScore(targetNode, sourceNode.owner);
+  if (captureScore >= (targetNode.captureThreshold || EMBRYO)) {
+    tentacle._captureNeutralTarget(
+      targetNode,
+      getContestCaptureOwner(targetNode, sourceNode.owner),
+      captureScore,
+    );
   }
 
   return contestContribution;
 }
 
 export function applyTentacleEnemyAttackFlow(tentacle, targetNode, sourceNode, feedRate, relayFlowMultiplier, dt) {
+  if (!areHostileOwners(targetNode.owner, sourceNode.owner)) {
+    return applyTentacleFriendlyFlow(targetNode, feedRate, relayFlowMultiplier, dt);
+  }
+
   const damageAmount =
     feedRate *
     computeAttackLevelMultiplier(sourceNode.level) /

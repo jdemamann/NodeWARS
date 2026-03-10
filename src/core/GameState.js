@@ -9,8 +9,12 @@ import { LEVELS, getLevelConfig, getNextLevelId, getPreviousLevelId } from '../c
 import { store } from './storage.js';
 
 const DEFAULT_SETTINGS = Object.freeze({
-  w2: false,
-  w3: false,
+  /* World toggles act as explicit visibility overrides in Settings:
+     null  -> follow natural campaign progression
+     true  -> force the world visible
+     false -> force the world hidden */
+  w2: null,
+  w3: null,
   debug: false,
   sound: true,
   music: true,
@@ -107,8 +111,8 @@ class GameState {
     this.curLvl = 1;
     this.scores = Array(33).fill(null);
     this.levelFailStreaks = Array(33).fill(0);
-    this.settings.w2 = false;
-    this.settings.w3 = false;
+    this.settings.w2 = null;
+    this.settings.w3 = null;
     this.save();
   }
 
@@ -186,15 +190,10 @@ class GameState {
   isWorldUnlocked(worldId) {
     if (this.settings.debug) return true;
     if (worldId <= 1) return true;
+    const manualVisibility = this._getManualWorldVisibility(worldId);
+    if (manualVisibility != null) return manualVisibility;
     const unlockRequirement = this._getWorldUnlockRequirement(worldId);
-    if (unlockRequirement == null) return false;
-    const unlockedByProgress = this.completed >= unlockRequirement;
-    const unlockedManually = worldId === 2
-      ? !!this.settings.w2
-      : worldId === 3
-        ? !!this.settings.w3
-        : false;
-    return unlockedByProgress || unlockedManually;
+    return unlockRequirement != null && this.completed >= unlockRequirement;
   }
 
   isLevelUnlocked(levelConfig) {
@@ -216,10 +215,10 @@ class GameState {
     return previousLevelId != null && previousLevelId <= this.completed;
   }
 
-  _syncWorldUnlocksFromProgress() {
-    this.settings.w2 = this.settings.w2 || this.completed >= (this._getWorldUnlockRequirement(2) ?? Infinity);
-    this.settings.w3 = this.settings.w3 || this.completed >= (this._getWorldUnlockRequirement(3) ?? Infinity);
-  }
+  /* World visibility is now derived from campaign progress plus an explicit
+     manual override in Settings, so there is no longer any persisted unlock
+     flag to synchronize here. */
+  _syncWorldUnlocksFromProgress() {}
 
   _getWorldUnlockRequirement(worldId) {
     if (worldId <= 1) return 0;
@@ -234,6 +233,12 @@ class GameState {
       .filter(levelConfig => (levelConfig.worldId || 1) === worldId && !levelConfig.isTutorial)
       .sort((leftLevel, rightLevel) => leftLevel.id - rightLevel.id);
     return playableWorldLevels[0]?.id ?? null;
+  }
+
+  _getManualWorldVisibility(worldId) {
+    if (worldId === 2) return typeof this.settings.w2 === 'boolean' ? this.settings.w2 : null;
+    if (worldId === 3) return typeof this.settings.w3 === 'boolean' ? this.settings.w3 : null;
+    return null;
   }
 
   _normalizeSettings(partialSettings = {}) {
@@ -259,8 +264,13 @@ class GameState {
       ? Math.max(0.5, Math.min(2.0, zoom))
       : DEFAULT_SETTINGS.textZoom;
 
-    ['w2', 'w3', 'debug', 'sound', 'music', 'showFps', 'highGraphics'].forEach(settingKey => {
+    ['debug', 'sound', 'music', 'showFps', 'highGraphics'].forEach(settingKey => {
       normalizedSettings[settingKey] = !!normalizedSettings[settingKey];
+    });
+
+    ['w2', 'w3'].forEach(settingKey => {
+      const value = normalizedSettings[settingKey];
+      normalizedSettings[settingKey] = typeof value === 'boolean' ? value : null;
     });
 
     return normalizedSettings;

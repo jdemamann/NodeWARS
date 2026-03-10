@@ -45,6 +45,7 @@ import {
 } from '../input/PlayerSliceEffects.js';
 import { bindGameInputEvents } from '../input/GameInputBinding.js';
 import { getFixedCampaignLayout } from '../levels/FixedCampaignLayouts.js';
+import { areHostileOwners } from '../systems/OwnerTeams.js';
 
 const { input: INPUT_TUNING } = GAMEPLAY_RULES;
 
@@ -621,7 +622,7 @@ export class Game {
     this.tents.forEach(t => {
       if (!t.alive || t.clashPartner || t.state !== TentState.ACTIVE) return;
       const opp = byRoute.get(`${t.effectiveTargetNode.id}-${t.effectiveSourceNode.id}`);
-      if (opp && !opp.clashPartner && opp.effectiveSourceNode.owner !== t.effectiveSourceNode.owner) {
+      if (opp && !opp.clashPartner && areHostileOwners(opp.effectiveSourceNode.owner, t.effectiveSourceNode.owner)) {
         t.clashPartner = opp; opp.clashPartner = t;
         if (prevPartner.get(t) !== opp) {
           /* Fresh ACTIVE↔ACTIVE clashes keep the canonical mid-lane mechanics,
@@ -751,7 +752,9 @@ export class Game {
     /* If an active enemy tentacle already goes the other way, skip growing
        and enter clash immediately — "tug of war" starts at once. */
     const opposingTentacle = findOpposingActiveTentacle(this.tents, sourceNode, targetNode);
-    if (opposingTentacle) newTentacle.activateImmediate();
+    if (opposingTentacle && areHostileOwners(opposingTentacle.effectiveSourceNode.owner, sourceNode.owner)) {
+      newTentacle.activateImmediate();
+    }
 
     SFX.buildStart();
     this.tents.push(newTentacle);

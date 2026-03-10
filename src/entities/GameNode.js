@@ -40,7 +40,7 @@ export class GameNode {
     /* Gameplay state */
     this.selected   = false;
     this.underAttack= 0;
-    this.contest    = null;   // { ownerId: score } for neutral capture races
+    this.contest    = null;   // { ownerId: rawScore } for neutral capture races; coalition summing is resolved by NeutralContest helpers
     this.autoRetract= false;
     this.inFog      = false;
 

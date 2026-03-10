@@ -8,8 +8,10 @@
 import { GAMEPLAY_RULES, NodeType, EMBRYO } from '../config/gameConfig.js';
 import { ownerColor, ownerRelayCoreColor } from '../theme/ownerPalette.js';
 import { computeEnergyLevel, maxRange } from '../math/simulationMath.js';
+import { getContestContributorOwners, getDisplayContestEntries } from '../systems/NeutralContest.js';
 import { drawPolygon } from './canvasPrimitives.js';
 import { STATE } from '../core/GameState.js';
+import { getCanvasCopyFont, getCanvasDisplayFont } from '../theme/uiFonts.js';
 
 const { progression: PROGRESSION_RULES, render: RENDER_RULES } = GAMEPLAY_RULES;
 
@@ -133,10 +135,7 @@ export class NodeRenderer {
        capture threshold so contested nodes never look falsely completed. */
     if (n.owner === 0 && n.contest && !n.inFog) {
       const captureThreshold = Math.max(1, n.captureThreshold || EMBRYO);
-      const contestEntries = [1, 2, 3]
-        .map(owner => ({ owner, score: n.contest[owner] || 0 }))
-        .filter(entry => entry.score > 0)
-        .sort((left, right) => right.score - left.score);
+      const contestEntries = getDisplayContestEntries(n);
       const leadingEntry = contestEntries[0] || null;
       const leadingFraction = leadingEntry
         ? Math.min(1, leadingEntry.score / captureThreshold)
@@ -157,6 +156,22 @@ export class NodeRenderer {
         sg(ctx, ctx.strokeStyle, 8);
         ctx.globalAlpha = 0.9;
         ctx.stroke();
+
+        const contributorOwners = getContestContributorOwners(leadingEntry);
+        if (contributorOwners.length > 1) {
+          const secondaryOwner = contributorOwners.find(owner => owner !== leadingEntry.owner);
+          if (secondaryOwner != null) {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, r + 2, -Math.PI / 2, -Math.PI / 2 + leadingFraction * Math.PI * 2);
+            ctx.strokeStyle = ownerColor(secondaryOwner, Math.min(n.level, 4), '#c040ff');
+            ctx.lineWidth = 1.25;
+            ctx.globalAlpha = 0.85;
+            ctx.setLineDash([2.5, 4.5]);
+            sg(ctx, ctx.strokeStyle, 5);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
       }
 
       contestEntries.slice(1).forEach((entry, index) => {
@@ -199,7 +214,7 @@ export class NodeRenderer {
       }
 
       ctx.save();
-      ctx.font          = '7px "Share Tech Mono"';
+      ctx.font          = getCanvasCopyFont(7);
       ctx.fillStyle     = contestEntries.length > 1 ? '#f5c518' : 'rgba(255,255,255,0.42)';
       ctx.textAlign     = 'center';
       ctx.textBaseline  = 'middle';
@@ -251,7 +266,7 @@ export class NodeRenderer {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.shadowBlur = 0;
-      ctx.font = 'bold 8px "Orbitron",sans-serif';
+      ctx.font = getCanvasDisplayFont(8, 'bold');
       ctx.fillStyle = '#ffb0b8';
       ctx.globalAlpha = 0.75 + warningPulse * 0.2;
       ctx.textAlign = 'center';
@@ -297,7 +312,7 @@ export class NodeRenderer {
       ctx.strokeStyle = col;
       ctx.lineWidth   = 3;
       ctx.stroke();
-      ctx.font         = `bold ${Math.round(10 + lf * 6)}px 'Orbitron',sans-serif`;
+      ctx.font         = getCanvasDisplayFont(Math.round(10 + lf * 6), 'bold');
       ctx.fillStyle    = col;
       ctx.globalAlpha  = lf * 0.95;
       ctx.textAlign    = 'center';
@@ -442,7 +457,7 @@ export class NodeRenderer {
     /* Energy number */
     const fs = Math.max(9, n.radius * 0.42);
     ctx.save();
-    ctx.font          = `bold ${fs}px "Share Tech Mono"`;
+    ctx.font          = getCanvasCopyFont(fs, 'bold');
     ctx.textAlign     = 'center';
     ctx.textBaseline  = 'middle';
     ctx.fillStyle     = col;
@@ -468,7 +483,7 @@ export class NodeRenderer {
     if (n.owner !== 0 && n.outCount > 0) {
       const mx = PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[lvl];
       ctx.save();
-      ctx.font          = '7px "Share Tech Mono"';
+      ctx.font          = getCanvasCopyFont(7);
       ctx.fillStyle     = n.outCount >= mx ? '#f5c518' : col;
       ctx.globalAlpha   = 0.6;
       ctx.textAlign     = 'center';
@@ -506,7 +521,7 @@ export class NodeRenderer {
         ctx.globalAlpha = fogAlpha * 0.85;
         ctx.stroke();
       }
-      ctx.font         = '7px "Share Tech Mono"';
+      ctx.font         = getCanvasCopyFont(7);
       ctx.fillStyle    = '#f5c518';
       ctx.globalAlpha  = fogAlpha * 0.65;
       ctx.textAlign    = 'center';
@@ -615,14 +630,14 @@ export class NodeRenderer {
       }
     }
 
-    ctx.font          = 'bold 7px "Orbitron",sans-serif';
+    ctx.font          = getCanvasDisplayFont(7, 'bold');
     ctx.fillStyle     = rc;
     ctx.textAlign     = 'center';
     ctx.textBaseline  = 'middle';
     ctx.globalAlpha   = fogAlpha * (n.inFog ? 0.3 : 1);
     ctx.fillText(n.isBunker && n.owner === 0 ? 'FORT' : 'RELAY', n.x, n.y);
     if (!n.inFog) {
-      ctx.font = '6px "Share Tech Mono",monospace';
+      ctx.font = getCanvasCopyFont(6);
       ctx.fillStyle = rc;
       ctx.globalAlpha = fogAlpha * (rb ? 0.72 : 0.55);
       ctx.fillText(rb ? 'FLOW +' : 'CAPTURE', n.x, n.y + r + 13);
@@ -718,14 +733,14 @@ export class NodeRenderer {
         ctx.stroke();
       }
       /* Label */
-      ctx.font          = 'bold 7px "Orbitron",sans-serif';
+      ctx.font          = getCanvasDisplayFont(7, 'bold');
       ctx.fillStyle     = sigCol;
       ctx.globalAlpha   = fogA * (n.inFog ? 0.3 : 0.75);
       ctx.textAlign     = 'center';
       ctx.textBaseline  = 'middle';
       ctx.fillText('SIGNAL', x, y + 22);
       if (n.owner !== 0) {
-        ctx.font = '6px "Share Tech Mono",monospace';
+        ctx.font = getCanvasCopyFont(6);
         ctx.globalAlpha = fogA * 0.62;
         ctx.fillText('REVEAL', x, y + 31);
       }
@@ -769,7 +784,7 @@ export class NodeRenderer {
       ctx.globalAlpha = 0.95;
       sg(ctx, '#ff0020', 16);
       ctx.fill();
-      ctx.font          = 'bold 10px monospace';
+      ctx.font          = getCanvasCopyFont(10, 'bold');
       ctx.fillStyle     = '#ff8090';
       ctx.globalAlpha   = 0.9;
       ctx.textAlign     = 'center';

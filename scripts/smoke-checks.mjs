@@ -460,8 +460,10 @@ async function testNeutralCaptureVisualUsesRealThresholds() {
   const uiSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
 
   assert.match(nodeRendererSource, /const captureThreshold = Math\.max\(1, n\.captureThreshold \|\| EMBRYO\)/, 'neutral capture ring should use the node capture threshold');
-  assert.doesNotMatch(nodeRendererSource, /const frac = \(sc \/ EMBRYO\) \* Math\.PI \* 2;/, 'neutral capture ring should no longer use the embryo baseline directly for all nodes');
+  assert.match(nodeRendererSource, /getDisplayContestEntries\(n\)/, 'neutral capture ring should use the coalition-aware contest helper');
+  assert.match(nodeRendererSource, /getContestContributorOwners\(leadingEntry\)/, 'neutral capture ring should be able to show mixed coalition contributors');
   assert.match(uiSource, /contest_leader/, 'neutral info panel should expose the current capture leader');
+  assert.match(uiSource, /getContestContributorOwners\(leadingContest\)/, 'neutral info panel should show the coalition contributors behind a summed capture');
 }
 
 async function testTutorialCopyMatchesCurrentControlsAndRules() {
@@ -577,9 +579,13 @@ async function testMenuAndDisplayControlsStayPresent() {
   assert.match(indexSource, /hero-logo/, 'main menu should include the custom logo structure');
   assert.match(indexSource, /id="togShowFps"/, 'settings should expose the FPS toggle');
   assert.match(indexSource, /id="btnCopyDebug"/, 'settings should expose the debug snapshot action');
+  assert.match(indexSource, /id="btnViewEnding"/, 'settings should expose the campaign-ending preview action in debug mode');
   assert.match(indexSource, /id="hfps"/, 'HUD should expose the FPS label');
   assert.match(mainSource, /cycleTheme\(/, 'main settings flow should cycle themed UI variants');
   assert.match(mainSource, /buildDebugSnapshot\(/, 'main settings flow should build a debug snapshot');
+  assert.match(mainSource, /async function copyTextToClipboard\(text\)/, 'menu actions should use a dedicated clipboard helper for copy operations');
+  assert.match(mainSource, /document\.execCommand\('copy'\)/, 'clipboard copy should keep a legacy fallback path for local-file and webview contexts');
+  assert.match(mainSource, /BTN_COPY_DEBUG\)\?\.addEventListener\('click', async \(\) => \{[\s\S]*copyTextToClipboard\(snapshot\)/, 'debug snapshot button should route through the robust clipboard helper');
   assert.match(screensSource, /showFps/, 'settings UI refresh should include the FPS toggle');
   assert.match(gameStateSource, /showFps:\s+false/, 'game state should persist the FPS toggle');
   assert.match(gameStateSource, /fontId:\s+'exo2'/, 'default font should favor the more legible preset');
@@ -589,6 +595,7 @@ async function testMenuAndDisplayControlsStayPresent() {
   assert.match(cssSource, /html\[data-theme="GLACIER"\]/, 'stylesheet should define the Glacier theme');
   assert.match(i18nSource, /setShowFps/, 'i18n should include the FPS setting labels');
   assert.match(i18nSource, /setCopyDebug/, 'i18n should include the debug snapshot labels');
+  assert.match(i18nSource, /setViewEnding/, 'i18n should include the debug ending-preview labels');
 }
 
 async function testRenderPerformanceInstrumentationStaysPresent() {
@@ -632,6 +639,7 @@ async function testSettingsTutorialAndStoryStayInSync() {
     'setGraphicsMode', 'setGraphicsModeDesc', 'setShowFps', 'setShowFpsDesc',
     'setTheme', 'setThemeDesc', 'setFont', 'setFontDesc', 'setZoom', 'setZoomDesc',
     'setLang', 'setLangDesc', 'setDebug', 'setDebugDesc', 'setCopyDebug', 'setCopyDebugDesc',
+    'setViewEnding', 'setViewEndingDesc',
     'setReset', 'setResetDesc',
   ];
 
@@ -724,9 +732,9 @@ async function testWorldUnlockAndPurpleBadgeGuardrailsStayPresent() {
   const { LEVELS } = await load('src/config/gameConfig.js');
 
   assert.match(gameStateSource, /_getWorldUnlockRequirement\(worldId\)/, 'world unlock should derive from level data, not hard-coded ranges');
-  assert.match(gameStateSource, /const unlockedByProgress = this\.completed >= unlockRequirement;/, 'world unlock should derive from canonical progress thresholds');
-  assert.match(gameStateSource, /const unlockedManually = worldId === 2/, 'world unlock should also respect manual settings toggles for later worlds');
-  assert.match(gameStateSource, /return unlockedByProgress \|\| unlockedManually;/, 'world unlock should accept either progression or manual enable');
+  assert.match(gameStateSource, /const manualVisibility = this\._getManualWorldVisibility\(worldId\);/, 'world unlock should read an explicit manual visibility override');
+  assert.match(gameStateSource, /if \(manualVisibility != null\) return manualVisibility;/, 'manual world visibility should take precedence over natural progression');
+  assert.match(gameStateSource, /return unlockRequirement != null && this\.completed >= unlockRequirement;/, 'natural world unlock should still derive from canonical progress thresholds');
   assert.match(gameStateSource, /isLevelUnlocked\(levelConfig\)/, 'level unlock should be centralized in GameState');
   assert.match(gameStateSource, /getNextLevelId\(levelId = this\.curLvl\)/, 'progression should expose a canonical next-level helper');
   assert.match(gameStateSource, /recordTutorialCompletion\(tutorialWorldId, tutorialLevelId\)/, 'tutorial completion should be centralized in GameState');
@@ -749,13 +757,18 @@ async function testWorldUnlockAndPurpleBadgeGuardrailsStayPresent() {
   assert.equal(STATE.isWorldUnlocked(2), false, 'World 2 should stay locked in a fresh campaign without manual enable');
   STATE.settings.w2 = true;
   assert.equal(STATE.isWorldUnlocked(2), true, 'manual World 2 enable should unlock the world even before campaign progress reaches it');
-  STATE.settings.w2 = false;
+  STATE.settings.w2 = null;
 
   STATE.completed = 10;
   STATE._syncWorldUnlocksFromProgress();
   const world2Tutorial = LEVELS.find(levelConfig => levelConfig.id === 11);
   const world2FirstPhase = LEVELS.find(levelConfig => levelConfig.id === 12);
   assert.equal(STATE.isWorldUnlocked(2), true, 'finishing World 1 should unlock World 2');
+  STATE.settings.w2 = false;
+  assert.equal(STATE.isWorldUnlocked(2), false, 'manual World 2 disable should override natural campaign unlock');
+  STATE.settings.w2 = true;
+  assert.equal(STATE.isWorldUnlocked(2), true, 'manual World 2 enable should restore the world after an explicit disable');
+  STATE.settings.w2 = null;
   assert.equal(STATE.isLevelUnlocked(world2Tutorial), true, 'World 2 tutorial should be available as soon as World 2 opens');
   assert.equal(STATE.isLevelUnlocked(world2FirstPhase), true, 'World 2 first playable phase should be available even if the tutorial is skipped');
   assert.equal(STATE.getNextLevelId(11), 12, 'finishing the World 2 tutorial should flow to the first real World 2 phase');
@@ -958,9 +971,11 @@ async function testInputWaveV2GuardrailsStayPresent() {
   assert.match(gameSource, /this\._disposeInputBindings = bindGameInputEvents\(this\)/, 'game should keep a disposable handle for global input bindings');
   assert.match(inputBindingSource, /return function disposeGameInputEvents\(\)/, 'input binding should expose a dispose function');
   assert.equal(packageJson.scripts.smoke, 'node scripts/smoke-checks.mjs', 'package.json should expose the smoke script');
+  assert.equal(packageJson.scripts['ui-sanity'], 'node scripts/ui-actions-sanity.mjs', 'package.json should expose the UI sanity script');
   assert.equal(packageJson.scripts['campaign-sanity'], 'node scripts/campaign-sanity.mjs', 'package.json should expose the campaign sanity script');
   assert.equal(packageJson.scripts.soak, 'node scripts/simulation-soak.mjs', 'package.json should expose the soak script');
-  assert.equal(packageJson.scripts.check, 'npm run smoke && npm run campaign-sanity && npm run soak', 'package.json should expose an aggregate check script');
+  assert.equal(packageJson.scripts['ui-dom-sanity'], 'node scripts/ui-dom-sanity.mjs', 'package.json should expose the UI DOM sanity script');
+  assert.equal(packageJson.scripts.check, 'npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run campaign-sanity && npm run soak', 'package.json should expose an aggregate check script');
 }
 
 async function testRegenDisplayAndFlowTooltipStayCanonical() {
@@ -975,6 +990,99 @@ async function testRegenDisplayAndFlowTooltipStayCanonical() {
   assert.match(gameSource, /previewModel\.displayFlowRate > 0/, 'the quick tooltip should keep flow visible even for low non-zero rates');
   assert.match(gameSource, /toFixed\(1\) \+ 'e\/s'/, 'the quick tooltip should show flow with one decimal place');
   assert.match(energyBudgetSource, /FRENZY_REGEN_MULT/, 'displayed regen helper should stay aligned with frenzy regen rules');
+}
+
+async function testRedPurpleAllianceSkipsImmediateClash() {
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const aiSource = await fs.readFile(path.join(ROOT, 'src/systems/AI.js'), 'utf8');
+  const tentRulesSource = await fs.readFile(path.join(ROOT, 'src/entities/TentRules.js'), 'utf8');
+
+  assert.match(gameSource, /areHostileOwners\(opposingTentacle\.effectiveSourceNode\.owner, sourceNode\.owner\)/, 'player-created tentacles should only trigger immediate clash against hostile owners');
+  assert.match(aiSource, /areHostileOwners\(opposingTentacle\.effectiveSourceNode\.owner, sourceNode\.owner\)/, 'AI-created tentacles should only trigger immediate clash against hostile owners');
+  assert.match(tentRulesSource, /areAlliedOwners\(opposingTentacle\.effectiveSourceNode\.owner, tentacle\.effectiveSourceNode\.owner\)/, 'growing allied tentacles should not convert into clashes');
+}
+
+async function testAllianceUiAndOwnershipStayCoalitionAware() {
+  const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+  const ownershipSource = await fs.readFile(path.join(ROOT, 'src/systems/Ownership.js'), 'utf8');
+  const tentCombatSource = await fs.readFile(path.join(ROOT, 'src/entities/TentCombat.js'), 'utf8');
+  const autoRetractSource = await fs.readFile(path.join(ROOT, 'src/systems/world/AutoRetractSystem.js'), 'utf8');
+
+  assert.match(uiRendererSource, /areAlliedOwners\(t2\.source\.owner, n\.owner\)/, 'node info panel should count coalition support as allied incoming flow');
+  assert.match(ownershipSource, /!areAlliedOwners\(tent\.effectiveTargetNode\.owner, newOwner\)/, 'ownership cleanup should preserve allied links after a capture');
+  assert.match(tentCombatSource, /areAlliedOwners\(targetNode\.owner, sourceNode\.owner\)/, 'tentacle combat should route coalition links through the friendly flow path');
+  assert.match(autoRetractSource, /areHostileOwners\(tentacle\.target\.owner, node\.owner\)/, 'auto-retract should only retract hostile outgoing tentacles');
+}
+
+async function testNeutralContestAllianceModesStayParametrizable() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const {
+    getContestCaptureOwner,
+    getContestCaptureScore,
+    getDisplayContestEntries,
+    shouldIgnoreAlliedContestContribution,
+  } = await load('src/systems/NeutralContest.js');
+  const { GAME_BALANCE } = await load('src/config/gameConfig.js');
+
+  const target = new GameNode(0, 0, 0, 20, 0);
+  target.contest = { 2: 6, 3: 5, 1: 4 };
+
+  assert.equal(GAME_BALANCE.NEUTRAL_CAPTURE_ALLIANCE_MODE, 'sum', 'neutral capture alliance mode should default to coalition sum for balancing flexibility');
+  assert.equal(getContestCaptureScore(target, 3, 'sum'), 11, 'sum mode should combine red and purple neutral capture pressure');
+  assert.equal(getContestCaptureOwner(target, 3, 'sum'), 2, 'sum mode should award the node to the dominant allied contributor');
+
+  const displayEntries = getDisplayContestEntries(target, 'sum');
+  assert.equal(displayEntries.length, 2, 'sum mode should display coalition contest progress rather than separate allied arcs');
+  assert.equal(displayEntries[0].score, 11, 'the leading displayed coalition score should match the summed allied pressure');
+
+  const lockoutTarget = new GameNode(1, 0, 0, 20, 0);
+  lockoutTarget.contest = { 2: 3, 3: 0 };
+  assert.equal(
+    shouldIgnoreAlliedContestContribution(lockoutTarget, 3, 'lockout'),
+    true,
+    'lockout mode should prevent a second allied owner from interfering once the first one has started the neutral capture',
+  );
+}
+
+async function testCampaignEndingFlowAndDebugPreviewStayPresent() {
+  const screenControllerSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+  const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
+  const domIdsSource = await fs.readFile(path.join(ROOT, 'src/ui/DomIds.js'), 'utf8');
+  const i18nSource = await fs.readFile(path.join(ROOT, 'src/localization/i18n.js'), 'utf8');
+
+  assert.match(screenControllerSource, /if \(win && levelId === 32\) \{\s*showCampaignEnding\(game\);/s, 'winning the final phase should route to the dedicated campaign ending screen');
+  assert.match(screenControllerSource, /export function showCampaignEnding\(/, 'screen controller should expose a dedicated campaign ending entry point');
+  assert.match(mainSource, /BTN_VIEW_ENDING/, 'debug mode should expose a button to preview the campaign ending');
+  assert.match(mainSource, /showCampaignEnding\(debugPreviewGame, \{ debugPreview: true \}\)/, 'debug ending preview should open the ending screen in preview mode');
+  assert.match(indexSource, /id="sce"/, 'campaign ending screen should exist in the HTML with a unique DOM id');
+  assert.match(indexSource, /id="btnViewEnding"/, 'settings screen should expose the debug preview ending button');
+  assert.match(domIdsSource, /SCREEN_ENDING:\s+'sce'/, 'campaign ending screen id should not collide with existing HUD ids');
+  assert.match(i18nSource, /endingStory:/, 'localization should provide the campaign ending narrative');
+  assert.match(i18nSource, /endingTitle:/, 'localization should provide the campaign ending title');
+  assert.match(i18nSource, /setViewEnding:/, 'settings copy should expose the campaign ending preview label in i18n');
+  assert.match(i18nSource, /viewEnding:/, 'button copy should expose the campaign ending preview CTA in i18n');
+}
+
+async function testCanvasFontSelectionStaysCanonical() {
+  const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+  const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
+  const tentRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/TentRenderer.js'), 'utf8');
+  const hazardRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/HazardRenderer.js'), 'utf8');
+  const tutorialSource = await fs.readFile(path.join(ROOT, 'src/systems/Tutorial.js'), 'utf8');
+  const fontHelperSource = await fs.readFile(path.join(ROOT, 'src/theme/uiFonts.js'), 'utf8');
+
+  assert.match(fontHelperSource, /export function getCanvasDisplayFont/, 'UI font helper should expose a canonical canvas display-font builder');
+  assert.match(fontHelperSource, /export function getCanvasCopyFont/, 'UI font helper should expose a canonical canvas copy-font builder');
+  assert.match(uiRendererSource, /getCanvasCopyFont|getCanvasDisplayFont/, 'UI renderer should use the shared canvas font helper');
+  assert.match(nodeRendererSource, /getCanvasCopyFont|getCanvasDisplayFont/, 'node renderer should use the shared canvas font helper');
+  assert.match(tentRendererSource, /getCanvasCopyFont/, 'tent renderer should use the shared canvas font helper');
+  assert.match(hazardRendererSource, /getCanvasCopyFont|getCanvasDisplayFont/, 'hazard renderer should use the shared canvas font helper');
+  assert.match(tutorialSource, /getCanvasCopyFont/, 'tutorial overlay should use the shared canvas font helper for its labels');
+
+  for (const source of [uiRendererSource, nodeRendererSource, tentRendererSource, hazardRendererSource]) {
+    assert.doesNotMatch(source, /Orbitron|Share Tech Mono/, 'canvas UI renderers should not hardcode specific font family names');
+  }
 }
 
 async function main() {
@@ -1026,6 +1134,11 @@ async function main() {
     ['loadLevel finalization and invalid-action UX stay aligned', testLoadLevelFinalizationAndInvalidActionUxStayAligned],
     ['Input wave V2 guardrails stay present', testInputWaveV2GuardrailsStayPresent],
     ['Regen display and flow tooltip stay canonical', testRegenDisplayAndFlowTooltipStayCanonical],
+    ['Red-purple alliance skips immediate clash paths', testRedPurpleAllianceSkipsImmediateClash],
+    ['Alliance-aware UI and ownership rules stay present', testAllianceUiAndOwnershipStayCoalitionAware],
+    ['Neutral contest alliance modes stay parametrizable', testNeutralContestAllianceModesStayParametrizable],
+    ['Campaign ending flow and debug preview stay present', testCampaignEndingFlowAndDebugPreviewStayPresent],
+    ['Canvas font selection stays canonical', testCanvasFontSelectionStaysCanonical],
   ];
 
   let passed = 0;

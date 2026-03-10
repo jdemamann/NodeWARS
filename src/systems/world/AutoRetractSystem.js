@@ -1,4 +1,5 @@
 import { bus } from '../../core/EventBus.js';
+import { areHostileOwners } from '../OwnerTeams.js';
 
 export class AutoRetractSystem {
   static update(game) {
@@ -11,7 +12,7 @@ export class AutoRetractSystem {
       let killedAny = false;
       for (let tentacleIndex = 0; tentacleIndex < tentacles.length; tentacleIndex += 1) {
         const tentacle = tentacles[tentacleIndex];
-        if (tentacle.alive && !tentacle.reversed && tentacle.source === node && tentacle.target.owner !== node.owner) {
+        if (tentacle.alive && !tentacle.reversed && tentacle.source === node && areHostileOwners(tentacle.target.owner, node.owner)) {
           tentacle.kill();
           killedAny = true;
         }

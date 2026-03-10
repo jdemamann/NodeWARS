@@ -5,6 +5,7 @@
    ================================================================ */
 
 import { STATE } from '../core/GameState.js';
+import { getCanvasCopyFont, getCanvasDisplayFont } from '../theme/uiFonts.js';
 
 /** Apply shadow only when high-graphics mode is on. */
 function sg(ctx, color, blur) {
@@ -113,7 +114,7 @@ export class HazardRenderer {
       ctx.setLineDash([10, 8]);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.font          = 'bold 9px "Orbitron",sans-serif';
+      ctx.font          = getCanvasDisplayFont(9, 'bold');
       ctx.fillStyle     = `rgba(255,80,255,${0.7 + Math.sin(time * 4) * 0.2})`;
       ctx.textAlign     = 'center';
       ctx.textBaseline  = 'middle';
@@ -122,7 +123,7 @@ export class HazardRenderer {
       ctx.shadowBlur    = 0;
     } else if (warn > 0.1) {
       /* Danger label when active */
-      ctx.font          = 'bold 9px "Orbitron",sans-serif';
+      ctx.font          = getCanvasDisplayFont(9, 'bold');
       ctx.fillStyle     = `rgba(255,100,255,${warn * 0.9})`;
       ctx.textAlign     = 'center';
       ctx.textBaseline  = 'middle';
@@ -223,14 +224,14 @@ export class HazardRenderer {
       ctx.shadowBlur  = 0;
     }
 
-    ctx.font          = 'bold 8px "Orbitron",sans-serif';
+    ctx.font          = getCanvasDisplayFont(8, 'bold');
     ctx.fillStyle     = ps.isSuper ? 'rgba(255,240,100,0.9)' : 'rgba(255,200,80,0.7)';
     ctx.textAlign     = 'center';
     ctx.textBaseline  = 'middle';
     ctx.shadowColor   = ps.isSuper ? '#ffdd00' : 'transparent';
     ctx.shadowBlur    = ps.isSuper ? (highGraphics ? 10 : 0) : 0;
     ctx.fillText(ps.isSuper ? 'NEXUS CORE' : 'PULSAR', x, y + 28);
-    ctx.font          = '6px "Share Tech Mono",monospace';
+    ctx.font          = getCanvasCopyFont(6);
     ctx.fillStyle     = `rgba(255,225,130,${0.58 + charge * 0.25})`;
     ctx.fillText(charge > 0 ? 'CHARGING' : (pulse > 0.05 ? 'BURST' : 'READY'), x, y + 37);
     ctx.shadowBlur    = 0;
