@@ -1,3 +1,10 @@
+/* ================================================================
+   Player tentacle interaction helpers
+
+   Shared helpers for click and drag flows: slot accounting, retract
+   lookup, and toggle detection for already-existing lanes.
+   ================================================================ */
+
 import { PROGRESSION_RULES } from '../config/gameConfig.js';
 import { findDirectedTentacle } from './TentacleCommands.js';
 

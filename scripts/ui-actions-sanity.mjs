@@ -34,6 +34,7 @@ async function testCriticalMenuButtonsAreWired() {
     'btnEndingLevels', 'btnEndingReplay', 'btnEndingMenu',
     'btnresume', 'btnprl', 'btnprr', 'btnpskip', 'btnpmenu',
     'btnCopyDebug', 'btnViewEnding', 'btnResetProg',
+    'btnMusicPrev', 'btnMusicToggle', 'btnMusicNext',
   ];
 
   for (const buttonId of buttonIds) {
@@ -49,6 +50,7 @@ async function testCriticalMenuButtonsAreWired() {
     'BTN_ENDING_LEVELS', 'BTN_ENDING_REPLAY', 'BTN_ENDING_MENU',
     'BTN_RESUME', 'BTN_PRL', 'BTN_PRR', 'BTN_PSKIP', 'BTN_PMENU',
     'BTN_COPY_DEBUG', 'BTN_VIEW_ENDING', 'BTN_RESET_PROG',
+    'BTN_MUSIC_PREV', 'BTN_MUSIC_TOGGLE', 'BTN_MUSIC_NEXT',
   ];
 
   for (const domIdName of wiredDomIds) {
@@ -87,8 +89,10 @@ async function testSettingsControlsHaveI18nCoverage() {
     'setCopyDebug', 'setCopyDebugDesc',
     'setViewEnding', 'setViewEndingDesc',
     'setReset', 'setResetDesc',
+    'setMusicPlayer', 'setMusicPlayerDesc',
+    'setMusicPlay', 'setMusicPause', 'setMusicCurrentIdle',
     'viewEnding',
-    'notifNowPlaying', 'notifMusicMeta',
+    'notifNowPlaying',
     'notifSignalTowerTitle', 'notifSignalTowerBody',
     'notifAiRetreatTitle', 'notifAiRetreatBody',
     'notifDebugSnapshotCopiedTitle', 'notifDebugSnapshotCopiedBody',
@@ -103,7 +107,7 @@ async function testSettingsControlsHaveI18nCoverage() {
     assert.match(i18n, new RegExp(`${key}:`), `i18n should expose ${key}`);
   }
 
-  for (const key of ['setCopyDebug', 'setViewEnding', 'setReset']) {
+  for (const key of ['setCopyDebug', 'setViewEnding', 'setReset', 'setMusicPlayer']) {
     assert.match(html, new RegExp(`data-t="${key}"`), `${key} should be rendered through i18n in index.html`);
   }
 }

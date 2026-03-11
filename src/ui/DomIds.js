@@ -1,5 +1,5 @@
 /* ================================================================
-   NODE WARS v3 — DOM ID Constants
+   DOM id constants
 
    Centralises every getElementById string so typos are caught at
    module load time rather than at runtime.
@@ -94,6 +94,7 @@ export const DOM_IDS = Object.freeze({
 
   /* Settings screen */
   SETTINGS_BODY:    'settingsBody',
+  WORLD_UNLOCK_GROUP:'worldUnlockGroup',
   TOG_W2:           'togW2',
   TOG_W3:           'togW3',
   TOG_DEBUG:        'togDebug',
@@ -113,6 +114,11 @@ export const DOM_IDS = Object.freeze({
   BTN_ZOOM_INC:     'btnZoomInc',
   ZOOM_DISPLAY:     'zoomDisplay',
   LANG_ROW_SETTINGS:'langRowSettings',
+  MUSIC_PLAYER_ROW: 'musicPlayerRow',
+  MUSIC_TRACK_LABEL:'musicTrackLabel',
+  BTN_MUSIC_PREV:   'btnMusicPrev',
+  BTN_MUSIC_TOGGLE: 'btnMusicToggle',
+  BTN_MUSIC_NEXT:   'btnMusicNext',
 
   /* Credits screen */
   SCREEN_CREDITS:   'scredit',

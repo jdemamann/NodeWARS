@@ -1,3 +1,10 @@
+/* ================================================================
+   UI font helpers
+
+   Maps the selected font preset to CSS stacks and canvas font strings
+   so menu UI and canvas labels stay visually aligned.
+   ================================================================ */
+
 import { STATE } from '../core/GameState.js';
 
 const FONT_STACKS = Object.freeze({

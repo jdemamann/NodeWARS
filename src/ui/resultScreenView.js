@@ -1,4 +1,12 @@
+/* ================================================================
+   Result screen helpers
+
+   Builds the summary rows shown after a phase result. The values are
+   presentation-focused rather than telemetry-heavy.
+   ================================================================ */
+
 export function buildMechanicSummary(levelConfig) {
+  // Surface only the dominant phase mechanics so the result screen reads fast.
   return [
     levelConfig.vortexCount ? (levelConfig.hasSuperVortex ? 'VOID CORE' : 'VORTEX') : null,
     levelConfig.relayCount ? 'RELAY' : null,

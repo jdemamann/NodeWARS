@@ -1,5 +1,5 @@
 /* ================================================================
-   NODE WARS v3 — Procedural Music Engine
+   Procedural music engine
 
    The soundtrack is grouped by gameplay context instead of per-level
    one-offs so the campaign can scale musical identity without needing
@@ -19,6 +19,9 @@ let currentTrack = null;
 let scheduledTimers = [];
 let beatIntervalId = null;
 let trackChangeListener = null;
+let pausedTrackId = null;
+let isPreviewPlayback = false;
+let preservePreviewOnPlay = false;
 
 const C3 = 130.81;
 const D3 = 146.83;
@@ -52,6 +55,7 @@ const TRACKS = Object.freeze({
     bpm: 78,
     loopSeconds: 16,
     kind: 'menu',
+    phaseRangeLabel: 'Menu',
   },
   genesisPulse: {
     id: 'genesisPulse',
@@ -61,6 +65,7 @@ const TRACKS = Object.freeze({
     bpm: 82,
     loopSeconds: 15,
     kind: 'world1',
+    phaseRangeLabel: 'World 1 tutorial · phases 1-4',
   },
   siegeBloom: {
     id: 'siegeBloom',
@@ -70,6 +75,7 @@ const TRACKS = Object.freeze({
     bpm: 86,
     loopSeconds: 14,
     kind: 'world1',
+    phaseRangeLabel: 'World 1 phases 5-9',
   },
   echoCore: {
     id: 'echoCore',
@@ -79,6 +85,7 @@ const TRACKS = Object.freeze({
     bpm: 92,
     loopSeconds: 14,
     kind: 'boss',
+    phaseRangeLabel: 'World 1 phase 10',
   },
   hollowSignal: {
     id: 'hollowSignal',
@@ -88,6 +95,7 @@ const TRACKS = Object.freeze({
     bpm: 72,
     loopSeconds: 18,
     kind: 'world2',
+    phaseRangeLabel: 'World 2 tutorial · phases 12-14',
   },
   entropyCurrent: {
     id: 'entropyCurrent',
@@ -97,6 +105,7 @@ const TRACKS = Object.freeze({
     bpm: 76,
     loopSeconds: 17,
     kind: 'world2',
+    phaseRangeLabel: 'World 2 phases 15-20',
   },
   oblivionGate: {
     id: 'oblivionGate',
@@ -106,6 +115,7 @@ const TRACKS = Object.freeze({
     bpm: 80,
     loopSeconds: 17,
     kind: 'boss',
+    phaseRangeLabel: 'World 2 phase 21',
   },
   current: {
     id: 'current',
@@ -115,6 +125,7 @@ const TRACKS = Object.freeze({
     bpm: 88,
     loopSeconds: 14,
     kind: 'world3',
+    phaseRangeLabel: 'World 3 tutorial · phases 23-24',
   },
   signalWar: {
     id: 'signalWar',
@@ -124,6 +135,7 @@ const TRACKS = Object.freeze({
     bpm: 94,
     loopSeconds: 13,
     kind: 'world3',
+    phaseRangeLabel: 'World 3 phases 25-28',
   },
   transcendenceProtocol: {
     id: 'transcendenceProtocol',
@@ -133,6 +145,7 @@ const TRACKS = Object.freeze({
     bpm: 98,
     loopSeconds: 13,
     kind: 'world3',
+    phaseRangeLabel: 'World 3 phases 29-32',
   },
   networkAwakens: {
     id: 'networkAwakens',
@@ -142,10 +155,27 @@ const TRACKS = Object.freeze({
     bpm: 84,
     loopSeconds: 16,
     kind: 'ending',
+    phaseRangeLabel: 'Campaign ending',
   },
 });
 
+const TRACK_ORDER = Object.freeze([
+  'menu',
+  'genesisPulse',
+  'siegeBloom',
+  'echoCore',
+  'hollowSignal',
+  'entropyCurrent',
+  'oblivionGate',
+  'current',
+  'signalWar',
+  'transcendenceProtocol',
+  'networkAwakens',
+]);
+
 function getAudioContext() {
+  // Keep a single shared Web Audio graph for menu, gameplay, and preview
+  // playback so transitions do not fight over multiple contexts.
   if (!audioContext) {
     try {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -161,6 +191,7 @@ function getAudioContext() {
 }
 
 function getMusicVolume() {
+  if (isPreviewPlayback) return 1;
   return (STATE.settings.sound && STATE.settings.music) ? 1 : 0;
 }
 
@@ -274,6 +305,7 @@ function beginTrack(trackId, fadeInDuration) {
   stopAll();
   const activeAudioContext = getAudioContext();
   currentTrack = trackId;
+  pausedTrackId = null;
   if (getMusicVolume() > 0) announceTrackChange(TRACKS[trackId]);
   if (!activeAudioContext) {
     isPlayingTrack = false;
@@ -282,6 +314,28 @@ function beginTrack(trackId, fadeInDuration) {
   isPlayingTrack = true;
   fadeIn(fadeInDuration);
   return true;
+}
+
+/*
+ * Marks the soundtrack runtime as being in manual preview mode.
+ * This lets Settings playback browse tracks without relying on campaign context.
+ */
+function beginPreviewPlayback() {
+  isPreviewPlayback = true;
+}
+
+/*
+ * Returns the soundtrack runtime to normal contextual playback mode.
+ */
+function endPreviewPlayback() {
+  isPreviewPlayback = false;
+}
+
+/*
+ * Clears preview state when gameplay-driven playback takes ownership again.
+ */
+function syncPreviewStateForNormalPlayback() {
+  if (!preservePreviewOnPlay) endPreviewPlayback();
 }
 
 function playLayeredTheme(trackId, config) {
@@ -362,6 +416,7 @@ function playLayeredTheme(trackId, config) {
    ║  "DRIFT SIGNAL" — MENU THEME   (SACRED — DO NOT MODIFY)║
    ╚══════════════════════════════════════════════════════════╝ */
 function playMenu() {
+  syncPreviewStateForNormalPlayback();
   if (!beginTrack('menu', 2.0)) return;
 
   const chords = [
@@ -413,6 +468,7 @@ function playMenu() {
 /* END "DRIFT SIGNAL" — SACRED ZONE ENDS HERE */
 
 function playGenesis() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('genesisPulse', {
     fadeInDuration: 1.8,
     bpm: 82,
@@ -438,10 +494,11 @@ function playGenesis() {
 }
 
 function playSiegeBloom() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('siegeBloom', {
     fadeInDuration: 1.6,
-    bpm: 86,
-    cycleMs: 3500,
+    bpm: 102,
+    cycleMs: 3000,
     chords: [
       [A3, C4, E4],
       [C4, E4, G4],
@@ -449,32 +506,37 @@ function playSiegeBloom() {
       [G3, B3, D4],
     ],
     arpPrimary: [
-      [A3, C4, E4, A4],
-      [C4, E4, G4, C5],
-      [F3, A3, C4, F4],
-      [G3, B3, D4, G4],
+      [A3, E4, A4, C5],
+      [C4, G4, C5, E5],
+      [F3, C4, F4, A4],
+      [G3, D4, G4, B4],
     ],
     arpSecondary: [
-      [E4, A4, C5],
-      [G4, C5, E5],
-      [C4, F4, A4],
-      [D4, G4, B4],
+      [E4, A4, C5, E5],
+      [G4, C5, E5, G5],
+      [C4, F4, A4, C5],
+      [D4, G4, B4, D5],
     ],
-    kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0],
+    kick: [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0],
     snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-    hat: [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1],
+    hat: [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1],
     accentNoteProbability: 0.7,
-    accentNoteDelaySec: 0.95,
-    bassGain: 0.25,
-    arpSecondaryGain: 0.07,
+    accentNoteDelaySec: 0.56,
+    bassGain: 0.22,
+    arpPrimaryGain: 0.1,
+    arpSecondaryGain: 0.085,
+    hatGain: 0.022,
+    kickGain: 0.056,
+    snareGain: 0.04,
   });
 }
 
 function playEchoCore() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('echoCore', {
     fadeInDuration: 1.5,
-    bpm: 92,
-    cycleMs: 3400,
+    bpm: 108,
+    cycleMs: 2800,
     chords: [
       [A3, E4, A4],
       [F3, A3, C4],
@@ -488,23 +550,29 @@ function playEchoCore() {
       [G3, B3, D4, G4],
     ],
     arpSecondary: [
-      [C5, A4],
-      [F4, C5],
-      [G4, E5],
-      [B4, D5],
+      [C5, E5, A5],
+      [F4, A4, C5],
+      [G4, C5, E5],
+      [B4, D5, G5],
     ],
-    kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0],
+    kick: [1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1],
     snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-    hat: [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1],
-    bassGain: 0.28,
-    chordGainA: 0.09,
-    chordGainB: 0.06,
+    hat: [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1],
+    bassGain: 0.24,
+    chordGainA: 0.095,
+    chordGainB: 0.065,
+    arpPrimaryGain: 0.11,
+    arpSecondaryGain: 0.09,
     accentNoteProbability: 0.85,
-    accentNoteDelaySec: 0.8,
+    accentNoteDelaySec: 0.48,
+    kickGain: 0.058,
+    snareGain: 0.042,
+    hatGain: 0.022,
   });
 }
 
 function playVoid() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('hollowSignal', {
     fadeInDuration: 2.2,
     bpm: 72,
@@ -536,10 +604,11 @@ function playVoid() {
 }
 
 function playEntropyCurrent() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('entropyCurrent', {
     fadeInDuration: 1.9,
-    bpm: 76,
-    cycleMs: 4200,
+    bpm: 90,
+    cycleMs: 3500,
     chords: [
       [D3, A3, D4],
       [Bb3, F4, Bb4],
@@ -554,26 +623,33 @@ function playEntropyCurrent() {
       [C4, E4, G4, C5],
     ],
     arpSecondary: [
-      [A4, D5],
-      [F4, Bb4],
-      [C5, F5],
-      [G4, C5],
+      [A4, D5, F5],
+      [F4, Bb4, D5],
+      [C5, F5, A5],
+      [G4, C5, E5],
     ],
-    kick: [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0],
-    snare: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-    hat: [1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+    kick: [1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+    snare: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+    hat: [1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0],
     kickFreq: 70,
-    hatFreq: 3900,
+    hatFreq: 4400,
+    bassGain: 0.2,
+    arpPrimaryGain: 0.095,
+    arpSecondaryGain: 0.08,
     accentNoteProbability: 0.7,
-    accentNoteDelaySec: 1.0,
+    accentNoteDelaySec: 0.68,
+    kickGain: 0.05,
+    snareGain: 0.03,
+    hatGain: 0.019,
   });
 }
 
 function playOblivionGate() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('oblivionGate', {
     fadeInDuration: 1.6,
-    bpm: 80,
-    cycleMs: 4100,
+    bpm: 84,
+    cycleMs: 3900,
     chords: [
       [D3, F3, A3],
       [Bb3, D4, F4],
@@ -588,24 +664,27 @@ function playOblivionGate() {
       [C4, G4, C5, E5],
     ],
     arpSecondary: [
-      [A4, F5],
-      [D5, Bb4],
-      [C5, A4],
-      [E5, G4],
+      [A4, D5, F5],
+      [D5, F5, Bb4],
+      [C5, F5, A4],
+      [E5, G5, C5],
     ],
-    kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
-    snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-    hat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
-    kickGain: 0.058,
-    snareGain: 0.036,
-    hatGain: 0.019,
-    bassGain: 0.26,
+    kick: [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0],
+    snare: [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+    hat: [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+    kickGain: 0.054,
+    snareGain: 0.038,
+    hatGain: 0.017,
+    bassGain: 0.23,
+    arpPrimaryGain: 0.1,
+    arpSecondaryGain: 0.08,
     accentNoteProbability: 0.85,
-    accentNoteDelaySec: 0.88,
+    accentNoteDelaySec: 0.94,
   });
 }
 
 function playNexus() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('current', {
     fadeInDuration: 1.4,
     bpm: 88,
@@ -642,10 +721,11 @@ function playNexus() {
 }
 
 function playSignalWar() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('signalWar', {
     fadeInDuration: 1.35,
-    bpm: 94,
-    cycleMs: 3200,
+    bpm: 112,
+    cycleMs: 2600,
     chords: [
       [A3, C4, E4],
       [E3, G3, B3],
@@ -659,29 +739,31 @@ function playSignalWar() {
       [G3, B3, D4, G4],
     ],
     arpSecondary: [
-      [E4, A4, C5],
-      [B4, E5, G4],
-      [C5, F4, A4],
-      [D5, G4, B4],
+      [E4, A4, C5, E5],
+      [B4, E5, G5, B5],
+      [C5, F4, A4, C5],
+      [D5, G4, B4, D5],
     ],
-    kick: [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+    kick: [1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1],
     snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-    hat: [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1],
-    kickGain: 0.055,
+    hat: [1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+    kickGain: 0.053,
     snareGain: 0.038,
-    hatGain: 0.02,
-    bassGain: 0.22,
-    arpSecondaryGain: 0.075,
+    hatGain: 0.025,
+    bassGain: 0.2,
+    arpPrimaryGain: 0.1,
+    arpSecondaryGain: 0.088,
     accentNoteProbability: 0.72,
-    accentNoteDelaySec: 0.72,
+    accentNoteDelaySec: 0.44,
   });
 }
 
 function playTranscendenceProtocol() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('transcendenceProtocol', {
     fadeInDuration: 1.2,
-    bpm: 98,
-    cycleMs: 3100,
+    bpm: 118,
+    cycleMs: 2450,
     chords: [
       [A3, E4, A4],
       [E3, B3, E4],
@@ -695,27 +777,29 @@ function playTranscendenceProtocol() {
       [G3, B3, D4, G4],
     ],
     arpSecondary: [
-      [C5, A4, E5],
-      [B4, G4, E5],
-      [A4, F4, C5],
-      [B4, G4, D5],
+      [C5, E5, A5],
+      [B4, E5, G5],
+      [A4, C5, F5],
+      [B4, D5, G5],
     ],
-    kick: [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+    kick: [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0],
     snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-    hat: [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1],
-    kickGain: 0.06,
+    hat: [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+    kickGain: 0.056,
     snareGain: 0.04,
-    hatGain: 0.021,
-    bassGain: 0.24,
+    hatGain: 0.026,
+    bassGain: 0.22,
     chordGainA: 0.085,
     chordGainB: 0.06,
-    arpSecondaryGain: 0.08,
+    arpPrimaryGain: 0.105,
+    arpSecondaryGain: 0.09,
     accentNoteProbability: 0.92,
-    accentNoteDelaySec: 0.66,
+    accentNoteDelaySec: 0.38,
   });
 }
 
 function playEnding() {
+  syncPreviewStateForNormalPlayback();
   playLayeredTheme('networkAwakens', {
     fadeInDuration: 2.0,
     bpm: 84,
@@ -755,6 +839,8 @@ function playEnding() {
 }
 
 function playLevelTheme(levelConfig) {
+  // Track selection stays phase-band based so campaign pacing can change
+  // without rewriting the runtime music routing.
   if (!levelConfig) {
     playMenu();
     return;
@@ -785,6 +871,62 @@ function playLevelTheme(levelConfig) {
   }
 
   playMenu();
+}
+
+/*
+ * Plays a specific track by id for manual preview in Settings.
+ * Input: a track id from TRACK_ORDER. Output: the requested track becomes current if available.
+ */
+function playTrackById(trackId) {
+  // Preview mode intentionally bypasses campaign context so the Settings
+  // soundtrack player can audition every available track on demand.
+  beginPreviewPlayback();
+  preservePreviewOnPlay = true;
+  try {
+    switch (trackId) {
+      case 'menu': playMenu(); break;
+      case 'genesisPulse': playGenesis(); break;
+      case 'siegeBloom': playSiegeBloom(); break;
+      case 'echoCore': playEchoCore(); break;
+      case 'hollowSignal': playVoid(); break;
+      case 'entropyCurrent': playEntropyCurrent(); break;
+      case 'oblivionGate': playOblivionGate(); break;
+      case 'current': playNexus(); break;
+      case 'signalWar': playSignalWar(); break;
+      case 'transcendenceProtocol': playTranscendenceProtocol(); break;
+      case 'networkAwakens': playEnding(); break;
+      default: playMenu(); break;
+    }
+  } finally {
+    preservePreviewOnPlay = false;
+  }
+}
+
+/*
+ * Moves soundtrack preview playback backward or forward through the available track list.
+ */
+function stepTrack(offset) {
+  const activeTrackId = pausedTrackId || currentTrack || TRACK_ORDER[0];
+  const activeTrackIndex = Math.max(0, TRACK_ORDER.indexOf(activeTrackId));
+  const nextTrackIndex = (activeTrackIndex + offset + TRACK_ORDER.length) % TRACK_ORDER.length;
+  playTrackById(TRACK_ORDER[nextTrackIndex]);
+}
+
+/*
+ * Pauses or resumes manual soundtrack preview playback without changing the selected track.
+ */
+function togglePlayback() {
+  if (isPlayingTrack && currentTrack) {
+    pausedTrackId = currentTrack;
+    fadeOut(0.25);
+    scheduleTimer(() => {
+      if (pausedTrackId) stopAll();
+    }, 260);
+    return;
+  }
+
+  beginPreviewPlayback();
+  playTrackById(pausedTrackId || currentTrack || 'menu');
 }
 
 /* ── UI SOUND EFFECTS ── */
@@ -882,6 +1024,22 @@ export const Music = {
   playTranscendenceProtocol,
   playEnding,
   playLevelTheme,
+  playTrackById,
+  /*
+   * Steps to the previous previewable track and clears any paused-track latch.
+   */
+  previousTrack() {
+    pausedTrackId = null;
+    stepTrack(-1);
+  },
+  /*
+   * Steps to the next previewable track and clears any paused-track latch.
+   */
+  nextTrack() {
+    pausedTrackId = null;
+    stepTrack(1);
+  },
+  togglePlayback,
   menuClick,
   menuHover,
   tabSwitch,
@@ -895,6 +1053,7 @@ export const Music = {
   isPlaying: () => isPlayingTrack,
   currentTrack: () => currentTrack,
   currentTrackInfo: () => getTrackInfo(currentTrack),
+  pausedTrackInfo: () => getTrackInfo(pausedTrackId),
   getTrackInfo,
   setTrackChangeListener(listener) {
     trackChangeListener = listener;

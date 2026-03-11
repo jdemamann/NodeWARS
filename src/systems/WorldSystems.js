@@ -1,3 +1,10 @@
+/* ================================================================
+   World systems coordinator
+
+   Runs the optional layer on top of the core simulation: visibility,
+   pulsars, vortexes, auto-retract, and camera follow.
+   ================================================================ */
+
 import { VortexSystem } from './world/VortexSystem.js';
 import { PulsarSystem } from './world/PulsarSystem.js';
 import { VisibilitySystem } from './world/VisibilitySystem.js';

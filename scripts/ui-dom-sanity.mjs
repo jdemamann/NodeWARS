@@ -180,6 +180,7 @@ async function setupUiDomHarness() {
     DOM_IDS.SCREEN_PAUSE,
     DOM_IDS.SCREEN_SETTINGS,
     DOM_IDS.SCREEN_CREDITS,
+    DOM_IDS.WORLD_UNLOCK_GROUP,
     DOM_IDS.WORLD_TABS,
     DOM_IDS.LGRID,
     DOM_IDS.WORLD_DESC,
@@ -201,6 +202,8 @@ async function setupUiDomHarness() {
     DOM_IDS.TOG_DEBUG,
     DOM_IDS.TOG_SOUND,
     DOM_IDS.TOG_MUSIC,
+    DOM_IDS.MUSIC_TRACK_LABEL,
+    DOM_IDS.BTN_MUSIC_TOGGLE,
     'togShowFps',
     'togGraphicsMode',
     'togTheme',
@@ -242,6 +245,7 @@ async function testRefreshSettingsUiReflectsEffectiveState() {
 
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).textContent, 'ON', 'world 2 toggle should reflect natural campaign unlock');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).classList.contains('on'), true, 'world 2 toggle should gain ON styling when visible');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_UNLOCK_GROUP).style.display, '', 'manual world unlock controls should be visible when debug mode is enabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_RESET_ROW).style.display, '', 'debug rows should be visible when debug mode is enabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_COPY_ROW).style.display, '', 'copy row should be visible when debug mode is enabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_ENDING_ROW).style.display, '', 'ending preview row should be visible when debug mode is enabled');
@@ -249,6 +253,8 @@ async function testRefreshSettingsUiReflectsEffectiveState() {
     assert.equal(fakeDocument.getElementById('togShowFps').textContent, 'ON', 'show-fps toggle should reflect the enabled state');
     assert.equal(fakeDocument.getElementById('togGraphicsMode').textContent, 'HIGH', 'graphics profile toggle should reflect high mode');
     assert.equal(fakeDocument.getElementById('togTheme').textContent, 'SOLAR', 'theme toggle should reflect the active theme');
+    assert.notEqual(fakeDocument.getElementById(DOM_IDS.MUSIC_TRACK_LABEL).textContent, '', 'settings UI should show the current soundtrack title');
+    assert.notEqual(fakeDocument.getElementById(DOM_IDS.BTN_MUSIC_TOGGLE).textContent, '', 'settings UI should expose the soundtrack play/pause label');
 
     STATE.settings.w2 = false;
     STATE.settings.debug = false;
@@ -256,6 +262,7 @@ async function testRefreshSettingsUiReflectsEffectiveState() {
 
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).textContent, 'OFF', 'manual world-2 disable should override natural campaign unlock in settings UI');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).classList.contains('on'), false, 'world-2 disable should clear the ON styling');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_UNLOCK_GROUP).style.display, 'none', 'manual world unlock controls should hide when debug mode is disabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_RESET_ROW).style.display, 'none', 'debug rows should hide when debug mode is disabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_INFO_PANEL).style.display, 'none', 'debug panel should hide when debug mode is disabled');
   } finally {

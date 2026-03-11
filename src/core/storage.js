@@ -1,7 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Safe Storage
-   Falls back to in-memory if localStorage is blocked (file:// URI,
-   or restricted Android WebView).
+   Safe storage
+
+   Wraps localStorage with an in-memory fallback for restricted
+   contexts such as file URLs or locked-down WebViews.
    ================================================================ */
 
 const _mem = {};

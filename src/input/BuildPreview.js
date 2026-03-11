@@ -1,3 +1,11 @@
+/* ================================================================
+   Build preview model
+
+   Produces the tooltip model shown while the player hovers a possible
+   target. It returns plain data so Game.js and the renderer can stay
+   decoupled from preview logic.
+   ================================================================ */
+
 import { computeTentacleBuildCost } from './TentacleCommands.js';
 import { findToggleableTentacle, getTentacleSlotUsage } from './PlayerTentacleInteraction.js';
 

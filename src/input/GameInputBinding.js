@@ -1,3 +1,11 @@
+/* ================================================================
+   Game input binding
+
+   Wires mouse, touch, keyboard, and long-press events into the Game
+   instance. This module owns raw DOM event cleanup so Game.js only
+   needs to expose semantic handlers.
+   ================================================================ */
+
 import { GAMEPLAY_RULES } from '../config/gameConfig.js';
 import {
   getMonotonicInputTimestamp,
@@ -126,6 +134,8 @@ export function bindGameInputEvents(game) {
 
     if (game._tapStart && !game.paused) {
       if (shouldPromoteTapToSlice(game._tapStart, touchX, touchY, INPUT_TUNING.TOUCH_SLICE_DRAG_THRESHOLD_PX)) {
+        // Touch drag is promoted through the same slice entry point as mouse
+        // so gesture cleanup and frenzy rules stay shared.
         game._beginSlice(game._tapStart.x, game._tapStart.y, 2);
         game._extendSlice(touchX, touchY);
         game._tapStart = null;

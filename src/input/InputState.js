@@ -1,3 +1,11 @@
+/* ================================================================
+   Input state helpers
+
+   Pure helpers for pointer/touch gesture bookkeeping. They avoid
+   storing gesture math directly in Game.js so click and slice flows
+   can share the same thresholds.
+   ================================================================ */
+
 export function getCanvasPointFromClient(canvas, clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -11,6 +19,7 @@ export function createSlicePathStart(screenX, screenY) {
 }
 
 export function appendSlicePoint(slicePath, screenX, screenY) {
+  // Append in place to keep the hot slice path cheap during long drags.
   slicePath.push({ x: screenX, y: screenY });
   return slicePath;
 }

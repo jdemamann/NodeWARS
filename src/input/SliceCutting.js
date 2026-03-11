@@ -1,3 +1,10 @@
+/* ================================================================
+   Slice scanning
+
+   Converts the latest drawn slice segment into a list of cuttable
+   player tentacles with canonical source/target orientation.
+   ================================================================ */
+
 import { findBezierCutRatio } from '../math/bezierGeometry.js';
 
 export function getLatestSliceSegment(slicePath) {

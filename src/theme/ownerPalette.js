@@ -1,3 +1,10 @@
+/* ================================================================
+   Owner palette helpers
+
+   Shared palette lookups for gameplay rendering and UI panels. This
+   keeps owner colors canonical across the project.
+   ================================================================ */
+
 import { CP, CE, CE3 } from '../config/gameConfig.js';
 
 export function ownerColor(owner, level, neutralColor = '#7a8fa0') {

@@ -29,6 +29,9 @@ This agent owns structural code readability:
 - when useful, document inputs and outputs in one or two lines without verbose JSDoc
 - constant blocks should explain tuning effect, not just restate the name
 - an outdated comment is worse than no comment
+- if a touched `src/*.js` file still lacks a module header, add one in the same wave
+- if a created or materially changed function has no short block header, add one in the same wave
+- use `docs/project/commentary-header-template.md` as the default template source
 
 ## What This Agent Should Look For
 
@@ -44,6 +47,7 @@ At minimum:
 
 ```bash
 node scripts/smoke-checks.mjs
+node scripts/commentary-policy.mjs
 ```
 
 Add the checks for the domain touched by the wave.
@@ -68,3 +72,4 @@ Add the checks for the domain touched by the wave.
 - sensitive functions and blocks are easier to read
 - no unnecessary documentation overhead was introduced
 - comments and implementation remain aligned
+- changed source files pass the commentary policy gate

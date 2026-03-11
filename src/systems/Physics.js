@@ -1,9 +1,9 @@
 /* ================================================================
-   NODE WARS v3 — Physics System
+   Physics system
 
    Owns core simulation bookkeeping shared by nodes and tentacles.
    World-layer mechanics such as fog, pulsars, vortexes, relays, and
-   camera follow live in `WorldSystems`.
+   camera follow live in WorldSystems.
    ================================================================ */
 
 import { TentState } from '../config/gameConfig.js';

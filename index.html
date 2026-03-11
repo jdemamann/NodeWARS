@@ -83,7 +83,7 @@
 <div class="scr off" id="sq">
   <div class="st" data-t="settings">⚙ SETTINGS</div>
   <div class="settings-body" id="settingsBody">
-    <div class="sgroup">
+    <div class="sgroup" id="worldUnlockGroup">
       <div class="sgroup-title" data-t="setWorlds">🌍 WORLDS</div>
       <div class="srow">
         <div class="slabel">
@@ -115,6 +115,18 @@
           <span class="sdesc" data-t="setMusicDesc">Procedural adaptive soundtrack</span>
         </div>
         <button class="stoggle" id="togMusic">ON</button>
+      </div>
+      <div class="srow music-player-row" id="musicPlayerRow">
+        <div class="slabel">
+          <span data-t="setMusicPlayer">♫ SOUNDTRACK PLAYER</span>
+          <span class="sdesc" data-t="setMusicPlayerDesc">Preview grouped tracks without leaving settings</span>
+          <span class="music-track-label" id="musicTrackLabel">DRIFT SIGNAL</span>
+        </div>
+        <div class="music-player-controls">
+          <button class="stoggle music-player-btn" id="btnMusicPrev">⏮</button>
+          <button class="stoggle music-player-btn" id="btnMusicToggle">▶ PLAY</button>
+          <button class="stoggle music-player-btn" id="btnMusicNext">⏭</button>
+        </div>
       </div>
     </div>
     <div class="sgroup">

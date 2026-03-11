@@ -1,10 +1,9 @@
 /* ================================================================
-   NODE WARS v3 — Screen Manager
+   Screen controller
 
-   showScr / fadeGo / showToast / buildWorldTabs / buildGrid /
-   buildStory / endLevel / showWorldBanner
-
-   Depends on: STATE, i18n (T), Audio, Music, LEVELS, WORLDS
+   Owns menu/screen composition, transitions, and notification cards.
+   Depends on state, localization, audio, and the small view-builder
+   helpers under src/ui.
    ================================================================ */
 
 import { DOM_IDS }       from './DomIds.js';
@@ -85,6 +84,8 @@ export function showNotification({
   dedupeKey = '',
   dedupeMs = null,
 } = {}) {
+  // Notifications are the lightweight bottom-right channel for music changes,
+  // debug info, and contextual gameplay guidance.
   const notificationStack = $(DOM_IDS.NOTIFICATIONS);
   if (!notificationStack) return;
 
@@ -155,6 +156,8 @@ export function showToast(msg) {
 
 /* ── Level-select: world tabs + grid ── */
 export function syncWorldTab() {
+  // Keep the world tab anchored to the current phase while respecting unlock
+  // rules and tutorial-as-optional onboarding.
   const currentLevelConfig = LEVELS.find(levelConfig => levelConfig.id === STATE.curLvl);
   if (!currentLevelConfig) return;
   const currentWorldId = currentLevelConfig.worldId || 1;
@@ -165,6 +168,8 @@ export function syncWorldTab() {
 }
 
 export function buildWorldTabs() {
+  // Tabs are built from effective unlock state, not raw settings flags, so UI
+  // stays aligned with progression and debug overrides.
   const tabs = $(DOM_IDS.WORLD_TABS);
   const grid = $(DOM_IDS.LGRID);
   if (!tabs || !grid) return;
@@ -207,6 +212,8 @@ export function buildWorldTabs() {
 }
 
 export function buildGrid(worldFilter = _activeWorldTab) {
+  // Grid cards are derived from effective progression state, then decorated by
+  // authored world metadata and stored score/star results.
   const levelGridElement = $(DOM_IDS.LGRID);
   levelGridElement.innerHTML = '';
 
@@ -451,6 +458,15 @@ export function showCampaignEnding(game, { debugPreview = false } = {}) {
 export function refreshSettingsUI() {
   applySettingsToggleState(STATE);
   applyDebugSettingsVisibility(STATE.settings.debug);
+
+  const currentTrackLabel = $(DOM_IDS.MUSIC_TRACK_LABEL);
+  if (currentTrackLabel) {
+    const trackInfo = Music.currentTrackInfo() || Music.pausedTrackInfo();
+    currentTrackLabel.textContent = trackInfo ? T(trackInfo.titleKey) : T('setMusicCurrentIdle');
+  }
+
+  const toggleButton = $(DOM_IDS.BTN_MUSIC_TOGGLE);
+  if (toggleButton) toggleButton.textContent = Music.isPlaying() ? T('setMusicPause') : T('setMusicPlay');
 }
 
 export function updateDebugInfo() {

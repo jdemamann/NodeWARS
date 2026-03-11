@@ -1,3 +1,11 @@
+/* ================================================================
+   Node hit testing
+
+   Shared pointer hit-test helpers for mouse, touch, hover, and drag
+   targeting. Returns the closest valid node under the pointer so UI
+   interactions stay stable when nodes overlap visually.
+   ================================================================ */
+
 import { NodeType } from '../config/gameConfig.js';
 import { computeDistanceSquared } from '../math/simulationMath.js';
 

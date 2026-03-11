@@ -1,3 +1,9 @@
+/* ================================================================
+   Camera system
+
+   Applies the light camera follow used during active gameplay.
+   ================================================================ */
+
 import { GAMEPLAY_RULES } from '../../config/gameConfig.js';
 
 const { world: WORLD_RULES } = GAMEPLAY_RULES;

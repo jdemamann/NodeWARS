@@ -1,3 +1,10 @@
+/* ================================================================
+   Vortex system
+
+   Updates moving and pulsing hazards, then drains active tentacles
+   that pass through the vortex volume.
+   ================================================================ */
+
 import { TentState } from '../../config/gameConfig.js';
 import { bus } from '../../core/EventBus.js';
 

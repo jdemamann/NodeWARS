@@ -1,3 +1,11 @@
+/* ================================================================
+   Ownership transitions
+
+   Canonical ownership change helpers. Captured nodes always drop their
+   old outgoing commitments, while incoming pressure continues to
+   resolve naturally on the next simulation tick.
+   ================================================================ */
+
 import { bus } from '../core/EventBus.js';
 import { isPlayerEnemyOwner } from './OwnerTeams.js';
 

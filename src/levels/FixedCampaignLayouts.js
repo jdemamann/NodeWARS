@@ -1,3 +1,11 @@
+/* ================================================================
+   Fixed campaign layouts
+
+   Authored node placements and world-feature setups for the campaign.
+   Each exported layout is keyed by level id and consumed by Game when
+   a fixed phase is loaded.
+   ================================================================ */
+
 import { NodeType } from '../config/gameConfig.js';
 
 function node(x, y, energy, owner = 0, type = NodeType.NORMAL, extra = {}) {

@@ -1,3 +1,10 @@
+/* ================================================================
+   AI scoring helpers
+
+   Heuristic helpers used by AI.js to classify tactical state and
+   score candidate launches or slice opportunities.
+   ================================================================ */
+
 import { NodeType } from '../config/gameConfig.js';
 import { computeDistance } from '../math/simulationMath.js';
 import { getContestCaptureScore } from './NeutralContest.js';

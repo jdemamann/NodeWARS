@@ -100,6 +100,8 @@ Do not break these:
   - `node scripts/release-readiness.mjs`
 - long-run numeric stability:
   - `node scripts/simulation-soak.mjs`
+- commentary policy for changed source files:
+  - `node scripts/commentary-policy.mjs`
 
 Run the relevant subset after gameplay, campaign, UI/settings, persistence, or render changes that may affect state. Use `npm run check` for the full local gate.
 
@@ -134,6 +136,7 @@ Planning / balance:
 - `docs/project/operational-kanban.md`
 - `docs/project/issue-intake-template.md`
 - `docs/project/campaign-balance-wave-b-plan.md`
+- `docs/project/commentary-header-template.md`
 
 Domain agents:
 
@@ -172,6 +175,10 @@ Installed Codex skills:
 - Prefer small, test-backed changes.
 - Start each meaningful wave by checking the relevant domain agent and the check matrix.
 - If the task clearly matches an installed Codex skill, use the skill before ad-hoc work.
+- Keep source comments in English only.
+- If a touched `src/*.js` file still lacks a module header, add one in the same wave.
+- If a created or materially changed function in `src/*.js` lacks a short block header, add one in the same wave.
+- Reuse `docs/project/commentary-header-template.md` instead of inventing ad-hoc header styles.
 - If changing gameplay rules, update at least one guardrail or explain why not.
 - If changing settings, tutorial, story, or persistence, verify all linked surfaces still agree.
 - If changing campaign progression, tutorial completion, or skip flow, keep `GameState` as the canonical source of next-level and unlock rules.

@@ -1,3 +1,10 @@
+/* ================================================================
+   Tent local rules
+
+   Small pure helpers used by Tent.js for cut classification and
+   growing-state collision detection.
+   ================================================================ */
+
 import { TentState } from '../config/gameConfig.js';
 import { areAlliedOwners } from '../systems/OwnerTeams.js';
 
@@ -13,6 +20,8 @@ export function classifyTentacleCut(cutRatio, cutRules) {
 }
 
 export function resolveGrowingTentacleCollision(tentacle, tents) {
+  // Detect the first hostile mirrored growth pair and promote both lanes into
+  // the active clash state once their combined reach covers the lane.
   for (let i = 0; i < tents.length; i++) {
     const opposingTentacle = tents[i];
     if (opposingTentacle === tentacle || opposingTentacle.state !== TentState.GROWING) continue;

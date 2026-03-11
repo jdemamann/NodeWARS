@@ -1,12 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Background Renderer
+   Background renderer
 
    Draws the world background: solid fill, hex-dot grid, scanline,
    and ambient glow from player cells.
-
-   The hex grid is pre-rendered to an OffscreenCanvas once and
-   composited each frame — avoids re-stroking hundreds of dots at
-   60 fps.
    ================================================================ */
 
 import { THEMES } from '../config/gameConfig.js';

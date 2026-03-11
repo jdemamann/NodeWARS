@@ -1,11 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — GameNode
+   Game node entity
 
-   Responsibilities: data model + physics update.
-   Rendering is handled by NodeRenderer — no canvas calls here.
-
-   Key fix: NodeType enum replaces the dual type/isRelay pattern.
-   'r' (RELAY) now handles both roles — isRelay is a computed getter.
+   Owns node-side simulation state such as energy, regen, level sync,
+   and world-specialized flags. Rendering is handled by NodeRenderer.
    ================================================================ */
 
 import { NodeType, GAMEPLAY_RULES } from '../config/gameConfig.js';

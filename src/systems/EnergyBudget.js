@@ -1,3 +1,11 @@
+/* ================================================================
+   Energy budget helpers
+
+   Canonical helpers for per-node regen and outgoing lane budgets.
+   Rendering and gameplay should both use these helpers when they need
+   displayed or effective regen values.
+   ================================================================ */
+
 import { TIER_REGEN, GAME_BALANCE } from '../config/gameConfig.js';
 
 export function captureRelayFeedBudget(node) {

@@ -1,5 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Bezier Geometry
+   Bezier geometry
+
+   Shared geometry helpers for tentacle curves, slicing, and orb
+   interpolation along bezier paths.
    ================================================================ */
 
 /** Segment-segment intersection test. Returns true if [a,b] intersects [c,d]. */

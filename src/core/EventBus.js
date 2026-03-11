@@ -1,6 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — EventBus
-   Lightweight pub/sub for decoupling systems (audio, fog, UI).
+   Event bus
+
+   Lightweight pub/sub for decoupling runtime systems such as audio,
+   fog, visual feedback, and UI.
    ================================================================ */
 
 class EventBus {

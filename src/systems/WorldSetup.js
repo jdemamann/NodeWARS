@@ -1,9 +1,17 @@
+/* ================================================================
+   World setup helpers
+
+   Populates authored and generated world features such as hazards,
+   relays, pulsars, and neutral bunkers during level load.
+   ================================================================ */
+
 import { GAMEPLAY_RULES, NodeType } from '../config/gameConfig.js';
 import { GameNode } from '../entities/GameNode.js';
 
 const { world: WORLD_RULES } = GAMEPLAY_RULES;
 
 export function populateWorldFeatures(game, cfg, width, height) {
+  // Generated phases rebuild these feature arrays from config each load.
   game.hazards = [];
   game.pulsars = [];
   spawnHazards(game, cfg, width, height);
@@ -13,6 +21,7 @@ export function populateWorldFeatures(game, cfg, width, height) {
 }
 
 export function applyFixedWorldFeatures(game, layout) {
+  // Fixed layouts already provide fully-authored hazard and pulsar specs.
   game.hazards = (layout.hazards || []).map(hazardSpec => ({ ...hazardSpec }));
   game.pulsars = (layout.pulsars || []).map(pulsarSpec => ({ ...pulsarSpec }));
 }

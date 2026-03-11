@@ -1,3 +1,10 @@
+/* ================================================================
+   Visibility system
+
+   Handles relay capture reveal, signal tower vision windows, and fog
+   recalculation for hidden-information gameplay.
+   ================================================================ */
+
 import { GAMEPLAY_RULES, NodeType } from '../../config/gameConfig.js';
 import { computeDistanceSquared } from '../../math/simulationMath.js';
 import { bus } from '../../core/EventBus.js';

@@ -1,3 +1,10 @@
+/* ================================================================
+   Campaign ending view
+
+   Builds the final epilogue content shown after the last campaign
+   phase. Returns a plain view model so ScreenController can render it.
+   ================================================================ */
+
 function buildEndingStat(label, value, accentClass = '') {
   return (
     '<div class="ending-stat">' +
@@ -8,6 +15,8 @@ function buildEndingStat(label, value, accentClass = '') {
 }
 
 export function buildCampaignEndingMarkup(game, translate, language, { debugPreview = false } = {}) {
+  // Inputs are the finished Game snapshot and a translation lookup. The output
+  // is a plain object consumed by ScreenController.
   const elapsedSeconds = Math.floor(game?.scoreTime || 0);
   const worldsReclaimed = '3 / 3';
   const cuts = game?.cutsTotal || 0;

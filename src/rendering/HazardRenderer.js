@@ -1,7 +1,7 @@
 /* ================================================================
-   NODE WARS v3 — Hazard Renderer
+   Hazard renderer
 
-   Draws W2 vortex hazards and W3 pulsar beacons.
+   Draws vortex hazards and pulsar beacons.
    ================================================================ */
 
 import { STATE } from '../core/GameState.js';

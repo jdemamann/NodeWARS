@@ -1,3 +1,11 @@
+/* ================================================================
+   Tent combat helpers
+
+   Contains the state-independent parts of tentacle combat and payload
+   resolution. Tent.js uses these helpers to keep active flow, neutral
+   contest, and clash math readable.
+   ================================================================ */
+
 import { EMBRYO, GAME_BALANCE } from '../config/gameConfig.js';
 import {
   computeAttackLevelMultiplier,
@@ -19,6 +27,8 @@ export function applyTentaclePayloadToTarget({
   burstPulse = 0,
   damageMultiplier = 1,
 }) {
+  // Burst and split cuts both end up here so ownership, neutral contest, and
+  // direct enemy damage share the same resolution rules.
   const directDamage = payloadAmount * computeAttackLevelMultiplier(sourceNode.level) * damageMultiplier;
 
   if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
@@ -114,6 +124,8 @@ export function applyTentacleEnemyAttackFlow(tentacle, targetNode, sourceNode, f
 }
 
 export function computeTentacleClashForces(tentacle, opposingTentacle, feedRate) {
+  // Clash force is intentionally bandwidth-based rather than stored-payload
+  // based so the front keeps reflecting live lane pressure.
   const opposingFeedRate = Math.min(
     opposingTentacle.effectiveSourceNode?.tentFeedPerSec || 0,
     opposingTentacle.maxBandwidth,

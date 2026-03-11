@@ -9,6 +9,22 @@ const ROOT = path.resolve(__dirname, '..');
 
 const load = rel => import(path.join(ROOT, rel));
 
+async function listJsFiles(dir) {
+  const entries = await fs.readdir(path.join(ROOT, dir), { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const relativePath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await listJsFiles(relativePath));
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith('.js')) files.push(relativePath);
+  }
+
+  return files;
+}
+
 async function testRelayNoFreeEnergy() {
   const { NodeType, TentState } = await load('src/config/gameConfig.js');
   const { GameNode } = await load('src/entities/GameNode.js');
@@ -685,6 +701,7 @@ async function testMenuAndDisplayControlsStayPresent() {
   const indexSource = await fs.readFile(path.join(ROOT, 'index.html'), 'utf8');
   const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
   const screensSource = await fs.readFile(path.join(ROOT, 'src/ui/ScreenController.js'), 'utf8');
+  const settingsViewSource = await fs.readFile(path.join(ROOT, 'src/ui/settingsView.js'), 'utf8');
   const gameStateSource = await fs.readFile(path.join(ROOT, 'src/core/GameState.js'), 'utf8');
   const hudSource = await fs.readFile(path.join(ROOT, 'src/ui/HUD.js'), 'utf8');
   const cssSource = await fs.readFile(path.join(ROOT, 'styles/main.css'), 'utf8');
@@ -694,6 +711,9 @@ async function testMenuAndDisplayControlsStayPresent() {
   assert.match(indexSource, /id="togShowFps"/, 'settings should expose the FPS toggle');
   assert.match(indexSource, /id="btnCopyDebug"/, 'settings should expose the debug snapshot action');
   assert.match(indexSource, /id="btnViewEnding"/, 'settings should expose the campaign-ending preview action in debug mode');
+  assert.match(indexSource, /id="worldUnlockGroup"/, 'settings should wrap manual world unlock controls in a dedicated group');
+  assert.match(settingsViewSource, /WORLD_UNLOCK_GROUP/, 'settings debug visibility should manage the world unlock group explicitly');
+  assert.match(settingsViewSource, /world unlock toggles are a debug-only escape hatch/i, 'settings should document manual world unlock controls as a debug-only escape hatch');
   assert.match(indexSource, /id="hfps"/, 'HUD should expose the FPS label');
   assert.match(mainSource, /cycleTheme\(/, 'main settings flow should cycle themed UI variants');
   assert.match(mainSource, /buildDebugSnapshot\(/, 'main settings flow should build a debug snapshot');
@@ -1153,7 +1173,8 @@ async function testInputWaveV2GuardrailsStayPresent() {
   assert.equal(packageJson.scripts['release-readiness'], 'node scripts/release-readiness.mjs', 'package.json should expose the release readiness script');
   assert.equal(packageJson.scripts.soak, 'node scripts/simulation-soak.mjs', 'package.json should expose the soak script');
   assert.equal(packageJson.scripts['ui-dom-sanity'], 'node scripts/ui-dom-sanity.mjs', 'package.json should expose the UI DOM sanity script');
-  assert.equal(packageJson.scripts.check, 'npm run smoke && npm run ui-sanity && npm run ui-dom-sanity && npm run progression-sanity && npm run input-harness && npm run campaign-sanity && npm run release-readiness && npm run soak', 'package.json should expose an aggregate check script');
+  assert.equal(packageJson.scripts['commentary-policy'], 'node scripts/commentary-policy.mjs', 'package.json should expose the commentary policy script');
+  assert.equal(packageJson.scripts.check, 'npm run smoke && npm run commentary-policy && npm run ui-sanity && npm run ui-dom-sanity && npm run progression-sanity && npm run input-harness && npm run campaign-sanity && npm run release-readiness && npm run soak', 'package.json should expose an aggregate check script');
 }
 
 async function testRegenDisplayAndFlowTooltipStayCanonical() {
@@ -1285,16 +1306,28 @@ async function testGroupedMusicAndNotificationFlowStayCanonical() {
   assert.match(musicSource, /function playLevelTheme\(levelConfig\)/, 'music should resolve gameplay themes by grouped phase context');
   assert.match(musicSource, /function playEnding\(\)/, 'music should expose a dedicated epilogue theme');
   assert.match(musicSource, /setTrackChangeListener\(listener\)/, 'music should support structured track-change notifications');
+  assert.match(musicSource, /let isPreviewPlayback = false;/, 'music should track a dedicated preview-playback mode for the settings soundtrack player');
+  assert.match(musicSource, /if \(isPreviewPlayback\) return 1;/, 'preview playback should bypass the normal music toggle so settings preview always works');
+  assert.match(musicSource, /phaseRangeLabel:\s*'World 1 tutorial · phases 1-4'/, 'music metadata should document the World 1 opening phase range');
+  assert.match(musicSource, /phaseRangeLabel:\s*'World 2 phases 15-20'/, 'music metadata should document the World 2 mid-pressure phase range');
+  assert.match(musicSource, /phaseRangeLabel:\s*'World 3 phases 29-32'/, 'music metadata should document the World 3 finale phase range');
   assert.match(mainSource, /Music\.setTrackChangeListener\(/, 'main should subscribe to music track changes');
+  assert.match(mainSource, /BTN_MUSIC_PREV/, 'settings should expose a previous-track soundtrack player control');
+  assert.match(mainSource, /BTN_MUSIC_TOGGLE/, 'settings should expose a play-pause soundtrack player control');
+  assert.match(mainSource, /BTN_MUSIC_NEXT/, 'settings should expose a next-track soundtrack player control');
   assert.match(mainSource, /notifNowPlaying/, 'music notifications should stay localized through i18n');
   assert.match(mainSource, /dedupeKey:\s*`music:\$\{trackInfo\.id\}`/, 'music notifications should dedupe by canonical track id');
+  assert.match(musicSource, /if \(levelConfig\.isTutorial \|\| levelId <= 4\) playGenesis\(\);\s*else if \(levelId === 10\) playEchoCore\(\);\s*else playSiegeBloom\(\);/s, 'World 1 phase routing should stay mapped to opening, pressure, and boss tracks');
+  assert.match(musicSource, /if \(levelConfig\.isTutorial \|\| levelId <= 14\) playVoid\(\);\s*else if \(levelId === 21\) playOblivionGate\(\);\s*else playEntropyCurrent\(\);/s, 'World 2 phase routing should stay mapped to opening, pressure, and boss tracks');
+  assert.match(musicSource, /if \(levelConfig\.isTutorial \|\| levelId <= 24\) playNexus\(\);\s*else if \(levelId >= 29\) playTranscendenceProtocol\(\);\s*else playSignalWar\(\);/s, 'World 3 phase routing should stay mapped to opening, pressure, and finale tracks');
   assert.match(gameSource, /Music\.playLevelTheme\(cfg\)/, 'level loading should use grouped level themes');
   assert.match(gameSource, /Music\.playLevelTheme\(this\.cfg\)/, 'pause resume should restore grouped level themes');
   assert.match(screenControllerSource, /export function showNotification\(/, 'screen controller should expose the structured notification surface');
   assert.match(screenControllerSource, /const _notificationPriority = \{[\s\S]*warning:\s*4[\s\S]*objective:\s*3/s, 'notification stack should define explicit priority tiers');
   assert.match(screenControllerSource, /if \(dedupeKey\) \{[\s\S]*_notificationRecent\.set\(dedupeKey, now\)/s, 'notification stack should dedupe repeat events');
   assert.match(i18nSource, /trackSignalWar:/, 'localization should expose grouped soundtrack names');
-  assert.match(i18nSource, /notifMusicMeta:/, 'localization should expose the music popup metadata formatter');
+  assert.match(mainSource, /body:\s*T\(trackInfo\.roleKey\)/, 'music popup body should use the emotional track role copy');
+  assert.doesNotMatch(mainSource, /notifMusicMeta/, 'music popup should no longer expose technical BPM or loop metadata');
 }
 
 async function testMusicBootContractStaysRuntimeSafe() {
@@ -1345,6 +1378,27 @@ async function testCampaignBalanceWaveBValuesStayApplied() {
   assert.equal(getLevelConfig(24).playerStartEnergy, 34, 'Wave B should keep the stronger relay-race opening for the player');
   assert.equal(getLevelConfig(30).playerStartEnergy, 40, 'Wave B should keep the clearer SIGNAL LOCK opening');
   assert.equal(getLevelConfig(32).aiThinkIntervalSeconds, 1.6, 'Wave B should keep the slightly less oppressive final-phase think rate');
+}
+
+async function testCommentaryHeadersStayModernAndEnglish() {
+  const sourceFiles = await listJsFiles('src');
+  const legacyHeaderPattern = /NODE WARS v3/;
+  const portugueseCommentPattern = /\b(questao|descricao|controle|captura|energia|tentaculo|mundo|fase|jogador|inimigo|coment[aá]rio|renderiza|ajuste)\b/i;
+
+  for (const relativePath of sourceFiles.filter(file => file.endsWith('.js'))) {
+    const source = await fs.readFile(path.join(ROOT, relativePath), 'utf8');
+    assert.doesNotMatch(source, legacyHeaderPattern, `${relativePath} should not keep legacy v3 headers in comments`);
+    const firstNonEmptyLine = source.split('\n').find(line => line.trim()) || '';
+    assert.match(firstNonEmptyLine, /^\/\*/, `${relativePath} should start with a module header comment`);
+    const commentLines = source
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('//') || line.startsWith('/*') || line.startsWith('*'));
+
+    for (const commentLine of commentLines) {
+      assert.doesNotMatch(commentLine, portugueseCommentPattern, `${relativePath} should keep code comments in English`);
+    }
+  }
 }
 
 async function main() {
@@ -1409,6 +1463,7 @@ async function main() {
     ['UI domain check aggregation stays present', testUiDomainCheckAggregationStaysPresent],
     ['Canvas font selection stays canonical', testCanvasFontSelectionStaysCanonical],
     ['Campaign balance wave B values stay applied', testCampaignBalanceWaveBValuesStayApplied],
+    ['Commentary headers stay modern and English', testCommentaryHeadersStayModernAndEnglish],
   ];
 
   let passed = 0;

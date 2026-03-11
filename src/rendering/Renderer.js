@@ -1,5 +1,5 @@
 /* ================================================================
-   NODE WARS v3 — Renderer (coordinator)
+   Renderer coordinator
 
    Orchestrates the full render pipeline each frame:
      1. Camera shake

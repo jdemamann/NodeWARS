@@ -1,3 +1,10 @@
+/* ================================================================
+   Player click resolution
+
+   Converts a click into a semantic intent: select, retract, toggle,
+   build, or clear. Game.js applies the returned intent to live state.
+   ================================================================ */
+
 import { getRetractableTentaclesForNode, findToggleableTentacle, getTentacleSlotUsage } from './PlayerTentacleInteraction.js';
 import { computeTentacleBuildCost } from './TentacleCommands.js';
 

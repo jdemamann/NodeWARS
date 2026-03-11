@@ -1,8 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — GameState
-   Single source of truth for persistent/cross-cutting state.
-   Replaces the scattered globals: completed, curLvl, scores,
-   curLang, and SETTINGS.
+   Game state
+
+   Single source of truth for persistent and cross-cutting state:
+   progression, settings, language, and current phase identity.
    ================================================================ */
 
 import { LEVELS, getLevelConfig, getNextLevelId, getPreviousLevelId } from '../config/gameConfig.js';

@@ -1,6 +1,7 @@
 /* ================================================================
-   NODE WARS v3 — Sound Effects Engine (Web Audio API)
-   No audio assets needed — all sounds are procedurally generated.
+   Sound effects engine
+
+   No audio assets are needed; all sounds are procedurally generated.
    Cooldown timing is centralized through audioTiming.js so repeated
    combat events do not each reimplement their own time logic.
    ================================================================ */

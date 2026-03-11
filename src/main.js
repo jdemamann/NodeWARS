@@ -1,12 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Entry Point
+   Entry point
 
-   Bootstraps the game:
-     1. Load saved progress + settings
-     2. Build DOM event listeners (buttons, language, settings)
-     3. Create Game instance
-     4. Start AudioContext on first user gesture
-     5. Reveal UI (fade out boot screen)
+   Bootstraps saved state, DOM wiring, audio unlock, and the main Game
+   instance before handing control to the runtime loop.
    ================================================================ */
 
 import { STATE }    from './core/GameState.js';
@@ -48,7 +44,6 @@ function buildTrackNotification(trackInfo) {
     kicker: T('notifNowPlaying'),
     title: T(trackInfo.titleKey),
     body: T(trackInfo.roleKey),
-    meta: T('notifMusicMeta', trackInfo.bpm, trackInfo.durationLabel),
     durationMs: 3600,
     dedupeKey: `music:${trackInfo.id}`,
   };
@@ -70,6 +65,7 @@ function initGame() {
       Music.setTrackChangeListener(trackInfo => {
         const notification = buildTrackNotification(trackInfo);
         if (notification) showNotification(notification);
+        refreshSettingsUI();
       });
     } else {
       console.warn('Music track-change notifications are unavailable in this runtime.');
@@ -194,6 +190,18 @@ function wireButtons() {
   $id(DOM_IDS.BTN_VIEW_ENDING)?.addEventListener('click', () => {
     const debugPreviewGame = game || Screens._game;
     fadeGo(() => showCampaignEnding(debugPreviewGame, { debugPreview: true }));
+  });
+  $id(DOM_IDS.BTN_MUSIC_PREV)?.addEventListener('click', () => {
+    Music.previousTrack();
+    refreshSettingsUI();
+  });
+  $id(DOM_IDS.BTN_MUSIC_TOGGLE)?.addEventListener('click', () => {
+    Music.togglePlayback();
+    window.setTimeout(() => refreshSettingsUI(), 280);
+  });
+  $id(DOM_IDS.BTN_MUSIC_NEXT)?.addEventListener('click', () => {
+    Music.nextTrack();
+    refreshSettingsUI();
   });
   $id(DOM_IDS.BTN_RESET_PROG)?.addEventListener('click', () => {
     if (!confirm('Reset all progress?')) return;

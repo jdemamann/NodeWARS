@@ -1,3 +1,10 @@
+/* ================================================================
+   Tentacle command helpers
+
+   Shared lookup and cost helpers used by click resolution, drag
+   preview, and AI/path checks.
+   ================================================================ */
+
 import { TentState } from '../config/gameConfig.js';
 import { computeBuildCost, computeDistance } from '../math/simulationMath.js';
 

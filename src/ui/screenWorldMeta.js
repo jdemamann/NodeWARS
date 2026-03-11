@@ -1,4 +1,12 @@
+/* ================================================================
+   Screen world metadata
+
+   Provides display-only metadata for world tabs, banners, and accents.
+   ================================================================ */
+
 export function getLevelSelectWorldMeta(language) {
+  // This is presentation-only metadata; it should not be used as a gameplay
+  // source of truth for unlock or progression rules.
   const isPortuguese = language === 'pt';
   return {
     0: { name: 'TUTORIAL', col: '#00ff9d', icon: '◈', sub: '' },

@@ -1,3 +1,11 @@
+/* ================================================================
+   Neutral contest helpers
+
+   Coalition-aware helpers for neutral capture progress. They let red
+   and purple cooperate without losing ownership identity for the
+   eventual capture winner.
+   ================================================================ */
+
 import { GAME_BALANCE } from '../config/gameConfig.js';
 import { areAlliedOwners, getOwnerTeamId } from './OwnerTeams.js';
 

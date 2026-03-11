@@ -1,8 +1,17 @@
+/* ================================================================
+   Settings view helpers
+
+   Applies effective toggle state and debug-only visibility rules to
+   the Settings screen.
+   ================================================================ */
+
 import { DOM_IDS } from './DomIds.js';
 
 function $(id) { return document.getElementById(id); }
 
 export function applySettingsToggleState(state) {
+  // Show the effective runtime value rather than raw saved flags so campaign
+  // progression, debug overrides, and settings all agree in the UI.
   ['w2', 'w3', 'debug', 'sound', 'music', 'showFps'].forEach(key => {
     const id = 'tog' + key.charAt(0).toUpperCase() + key.slice(1);
     const button = $(id);
@@ -32,6 +41,9 @@ export function applySettingsToggleState(state) {
 }
 
 export function applyDebugSettingsVisibility(debugEnabled) {
+  const worldUnlockGroup = $(DOM_IDS.WORLD_UNLOCK_GROUP);
+  // Manual world unlock toggles are a debug-only escape hatch; natural campaign unlocks stay visible in the level select.
+  if (worldUnlockGroup) worldUnlockGroup.style.display = debugEnabled ? '' : 'none';
   const debugResetRow = $(DOM_IDS.DEBUG_RESET_ROW);
   if (debugResetRow) debugResetRow.style.display = debugEnabled ? '' : 'none';
   const debugCopyRow = $(DOM_IDS.DEBUG_COPY_ROW);

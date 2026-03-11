@@ -901,6 +901,12 @@ html { overflow: hidden; height: 100%; }
   color: var(--tx);
   text-shadow: 0 0 10px rgba(255,255,255,0.04);
 }
+.music-track-label {
+  font: bold 11px var(--font-ui);
+  letter-spacing: 1.8px;
+  color: var(--p);
+  margin-top: 3px;
+}
 .sdesc  {
   font: 10px/1.5 var(--font-copy);
   color: var(--mid);
@@ -924,6 +930,18 @@ html { overflow: hidden; height: 100%; }
 .stoggle.on      { background: color-mix(in srgb, var(--panel-soft) 55%, var(--p) 16%); border-color: var(--line-strong); color: var(--p); }
 .stoggle.sdanger { border-color: color-mix(in srgb, var(--e) 55%, transparent); color: var(--e); }
 .stoggle.sdanger:hover { background: color-mix(in srgb, var(--panel-soft) 50%, var(--e) 14%); }
+.music-player-row {
+  align-items: center;
+}
+.music-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.music-player-btn {
+  min-width: 92px;
+}
 .debug-info { background: color-mix(in srgb, var(--panel-soft) 60%, var(--ac) 6%); border: 1px solid color-mix(in srgb, var(--ac) 30%, transparent); border-radius: 16px; padding: 12px 16px; margin-top: 4px; box-shadow: 0 16px 36px rgba(0,0,0,0.12); }
 .debug-info-title {
   color: var(--ac);
@@ -1313,6 +1331,17 @@ html[data-font="exo2"]       { --font-ui: 'NW Exo 2', 'Exo 2', 'NW Orbitron', 'O
   .pinfo-save {
     font-size: 11px;
     line-height: 1.7;
+  }
+  .music-player-row {
+    align-items: flex-start;
+  }
+  .music-player-controls {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .music-player-btn {
+    min-width: 84px;
   }
 }
 

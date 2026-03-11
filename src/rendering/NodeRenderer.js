@@ -1,8 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Node Renderer
+   Node renderer
 
-   Static methods: draw a single GameNode onto a 2D canvas context.
-   All canvas calls are here; GameNode itself has zero draw logic.
+   Draws a single GameNode onto a 2D canvas context. All canvas calls
+   are here; GameNode itself has no rendering logic.
    ================================================================ */
 
 import { GAMEPLAY_RULES, NodeType, EMBRYO } from '../config/gameConfig.js';
@@ -35,6 +35,8 @@ function colorWithAlpha(hexColor, alpha) {
 }
 
 function drawNodeHull(ctx, x, y, radius, sides, angle) {
+  // Level 0 nodes intentionally fall back to circles so very low-energy cells
+  // never disappear because a polygon would have fewer than three sides.
   if (!sides || sides < 3) {
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -151,6 +153,8 @@ export class NodeRenderer {
       ctx.stroke();
 
       if (leadingEntry) {
+        // Coalition-sum capture can still show a secondary contributor without
+        // implying there are two independent threshold races.
         const leadColor = contestColor(leadingEntry.owner, leadingEntry.score);
         ctx.beginPath();
         ctx.arc(n.x, n.y, captureRingRadius, -Math.PI / 2, -Math.PI / 2 + leadingFraction * Math.PI * 2);
@@ -541,6 +545,8 @@ export class NodeRenderer {
 
   /* ── Relay node visual ── */
   static _drawRelay(ctx, n, r, ang, time, fogAlpha) {
+    // Relay visuals lean more crystalline than normal cells so infrastructure
+    // lanes read differently from biological nodes at first glance.
     const rc = ownerColor(n.owner, Math.max(n.level, 2), '#40ffbb');
     const rb = n.owner !== 0;
     const highGraphics = STATE.settings.graphicsMode === 'high';

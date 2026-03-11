@@ -1,6 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Tutorial System
-   Handles tutorial step logic, ghost-cursor drawing, and UI.
+   Tutorial system
+
+   Handles tutorial step logic, ghost-cursor drawing, and guided input
+   gating for the optional onboarding phases.
    ================================================================ */
 
 import { getTutorialSteps, T } from '../localization/i18n.js';

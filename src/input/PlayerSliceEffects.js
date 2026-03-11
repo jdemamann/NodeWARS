@@ -1,3 +1,11 @@
+/* ================================================================
+   Player slice effects
+
+   Wraps the side effects triggered by a successful player slice:
+   canonical cut application, defensive AI reaction tracking, frenzy
+   counting, and toast message generation.
+   ================================================================ */
+
 import { isPlayerEnemyOwner } from '../systems/OwnerTeams.js';
 
 export function applyPlayerSliceCut(sliceCut, handlers) {

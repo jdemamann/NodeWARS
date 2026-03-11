@@ -1,8 +1,9 @@
 /* ================================================================
-   NODE WARS v3 — AI System
+   AI system
 
-   Key improvement: personality is now a strategy object instead of
-   inline conditionals. Scoring weights are named constants.
+   Chooses tentacle launches and slice pressure for red and purple
+   coalition enemies. Tactical state selection and move scoring are
+   delegated to AIScoring so the runtime loop stays readable.
    ================================================================ */
 
 import { GAMEPLAY_RULES, NodeType, TentState } from '../config/gameConfig.js';

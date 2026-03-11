@@ -1,4 +1,13 @@
+/* ================================================================
+   Level select helpers
+
+   Small markup helpers for phase cards and mechanic badges inside the
+   campaign level-select screen.
+   ================================================================ */
+
 export function buildLevelMechanicBadge(levelConfig) {
+  // Keep the badge dense but readable: it is a quick mechanic cue, not a full
+  // phase description.
   if (levelConfig.vortexCount > 0) {
     return '<div class="lb-meta lb-meta-vortex">VORTEX×' + levelConfig.vortexCount +
       (levelConfig.hasSuperVortex ? ' ⊗' : '') +

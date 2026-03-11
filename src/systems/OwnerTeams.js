@@ -1,3 +1,11 @@
+/* ================================================================
+   Owner team helpers
+
+   Centralises alliance and hostility rules between owners. Gameplay,
+   AI, and rendering should all go through this module when they need
+   to know whether two owners cooperate or fight.
+   ================================================================ */
+
 export function getOwnerTeamId(ownerId) {
   if (ownerId === 1) return 1;
   if (ownerId === 2 || ownerId === 3) return 2;

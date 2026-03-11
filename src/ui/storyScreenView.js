@@ -1,3 +1,10 @@
+/* ================================================================
+   Story screen view
+
+   Converts localized story chapters into the themed markup shown in
+   the campaign story screen.
+   ================================================================ */
+
 function getStoryChapterMeta(chapterTitle) {
   if (!chapterTitle) return { icon: '◈', accentClass: 'story-accent-prologue' };
   if (chapterTitle.includes('WORLD 1') || chapterTitle.includes('MUNDO 1')) return { icon: '◈', accentClass: 'story-accent-genesis' };

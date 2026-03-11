@@ -17,26 +17,38 @@ all player-facing feedback reused a single plain-text toast.
 - track metadata
 - grouped theme playback
 - ending-theme playback
+- soundtrack preview playback from Settings
 - track-change listener registration
 
 Gameplay themes are selected through:
 
 - `Music.playLevelTheme(levelConfig)`
 
-Current grouping:
+Current grouped soundtrack map:
 
-- World 1 opening/tutorial phases
-- World 1 mid-pressure phases
-- World 1 boss
-- World 2 opening/tutorial phases
-- World 2 mid-pressure phases
-- World 2 boss
-- World 3 opening/tutorial phases
-- World 3 mid-pressure phases
-- World 3 late/final pressure phases
-- campaign ending
-
-The menu theme remains a separate sacred track.
+- `DRIFT SIGNAL`
+  - menu only
+  - sacred theme, intentionally unchanged
+- `GENESIS PULSE`
+  - World 1 tutorial and phases `1-4`
+- `SIEGE BLOOM`
+  - World 1 phases `5-9`
+- `ECHO CORE`
+  - World 1 phase `10`
+- `HOLLOW SIGNAL`
+  - World 2 tutorial and phases `12-14`
+- `ENTROPY CURRENT`
+  - World 2 phases `15-20`
+- `OBLIVION GATE`
+  - World 2 phase `21`
+- `CURRENT`
+  - World 3 tutorial and phases `23-24`
+- `SIGNAL WAR`
+  - World 3 phases `25-28`
+- `TRANSCENDENCE PROTOCOL`
+  - World 3 phases `29-32`
+- `THE NETWORK AWAKENS`
+  - campaign ending
 
 ## Notifications
 
@@ -61,6 +73,12 @@ Notification cards support:
 - dedupe key
 - priority-aware suppression / eviction
 
+For music changes specifically:
+
+- the title is the track name
+- the body is a short emotional description of the track's intent
+- technical metadata such as BPM or loop duration is intentionally omitted from the player-facing card
+
 Priority behavior:
 
 - `warning` outranks all other runtime cards
@@ -76,6 +94,17 @@ The new notification stack is already used for:
 - AI defensive retreat signal
 - debug snapshot copied
 - progress reset
+
+## Settings soundtrack player
+
+The settings screen now includes a lightweight soundtrack player:
+
+- previous track
+- play / pause preview
+- next track
+
+This preview surface uses the same canonical `Music` module as the rest of the
+game, instead of a separate settings-only audio path.
 
 ## Final campaign flow
 

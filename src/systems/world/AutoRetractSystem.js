@@ -1,3 +1,10 @@
+/* ================================================================
+   Auto-retract system
+
+   Retracts isolated hostile lanes after sustained starvation. Allied
+   support lines are intentionally ignored.
+   ================================================================ */
+
 import { bus } from '../../core/EventBus.js';
 import { areHostileOwners } from '../OwnerTeams.js';
 

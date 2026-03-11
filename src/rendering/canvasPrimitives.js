@@ -1,5 +1,7 @@
 /* ================================================================
-   NODE WARS v3 — Canvas Primitives
+   Canvas primitives
+
+   Small drawing helpers shared by renderers.
    ================================================================ */
 
 /** Draw a regular polygon (or circle if sides < 3) centered at (x,y). */

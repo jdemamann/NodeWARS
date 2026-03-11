@@ -1,5 +1,5 @@
 /* ================================================================
-   NODE WARS v3 — UI Renderer
+   UI renderer
 
    Canvas-drawn UI elements that overlay the game world:
      • transient world-space feedback events

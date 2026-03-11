@@ -1,8 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Game (loop coordinator)
+   Game loop coordinator
 
-   Owns the game loop, input handling, level loading, and the
-   main update pipeline.  Rendering is delegated to Renderer.
+   Orchestrates the live runtime: level loading, input, simulation,
+   rendering, HUD refresh, and screen transitions.
    ================================================================ */
 
 import { LEVELS, TentState, NodeType, TIER_REGEN, GAMEPLAY_RULES } from '../config/gameConfig.js';
@@ -276,6 +276,8 @@ export class Game {
 
   /* ─────────────────────────────── LEVEL LOADING ── */
   loadLevel(idx) {
+    // Level loading rebuilds the entire live runtime for the phase: nodes,
+    // world features, AI controllers, tutorial state, and music context.
     const cfg = LEVELS.find(l => l.id === idx) || LEVELS[idx];
     if (!cfg) { console.error('Level not found:', idx); return; }
     this._clearPendingTutorialReload();
@@ -335,6 +337,8 @@ export class Game {
   }
 
   _loadTutLayout(cfg, W, H) {
+    // Tutorial layouts stay deterministic so each scripted onboarding step has
+    // reliable geometry and expected targets.
     const cx = W / 2, cy = H / 2;
     const tutorialWorldId = cfg.tutorialWorldId || 1;
     const rnd = (a, b) => a + Math.random() * (b - a);
@@ -372,6 +376,7 @@ export class Game {
   }
 
   _finalizeLoadedLayout(cfg) {
+    // Central post-load sync point for tutorial UI and world transition polish.
     const tutbox = $id(DOM_IDS.TUTBOX);
     if (cfg.isTutorial) {
       this.tut.reset();
@@ -390,6 +395,8 @@ export class Game {
   }
 
   _loadRandomLayout(cfg, N, MR, mg, W, H) {
+    // Procedural fallback layout for non-authored phases. Authored layouts are
+    // preferred whenever a fixed campaign layout exists.
     const rnd = (a, b) => a + Math.random() * (b - a);
 
     if (cfg.isSymmetricLayout) {
@@ -471,6 +478,8 @@ export class Game {
 
   /* ─────────────────────────────── UPDATE ── */
   update(dt) {
+    // Frame order matters: budgets, clashes, nodes, world systems, tentacles,
+    // particles, AI, then end-state checks.
     this._frame++;
     if (this.state !== 'playing' || this.paused || this.done) return;
     this.time     += dt;

@@ -1,5 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Constants, Enums, Level Data
+   Constants, enums, and level data
+
+   This module is the main tuning surface for gameplay, campaign
+   progression, UI themes, and authored phase metadata.
    ================================================================ */
 
 /* ── ENUMS ── */

@@ -1,4 +1,13 @@
+/* ================================================================
+   Credits view
+
+   Builds the credits screen markup from localized labels and a small
+   fixed section list.
+   ================================================================ */
+
 export function buildCreditsMarkup(T, isPortuguese) {
+  // Credits stay intentionally short so this screen works as a clean product
+  // close-out rather than a dense legal page.
   const sections = [
     {
       title: isPortuguese ? 'CRIAÇÃO' : 'CREATION',

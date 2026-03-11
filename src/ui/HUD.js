@@ -1,9 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — HUD
+   HUD
 
-   Updates the fixed top-bar DOM elements.  Uses a dirty flag so
-   the DOM is only touched when values actually change — avoids
-   querySelector overhead at 60 fps.
+   Updates the fixed top-bar DOM elements. Uses a dirty flag so the
+   DOM is only touched when values actually change.
    ================================================================ */
 
 import { DOM_IDS } from './DomIds.js';

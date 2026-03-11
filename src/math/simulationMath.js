@@ -1,5 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Simulation Math
+   Simulation math
+
+   Shared scalar helpers used by gameplay systems, node progression,
+   and range/cost calculations.
    ================================================================ */
 
 import { LVL_STEP, BUILD_RULES, PROGRESSION_RULES } from '../config/gameConfig.js';

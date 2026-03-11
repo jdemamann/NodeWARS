@@ -1,9 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Tentacle Renderer
+   Tent renderer
 
-   Static methods: draw a single Tent (plus its orbs) onto a 2D
-   canvas context. All canvas calls live here; Tent has no draw
-   logic of its own.
+   Draws a single tentacle and its particles onto the canvas. All
+   canvas calls live here; Tent itself contains no rendering logic.
    ================================================================ */
 
 import { GAMEPLAY_RULES, TentState } from '../config/gameConfig.js';
@@ -27,6 +26,8 @@ function drawOrganicTaperedPath(ctx, sx, sy, cpx, cpy, ex, ey, t0, t1, widthBase
   clashCenter = null,
   clashDistortionPx = 0,
 } = {}) {
+  // The body is built as a filled silhouette instead of a stroked curve so
+  // high-graphics mode can read as tissue/pressure rather than a flat line.
   const N    = segmentCount;
   const left = [], right = [];
   const dt   = (t1 - t0) * 0.001;
@@ -168,6 +169,8 @@ function drawTransferSignature(ctx, tentacle, x, y, color, time, highGraphics) {
   }
 
   if (isRelaySurge) {
+    // Relay-fed lanes should look amplified so players can read that the lane
+    // is being backed by infrastructure rather than a normal direct feed.
     ctx.beginPath();
     ctx.arc(x, y, baseRadius * 1.1, 0, Math.PI * 2);
     ctx.strokeStyle = colorWithAlpha('#ffffff', RENDER_RULES.TENTACLE.RELAY_SURGE_ALPHA);

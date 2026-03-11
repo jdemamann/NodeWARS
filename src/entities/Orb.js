@@ -1,6 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Orb & FreeOrb with Object Pool
-   Eliminates per-frame GC pressure from constant new Orb() allocation.
+   Orb entities and pools
+
+   Energy particles are pooled to avoid per-frame allocation churn in
+   busy tentacle scenes.
    ================================================================ */
 
 import { clamp } from '../math/simulationMath.js';

@@ -31,6 +31,7 @@ Choose a small wave:
 
 Also choose the most relevant domain agent before starting.
 If the task clearly matches an installed Codex skill, choose that skill before implementation.
+If the wave touches `src/*.js`, also open `docs/project/commentary-header-template.md` before editing.
 
 ### 3. Write a short spec
 
@@ -65,10 +66,17 @@ Rules:
 - preserve canonical entry points
 - do not create duplicate rule paths
 - if gameplay changed, consider adding or updating a guardrail
+- if a touched source file lacks a module header, add it
+- if a created or materially changed function lacks a short header comment, add it
 
 ### 5. Validate
 
 Run the minimum checks from the matrix.
+If the wave touched `src/*.js`, always include:
+
+```bash
+node scripts/commentary-policy.mjs
+```
 
 If there is any doubt:
 

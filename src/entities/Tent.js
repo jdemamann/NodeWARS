@@ -1,9 +1,8 @@
 /* ================================================================
-   NODE WARS v3 — Tent (Tentacle)
+   Tent entity
 
-   Responsibilities: data model + physics update.
-   Rendering is handled by TentRenderer.
-   Orb spawning is delegated to OrbPool via the shouldSpawnOrb helper.
+   Owns tentacle lifecycle, flow, slice resolution, clash state, and
+   payload transfer. Rendering is handled by TentRenderer.
    ================================================================ */
 
 import { TentState, GROW_PPS, ADV_PPS, EMBRYO, TIER_REGEN, GAME_BALANCE, CUT_RULES } from '../config/gameConfig.js';

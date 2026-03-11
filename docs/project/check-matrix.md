@@ -123,6 +123,18 @@ Protects:
 npm run check
 ```
 
+### Commentary policy
+
+```bash
+node scripts/commentary-policy.mjs
+```
+
+Protects:
+
+- module headers in changed `src/*.js` files
+- short block headers for newly added or modified function signatures
+- English-only commentary policy in touched source files
+
 ---
 
 ## Matrix By Change Type
@@ -146,6 +158,7 @@ Suggested agent:
 Run:
 
 - `smoke-checks`
+- `commentary-policy` when source files were changed
 - `simulation-soak`
 
 Add:
@@ -168,6 +181,7 @@ Suggested agent:
 Run:
 
 - `smoke-checks`
+- `commentary-policy` when source files were changed
 - `simulation-soak`
 
 Add:
@@ -191,6 +205,7 @@ Suggested agent:
 Run:
 
 - `campaign-sanity`
+- `commentary-policy` when source files were changed
 - `smoke-checks`
 
 Add:
@@ -218,6 +233,7 @@ Suggested agents:
 
 Run:
 
+- `commentary-policy` when source files were changed
 - `ui-actions-sanity`
 - `ui-dom-sanity`
 
@@ -241,6 +257,7 @@ Suggested agent:
 Run:
 
 - `smoke-checks`
+- `commentary-policy` when source files were changed
 - `ui-actions-sanity`
 
 Add:

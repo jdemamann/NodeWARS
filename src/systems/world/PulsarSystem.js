@@ -1,3 +1,10 @@
+/* ================================================================
+   Pulsar system
+
+   Advances pulsar timers and injects energy into owned non-relay
+   nodes when a pulse fires.
+   ================================================================ */
+
 import { GAMEPLAY_RULES } from '../../config/gameConfig.js';
 import { computeDistanceSquared } from '../../math/simulationMath.js';
 import { bus } from '../../core/EventBus.js';
