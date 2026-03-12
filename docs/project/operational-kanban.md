@@ -16,9 +16,16 @@ Use it as the local source of truth when:
 
 - investigate additional tutorial playtest feedback once new sessions are recorded
 - evaluate whether `24 RELAY RACE` needs structural player opening support
-- decide when to start the Tentacle Wars fidelity track
+- prepare the dedicated `TentacleWars` mode branch and first prototype rollout
 
 ## Planned
+
+- `TASK-TW-001 TentacleWars Mode Skeleton`
+- `TASK-TW-002 TentacleWars Grade Table and Packet Core`
+- `TASK-TW-003 TentacleWars Tentacle Cost and Refund`
+- `TASK-TW-004 TentacleWars Overflow and Capture Core`
+- `TASK-TW-005 TentacleWars Sandbox Prototype`
+- `TASK-TW-006 TentacleWars AI Phase 1`
 
 ## In Progress
 

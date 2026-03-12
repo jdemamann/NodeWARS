@@ -87,6 +87,164 @@ Primary deliverables:
 - targeted fixes
 - matching guardrails
 
+### TENTACLEWARS TRACK
+
+#### TASK-TW-001 TentacleWars Mode Skeleton
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/meta-progression-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- add a clean mode boundary for `TentacleWars` without destabilizing `NodeWARS`
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/game-state-progression-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+
+Primary deliverables:
+
+- mode selection plumbing
+- runtime boundary for the new mode
+- no behavior drift in existing NodeWARS mode
+
+#### TASK-TW-002 TentacleWars Grade Table and Packet Core
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- implement the TentacleWars grade table, hysteresis, packet accumulator, and per-grade packet throughput
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- grade thresholds
+- packet accumulator model
+- parameterized packet throughput table
+
+#### TASK-TW-003 TentacleWars Tentacle Cost and Refund
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- implement linear distance-only tentacle cost, progressive growth payment, and full refund semantics for the new mode
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- distance-only cost rule
+- progressive build commitment
+- full refund on cancel/retract
+
+#### TASK-TW-004 TentacleWars Overflow and Capture Core
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- implement split-equal overflow, neutral acquisition cost, hostile reset + carryover, and packet-aware lane payout
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- overflow mode parameterization
+- neutral capture acquisition model
+- hostile capture reset and carryover rule
+
+#### TASK-TW-005 TentacleWars Sandbox Prototype
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/content-authored-levels-agent.md`
+  - `docs/agents/meta-progression-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- ship one randomized TentacleWars sandbox phase with player, red, purple, and neutrals for mechanic validation
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/campaign-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+
+Primary deliverables:
+
+- first playable TentacleWars prototype
+- randomized sandbox layout
+- mode-select flow into the prototype
+
+#### TASK-TW-006 TentacleWars AI Phase 1
+
+- Owner: `ai-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/ai-behavior-agent.md`
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `medium`
+- Status: `planned`
+
+Goal:
+
+- add red and purple AI behavior adapted to packet flow, overflow pressure, and purple slice identity in the new mode
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- red AI for TentacleWars mode
+- purple disruptive slice behavior
+- parameterized hostility mode
+
 ### LATER
 
 #### TASK-037 Enemy Slice Pressure Wave
