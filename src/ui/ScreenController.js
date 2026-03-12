@@ -461,8 +461,10 @@ export function refreshSettingsUI() {
 
   const currentTrackLabel = $(DOM_IDS.MUSIC_TRACK_LABEL);
   if (currentTrackLabel) {
-    const trackInfo = Music.currentTrackInfo() || Music.pausedTrackInfo();
-    currentTrackLabel.textContent = trackInfo ? T(trackInfo.titleKey) : T('setMusicCurrentIdle');
+    const trackInfo = Music.currentPreviewTrackInfo() || Music.pausedTrackInfo();
+    currentTrackLabel.textContent = trackInfo
+      ? `${T(trackInfo.titleKey)} · ${Music.currentPreviewTrackPosition()}/${Music.trackCount()}`
+      : T('setMusicCurrentIdle');
   }
 
   const toggleButton = $(DOM_IDS.BTN_MUSIC_TOGGLE);

@@ -123,6 +123,8 @@ async function testScreenTransitionsUseNamedScreens() {
   assert.match(mainSource, /showScr\('levels'\)/, 'main menu flow should still navigate to the level-select screen');
   assert.match(mainSource, /showScr\('settings'\)/, 'settings flow should still navigate to the settings screen');
   assert.match(mainSource, /showScr\('credits'\)/, 'credits flow should still navigate to the credits screen');
+  assert.match(mainSource, /BTN_CREDITS[\s\S]*Music\.playTrackById\('stella'\)/, 'credits flow should switch to Stella when the credits screen opens');
+  assert.match(mainSource, /BTN_CREDITS_BACK[\s\S]*Music\.playMenu\(\)/, 'leaving credits should restore the menu theme');
   assert.match(mainSource, /showScr\('menu'\)/, 'back buttons should still navigate to the menu screen');
   assert.match(screenController, /showScr\('ending'\)/, 'campaign completion should still navigate to the dedicated ending screen');
 }
@@ -165,6 +167,7 @@ async function testSettingsWorldTogglesAndMenuFeedbackStayRobust() {
     STATE.completed = 10;
     STATE.settings.w2 = null;
     STATE.settings.w3 = null;
+    STATE.settings.debug = true;
     assert.equal(STATE.isWorldUnlocked(2), true, 'world 2 should unlock naturally from campaign progress');
 
     STATE.settings.w2 = false;
@@ -179,6 +182,10 @@ async function testSettingsWorldTogglesAndMenuFeedbackStayRobust() {
 
     STATE.settings.w2 = true;
     assert.equal(STATE.isWorldUnlocked(2), true, 'world 2 manual ON should still work before natural unlock');
+
+    STATE.setDebugMode(false);
+    assert.equal(STATE.settings.w2, null, 'disabling debug should clear the world-2 override');
+    assert.equal(STATE.isWorldUnlocked(2), false, 'after debug is disabled, world 2 should return to natural progression');
   } finally {
     STATE.completed = originalCompleted;
     STATE.settings = originalSettings;

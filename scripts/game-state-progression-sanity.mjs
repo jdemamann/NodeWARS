@@ -66,10 +66,27 @@ function testTutorialCompletionUsesCanonicalProgression() {
 
 function testManualWorldOverridesRemainEffective() {
   withIsolatedState(() => {
+    STATE.settings.debug = true;
     STATE.settings.w2 = true;
     assert.equal(STATE.isWorldUnlocked(2), true, 'manual world visibility should be able to force-unlock World 2');
     STATE.settings.w2 = false;
     assert.equal(STATE.isWorldUnlocked(2), false, 'manual world visibility should also be able to hide World 2 again');
+  });
+}
+
+function testDisablingDebugClearsManualWorldOverrides() {
+  withIsolatedState(() => {
+    STATE.settings.debug = true;
+    STATE.settings.w2 = true;
+    STATE.settings.w3 = true;
+    assert.equal(STATE.isWorldUnlocked(2), true, 'debug-time world override should expose World 2');
+
+    STATE.setDebugMode(false);
+
+    assert.equal(STATE.settings.w2, null, 'disabling debug should clear the World 2 override');
+    assert.equal(STATE.settings.w3, null, 'disabling debug should clear the World 3 override');
+    assert.equal(STATE.isWorldUnlocked(2), false, 'after debug is disabled, World 2 should fall back to natural campaign progression');
+    assert.equal(STATE.isWorldUnlocked(3), false, 'after debug is disabled, World 3 should fall back to natural campaign progression');
   });
 }
 
@@ -89,6 +106,7 @@ const tests = [
   ['natural world transition still targets tutorials', testNaturalWorldTransitionStillTargetsTutorial],
   ['tutorial completion uses canonical progression', testTutorialCompletionUsesCanonicalProgression],
   ['manual world overrides remain effective', testManualWorldOverridesRemainEffective],
+  ['disabling debug clears manual world overrides', testDisablingDebugClearsManualWorldOverrides],
   ['skip rule and fail streak flow stay canonical', testSkipRuleAndFailStreakFlow],
 ];
 

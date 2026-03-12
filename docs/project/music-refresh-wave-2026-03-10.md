@@ -82,6 +82,10 @@ They no longer show:
   - World 3 phases `29-32`
 - `THE NETWORK AWAKENS`
   - campaign ending
+- `STELLA`
+  - bonus track available through the Settings soundtrack player
+- `AQUEOUS`
+  - bonus track available through the Settings soundtrack player
 
 ## Rationale
 

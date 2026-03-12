@@ -257,11 +257,11 @@ async function testRefreshSettingsUiReflectsEffectiveState() {
     assert.notEqual(fakeDocument.getElementById(DOM_IDS.BTN_MUSIC_TOGGLE).textContent, '', 'settings UI should expose the soundtrack play/pause label');
 
     STATE.settings.w2 = false;
-    STATE.settings.debug = false;
+    STATE.setDebugMode(false);
     screenController.refreshSettingsUI();
 
-    assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).textContent, 'OFF', 'manual world-2 disable should override natural campaign unlock in settings UI');
-    assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).classList.contains('on'), false, 'world-2 disable should clear the ON styling');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).textContent, 'ON', 'once debug is disabled, world 2 should reflect natural campaign unlock again');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).classList.contains('on'), true, 'natural campaign unlock should restore the ON styling');
     assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_UNLOCK_GROUP).style.display, 'none', 'manual world unlock controls should hide when debug mode is disabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_RESET_ROW).style.display, 'none', 'debug rows should hide when debug mode is disabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_INFO_PANEL).style.display, 'none', 'debug panel should hide when debug mode is disabled');
@@ -369,8 +369,10 @@ async function testBuildWorldTabsRespectsEffectiveVisibility() {
     assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_TABS).children.length, 1, 'manual World 2 disable should remove the second world tab again');
 
     STATE.settings.debug = true;
+    STATE.settings.w2 = true;
+    STATE.settings.w3 = true;
     screenController.buildWorldTabs();
-    assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_TABS).children.length, 3, 'debug mode should still expose all world tabs');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_TABS).children.length, 3, 'debug mode should expose extra world tabs only through explicit overrides');
   } finally {
     STATE.completed = originalCompleted;
     STATE.settings = originalSettings;

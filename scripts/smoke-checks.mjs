@@ -891,8 +891,13 @@ async function testWorldUnlockAndPurpleBadgeGuardrailsStayPresent() {
   assert.equal(STATE.isLevelUnlocked(world1FirstPhase), true, 'World 1 first playable phase should be available even if the tutorial is skipped');
   assert.equal(STATE.getNextLevelId(10), 11, 'finishing World 1 should naturally flow to the World 2 tutorial');
   assert.equal(STATE.isWorldUnlocked(2), false, 'World 2 should stay locked in a fresh campaign without manual enable');
+  STATE.settings.debug = true;
   STATE.settings.w2 = true;
   assert.equal(STATE.isWorldUnlocked(2), true, 'manual World 2 enable should unlock the world even before campaign progress reaches it');
+  STATE.setDebugMode(false);
+  assert.equal(STATE.settings.w2, null, 'disabling debug should clear the manual World 2 override');
+  assert.equal(STATE.isWorldUnlocked(2), false, 'after debug is disabled, World 2 should fall back to natural progression');
+  STATE.settings.debug = true;
   STATE.settings.w2 = null;
 
   STATE.completed = 10;
@@ -904,6 +909,9 @@ async function testWorldUnlockAndPurpleBadgeGuardrailsStayPresent() {
   assert.equal(STATE.isWorldUnlocked(2), false, 'manual World 2 disable should override natural campaign unlock');
   STATE.settings.w2 = true;
   assert.equal(STATE.isWorldUnlocked(2), true, 'manual World 2 enable should restore the world after an explicit disable');
+  STATE.setDebugMode(false);
+  assert.equal(STATE.isWorldUnlocked(2), true, 'disabling debug after a manual override should restore natural campaign unlock visibility');
+  STATE.settings.debug = true;
   STATE.settings.w2 = null;
   assert.equal(STATE.isLevelUnlocked(world2Tutorial), true, 'World 2 tutorial should be available as soon as World 2 opens');
   assert.equal(STATE.isLevelUnlocked(world2FirstPhase), true, 'World 2 first playable phase should be available even if the tutorial is skipped');
@@ -1293,6 +1301,7 @@ async function testCampaignEndingFlowAndDebugPreviewStayPresent() {
   assert.match(i18nSource, /setViewEnding:/, 'settings copy should expose the campaign ending preview label in i18n');
   assert.match(i18nSource, /viewEnding:/, 'button copy should expose the campaign ending preview CTA in i18n');
   assert.match(musicSource, /networkAwakens/, 'music system should expose a dedicated ending theme definition');
+  assert.match(musicSource, /stella/, 'music system should expose the Stella bonus track definition');
 }
 
 async function testGroupedMusicAndNotificationFlowStayCanonical() {
@@ -1307,7 +1316,10 @@ async function testGroupedMusicAndNotificationFlowStayCanonical() {
   assert.match(musicSource, /function playEnding\(\)/, 'music should expose a dedicated epilogue theme');
   assert.match(musicSource, /setTrackChangeListener\(listener\)/, 'music should support structured track-change notifications');
   assert.match(musicSource, /let isPreviewPlayback = false;/, 'music should track a dedicated preview-playback mode for the settings soundtrack player');
+  assert.match(musicSource, /let previewTrackId = null;/, 'music should keep a dedicated preview cursor for soundtrack browsing');
   assert.match(musicSource, /if \(isPreviewPlayback\) return 1;/, 'preview playback should bypass the normal music toggle so settings preview always works');
+  assert.match(musicSource, /trackCount: \(\) => TRACK_ORDER\.length/, 'music should expose the full soundtrack catalog size');
+  assert.match(musicSource, /currentPreviewTrackPosition:/, 'music should expose the current soundtrack preview position');
   assert.match(musicSource, /phaseRangeLabel:\s*'World 1 tutorial · phases 1-4'/, 'music metadata should document the World 1 opening phase range');
   assert.match(musicSource, /phaseRangeLabel:\s*'World 2 phases 15-20'/, 'music metadata should document the World 2 mid-pressure phase range');
   assert.match(musicSource, /phaseRangeLabel:\s*'World 3 phases 29-32'/, 'music metadata should document the World 3 finale phase range');
@@ -1326,6 +1338,8 @@ async function testGroupedMusicAndNotificationFlowStayCanonical() {
   assert.match(screenControllerSource, /const _notificationPriority = \{[\s\S]*warning:\s*4[\s\S]*objective:\s*3/s, 'notification stack should define explicit priority tiers');
   assert.match(screenControllerSource, /if \(dedupeKey\) \{[\s\S]*_notificationRecent\.set\(dedupeKey, now\)/s, 'notification stack should dedupe repeat events');
   assert.match(i18nSource, /trackSignalWar:/, 'localization should expose grouped soundtrack names');
+  assert.match(i18nSource, /trackStella:/, 'localization should expose the Stella bonus track name');
+  assert.match(i18nSource, /trackRoleBonusStella:/, 'localization should expose the Stella emotional role text');
   assert.match(mainSource, /body:\s*T\(trackInfo\.roleKey\)/, 'music popup body should use the emotional track role copy');
   assert.doesNotMatch(mainSource, /notifMusicMeta/, 'music popup should no longer expose technical BPM or loop metadata');
 }
@@ -1335,6 +1349,7 @@ async function testMusicBootContractStaysRuntimeSafe() {
   const { Music } = musicModule;
 
   assert.equal(typeof Music?.setTrackChangeListener, 'function', 'Music runtime contract should expose setTrackChangeListener for boot wiring');
+  assert.ok(Music.trackCount() >= 13, 'soundtrack player should expose the full music catalog including bonus tracks');
 
   const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
   assert.match(
@@ -1342,6 +1357,23 @@ async function testMusicBootContractStaysRuntimeSafe() {
     /if \(typeof Music\.setTrackChangeListener === 'function'\) \{[\s\S]*Music\.setTrackChangeListener\(/,
     'game boot should guard the optional track-change listener contract before using it',
   );
+}
+
+async function testSoundtrackPlayerCanBrowseTheFullCatalog() {
+  const musicModule = await load('src/audio/Music.js');
+  const { Music } = musicModule;
+
+  const visitedTrackIds = [];
+  for (let index = 0; index < Music.trackCount(); index += 1) {
+    Music.nextTrack();
+    const trackInfo = Music.currentPreviewTrackInfo();
+    assert.ok(trackInfo?.id, 'soundtrack player should expose a valid preview track when stepping through the catalog');
+    visitedTrackIds.push(trackInfo.id);
+  }
+
+  assert.ok(visitedTrackIds.includes('networkAwakens'), 'soundtrack player should reach the ending theme while browsing the catalog');
+  assert.ok(visitedTrackIds.includes('stella'), 'soundtrack player should reach Stella while browsing the catalog');
+  assert.ok(visitedTrackIds.includes('aqueous'), 'soundtrack player should reach Aqueous while browsing the catalog');
 }
 
 async function testUiDomainCheckAggregationStaysPresent() {
@@ -1460,6 +1492,7 @@ async function main() {
     ['Campaign ending flow and debug preview stay present', testCampaignEndingFlowAndDebugPreviewStayPresent],
     ['Grouped music and notification flow stay canonical', testGroupedMusicAndNotificationFlowStayCanonical],
     ['Music boot contract stays runtime-safe', testMusicBootContractStaysRuntimeSafe],
+    ['Soundtrack player can browse the full catalog', testSoundtrackPlayerCanBrowseTheFullCatalog],
     ['UI domain check aggregation stays present', testUiDomainCheckAggregationStaysPresent],
     ['Canvas font selection stays canonical', testCanvasFontSelectionStaysCanonical],
     ['Campaign balance wave B values stay applied', testCampaignBalanceWaveBValuesStayApplied],

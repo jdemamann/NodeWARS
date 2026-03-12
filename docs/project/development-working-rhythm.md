@@ -53,6 +53,7 @@ If the wave touches AI, progression, or checks, consult first:
 
 If the wave touches content, render, text, or comments, also consult:
 
+- `docs/agents/audio-reconstruction-agent.md` for authored soundtrack rebuilds
 - `docs/agents/content-authored-levels-agent.md`
 - `docs/agents/render-visual-language-agent.md`
 - `docs/agents/narrative-localization-agent.md`

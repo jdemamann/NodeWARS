@@ -20,6 +20,7 @@ let scheduledTimers = [];
 let beatIntervalId = null;
 let trackChangeListener = null;
 let pausedTrackId = null;
+let previewTrackId = null;
 let isPreviewPlayback = false;
 let preservePreviewOnPlay = false;
 
@@ -45,6 +46,7 @@ const E5 = 659.26;
 const F5 = 698.46;
 const G5 = 784.00;
 const A5 = 880.00;
+const B5 = 987.77;
 
 const TRACKS = Object.freeze({
   menu: {
@@ -157,6 +159,26 @@ const TRACKS = Object.freeze({
     kind: 'ending',
     phaseRangeLabel: 'Campaign ending',
   },
+  stella: {
+    id: 'stella',
+    titleKey: 'trackStella',
+    roleKey: 'trackRoleBonusStella',
+    icon: '✧',
+    bpm: 129,
+    loopSeconds: 15,
+    kind: 'bonus',
+    phaseRangeLabel: 'Soundtrack player bonus track',
+  },
+  aqueous: {
+    id: 'aqueous',
+    titleKey: 'trackAqueous',
+    roleKey: 'trackRoleBonusAqueous',
+    icon: '✧',
+    bpm: 152,
+    loopSeconds: 13,
+    kind: 'bonus',
+    phaseRangeLabel: 'Soundtrack player bonus track',
+  },
 });
 
 const TRACK_ORDER = Object.freeze([
@@ -171,6 +193,8 @@ const TRACK_ORDER = Object.freeze([
   'signalWar',
   'transcendenceProtocol',
   'networkAwakens',
+  'stella',
+  'aqueous',
 ]);
 
 function getAudioContext() {
@@ -322,6 +346,7 @@ function beginTrack(trackId, fadeInDuration) {
  */
 function beginPreviewPlayback() {
   isPreviewPlayback = true;
+  previewTrackId ||= TRACK_ORDER[0];
 }
 
 /*
@@ -838,6 +863,332 @@ function playEnding() {
   });
 }
 
+/*
+ * Bonus soundtrack track for manual listening in Settings.
+ * It aims for a brighter, guitar-song-like lift while staying inside the
+ * project's procedural synth vocabulary.
+ */
+function playStella() {
+  syncPreviewStateForNormalPlayback();
+  if (!beginTrack('stella', 1.4)) return;
+
+  const Cs4 = 277.18;
+  const D4 = 293.66;
+  const E4 = 329.63;
+  const Fs4 = 369.99;
+  const Gs4 = 415.30;
+  const A4 = 440.00;
+  const B4 = 493.88;
+  const Cs5 = 554.37;
+  const D5 = 587.33;
+  const E5 = 659.26;
+  const Fs5 = 739.99;
+  const Gs5 = 830.61;
+  const A5 = 880.00;
+  const B5 = 987.77;
+
+  const bpm = 129;
+  const beatMs = 60000 / bpm;
+  const stepMs = beatMs / 4;
+  const cycleMs = 3720;
+
+  const chordBeds = [
+    [A3, Cs4, E4],
+    [E3, Gs4, B4],
+    [Fs4, A4, Cs5],
+    [D4, Fs4, A4],
+  ];
+  const bassLine = [A3 / 2, E3 / 2, Fs4 / 2, D4 / 2];
+  const leadMotifs = [
+    [E4, A4, B4, Cs5, B4, A4, E4, Cs5],
+    [B4, Gs4, E4, Gs4, B4, E5, B4, Gs4],
+    [Cs5, A4, Fs4, A4, Cs5, E5, Fs5, E5],
+    [A4, Fs4, D4, Fs4, A4, D5, E5, Fs5],
+  ];
+  const sparkleMotifs = [
+    [A5, E5, Cs5],
+    [B5, Gs5, E5],
+    [A5, Fs5, Cs5],
+    [Fs5, E5, D5],
+  ];
+  const sectionPatterns = [
+    {
+      kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+      kickGain: 0.042,
+      snareGain: 0.024,
+      hatGain: 0.017,
+      bassGain: 0.16,
+      bedGainA: 0.075,
+      bedGainB: 0.052,
+      leadGain: 0.082,
+      sparkleGain: 0.0,
+    },
+    {
+      kick: [1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hat: [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1],
+      kickGain: 0.05,
+      snareGain: 0.03,
+      hatGain: 0.022,
+      bassGain: 0.19,
+      bedGainA: 0.085,
+      bedGainB: 0.057,
+      leadGain: 0.095,
+      sparkleGain: 0.03,
+    },
+    {
+      kick: [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      snare: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      hat: [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0],
+      kickGain: 0.03,
+      snareGain: 0.018,
+      hatGain: 0.012,
+      bassGain: 0.12,
+      bedGainA: 0.06,
+      bedGainB: 0.04,
+      leadGain: 0.07,
+      sparkleGain: 0.018,
+    },
+    {
+      kick: [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hat: [1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+      kickGain: 0.052,
+      snareGain: 0.033,
+      hatGain: 0.024,
+      bassGain: 0.2,
+      bedGainA: 0.09,
+      bedGainB: 0.06,
+      leadGain: 0.105,
+      sparkleGain: 0.04,
+    },
+  ];
+
+  let cycleIndex = 0;
+  let beatStep = 0;
+
+  /*
+   * Schedule the harmonic and melodic layer for the next Stella section.
+   * Input: none; it advances through internal section state.
+   * Output: queues oscillators for the active cycle and schedules the next pass.
+   */
+  function playCycle() {
+    if (!isPlayingTrack || currentTrack !== 'stella') return;
+
+    const section = sectionPatterns[cycleIndex % sectionPatterns.length];
+    const chord = chordBeds[cycleIndex % chordBeds.length];
+    const bass = bassLine[cycleIndex % bassLine.length];
+    const lead = leadMotifs[cycleIndex % leadMotifs.length];
+    const sparkle = sparkleMotifs[cycleIndex % sparkleMotifs.length];
+
+    osc(bass, 'sine', 3.5, section.bassGain, 0);
+    chord.forEach((frequency, index) => {
+      osc(frequency, 'triangle', 3.35, section.bedGainA, 0.04, index * 4);
+      osc(frequency, 'sine', 3.2, section.bedGainB, 0.04, -index * 3);
+    });
+
+    lead.forEach((frequency, index) => {
+      osc(frequency, index % 2 === 0 ? 'triangle' : 'sine', 0.22, section.leadGain, 0.12 + index * 0.18);
+    });
+
+    sparkle.forEach((frequency, index) => {
+      if (section.sparkleGain <= 0) return;
+      osc(frequency, 'sine', 0.12, section.sparkleGain, 0.72 + index * 0.28);
+    });
+
+    if (cycleIndex % 4 === 3) {
+      osc(lead[3], 'triangle', 0.32, section.leadGain * 0.8, 1.7);
+      osc(lead[5], 'sine', 0.25, section.sparkleGain + 0.02, 1.95);
+    }
+
+    cycleIndex = (cycleIndex + 1) % chordBeds.length;
+    scheduleTimer(playCycle, cycleMs);
+  }
+
+  /*
+   * Drive the per-step drum accents independently from the slower harmonic
+   * cycle so Stella can keep a song-like pulse without duplicating note logic.
+   */
+  beatIntervalId = setInterval(() => {
+    if (!isPlayingTrack || currentTrack !== 'stella') {
+      clearInterval(beatIntervalId);
+      return;
+    }
+
+    const section = sectionPatterns[cycleIndex % sectionPatterns.length];
+    const patternStep = beatStep % 16;
+    if (section.kick[patternStep]) noiseHit(0.14, section.kickGain, 0, 78);
+    if (section.snare[patternStep]) noiseHit(0.08, section.snareGain, 0, 250);
+    if (section.hat[patternStep]) noiseHit(0.045, section.hatGain, 0, 5600);
+    beatStep += 1;
+  }, stepMs);
+
+  playCycle();
+}
+
+/*
+ * Bonus soundtrack track rebuilt from an authored reference package.
+ * It keeps a fast aqueous pulse, an open A-centered harmonic field, and
+ * stronger section contrasts than the standard campaign themes.
+ */
+function playAqueous() {
+  syncPreviewStateForNormalPlayback();
+  if (!beginTrack('aqueous', 1.3)) return;
+
+  const Cs4 = 277.18;
+  const Fs4 = 369.99;
+  const Gs4 = 415.30;
+  const Cs5 = 554.37;
+  const D5 = 587.33;
+  const E5 = 659.26;
+  const Fs5 = 739.99;
+  const Gs5 = 830.61;
+  const A5 = 880.00;
+  const B5 = 987.77;
+
+  const bpm = 152;
+  const beatMs = 60000 / bpm;
+  const stepMs = beatMs / 4;
+  const cycleMs = beatMs * 8;
+
+  const chordBeds = [
+    [A3, Cs4, E4],
+    [G3, B3, D4],
+    [D3, Fs4, A4],
+    [E3, Gs4, B4],
+  ];
+  const bassLine = [A3 / 2, G3 / 2, D3 / 2, E3 / 2];
+  const leadMotifs = [
+    [E4, Fs4, A4, B4, A4, Fs4, E4, D4],
+    [D4, E4, G4, A4, G4, E4, D4, B3],
+    [A4, B4, D5, E5, D5, B4, A4, Fs4],
+    [B4, A4, Gs4, E4, Fs4, Gs4, B4, Cs5],
+  ];
+  const waterMotifs = [
+    [A5, E5, B4],
+    [Gs5, D5, B4],
+    [Fs5, D5, A4],
+    [B5, Gs5, E5],
+  ];
+  const sectionPatterns = [
+    {
+      kick: [1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hat: [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1],
+      kickGain: 0.046,
+      snareGain: 0.025,
+      hatGain: 0.02,
+      bassGain: 0.16,
+      bedGainA: 0.064,
+      bedGainB: 0.044,
+      leadGain: 0.078,
+      waterGain: 0.02,
+    },
+    {
+      kick: [1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hat: [1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+      kickGain: 0.052,
+      snareGain: 0.03,
+      hatGain: 0.024,
+      bassGain: 0.185,
+      bedGainA: 0.078,
+      bedGainB: 0.052,
+      leadGain: 0.093,
+      waterGain: 0.03,
+    },
+    {
+      kick: [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      snare: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      hat: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+      kickGain: 0.026,
+      snareGain: 0.014,
+      hatGain: 0.011,
+      bassGain: 0.11,
+      bedGainA: 0.05,
+      bedGainB: 0.032,
+      leadGain: 0.058,
+      waterGain: 0.042,
+    },
+    {
+      kick: [1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hat: [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+      kickGain: 0.056,
+      snareGain: 0.034,
+      hatGain: 0.028,
+      bassGain: 0.2,
+      bedGainA: 0.082,
+      bedGainB: 0.058,
+      leadGain: 0.1,
+      waterGain: 0.034,
+    },
+  ];
+
+  let cycleIndex = 0;
+  let beatStep = 0;
+
+  /*
+   * Schedule the harmonic wash and lead hooks for the current Aqueous cycle.
+   * Input: none; it advances its own section cursor.
+   * Output: queues bass, chord, lead, and shimmer layers before scheduling the next cycle.
+   */
+  function playCycle() {
+    if (!isPlayingTrack || currentTrack !== 'aqueous') return;
+
+    const section = sectionPatterns[cycleIndex % sectionPatterns.length];
+    const chord = chordBeds[cycleIndex % chordBeds.length];
+    const bass = bassLine[cycleIndex % bassLine.length];
+    const lead = leadMotifs[cycleIndex % leadMotifs.length];
+    const water = waterMotifs[cycleIndex % waterMotifs.length];
+
+    osc(bass, 'sine', 2.8, section.bassGain, 0);
+    chord.forEach((frequency, index) => {
+      osc(frequency, 'triangle', 2.6, section.bedGainA, 0.03, index * 5);
+      osc(frequency, 'sine', 2.4, section.bedGainB, 0.03, -index * 4);
+    });
+
+    lead.forEach((frequency, index) => {
+      osc(frequency, index % 3 === 0 ? 'triangle' : 'sine', 0.15, section.leadGain, 0.09 + index * 0.11);
+    });
+
+    water.forEach((frequency, index) => {
+      osc(frequency, 'sine', 0.11, section.waterGain, 0.46 + index * 0.21);
+    });
+
+    if (cycleIndex % 4 === 3) {
+      osc(lead[2], 'triangle', 0.24, section.leadGain * 0.72, 1.18);
+      osc(water[0], 'sine', 0.18, section.waterGain + 0.02, 1.42);
+      osc(Cs5, 'triangle', 0.16, section.waterGain + 0.01, 1.68);
+    }
+
+    cycleIndex = (cycleIndex + 1) % chordBeds.length;
+    scheduleTimer(playCycle, cycleMs);
+  }
+
+  /*
+   * Run the faster drum engine separately so Aqueous keeps a tight, driving
+   * pulse even while the harmonic bed moves on slower eight-beat cycles.
+   */
+  beatIntervalId = setInterval(() => {
+    if (!isPlayingTrack || currentTrack !== 'aqueous') {
+      clearInterval(beatIntervalId);
+      return;
+    }
+
+    const section = sectionPatterns[cycleIndex % sectionPatterns.length];
+    const patternStep = beatStep % 16;
+    if (section.kick[patternStep]) noiseHit(0.12, section.kickGain, 0, 82);
+    if (section.snare[patternStep]) noiseHit(0.08, section.snareGain, 0, 270);
+    if (section.hat[patternStep]) noiseHit(0.038, section.hatGain, 0, 6200);
+    beatStep += 1;
+  }, stepMs);
+
+  playCycle();
+}
+
 function playLevelTheme(levelConfig) {
   // Track selection stays phase-band based so campaign pacing can change
   // without rewriting the runtime music routing.
@@ -881,9 +1232,10 @@ function playTrackById(trackId) {
   // Preview mode intentionally bypasses campaign context so the Settings
   // soundtrack player can audition every available track on demand.
   beginPreviewPlayback();
+  previewTrackId = TRACKS[trackId] ? trackId : TRACK_ORDER[0];
   preservePreviewOnPlay = true;
   try {
-    switch (trackId) {
+    switch (previewTrackId) {
       case 'menu': playMenu(); break;
       case 'genesisPulse': playGenesis(); break;
       case 'siegeBloom': playSiegeBloom(); break;
@@ -895,6 +1247,8 @@ function playTrackById(trackId) {
       case 'signalWar': playSignalWar(); break;
       case 'transcendenceProtocol': playTranscendenceProtocol(); break;
       case 'networkAwakens': playEnding(); break;
+      case 'stella': playStella(); break;
+      case 'aqueous': playAqueous(); break;
       default: playMenu(); break;
     }
   } finally {
@@ -906,7 +1260,7 @@ function playTrackById(trackId) {
  * Moves soundtrack preview playback backward or forward through the available track list.
  */
 function stepTrack(offset) {
-  const activeTrackId = pausedTrackId || currentTrack || TRACK_ORDER[0];
+  const activeTrackId = previewTrackId || pausedTrackId || currentTrack || TRACK_ORDER[0];
   const activeTrackIndex = Math.max(0, TRACK_ORDER.indexOf(activeTrackId));
   const nextTrackIndex = (activeTrackIndex + offset + TRACK_ORDER.length) % TRACK_ORDER.length;
   playTrackById(TRACK_ORDER[nextTrackIndex]);
@@ -926,7 +1280,7 @@ function togglePlayback() {
   }
 
   beginPreviewPlayback();
-  playTrackById(pausedTrackId || currentTrack || 'menu');
+  playTrackById(previewTrackId || pausedTrackId || currentTrack || TRACK_ORDER[0]);
 }
 
 /* ── UI SOUND EFFECTS ── */
@@ -1023,6 +1377,8 @@ export const Music = {
   playSignalWar,
   playTranscendenceProtocol,
   playEnding,
+  playStella,
+  playAqueous,
   playLevelTheme,
   playTrackById,
   /*
@@ -1054,6 +1410,12 @@ export const Music = {
   currentTrack: () => currentTrack,
   currentTrackInfo: () => getTrackInfo(currentTrack),
   pausedTrackInfo: () => getTrackInfo(pausedTrackId),
+  currentPreviewTrackInfo: () => getTrackInfo(previewTrackId || currentTrack),
+  trackCount: () => TRACK_ORDER.length,
+  currentPreviewTrackPosition: () => {
+    const activeTrackId = previewTrackId || currentTrack || TRACK_ORDER[0];
+    return Math.max(0, TRACK_ORDER.indexOf(activeTrackId)) + 1;
+  },
   getTrackInfo,
   setTrackChangeListener(listener) {
     trackChangeListener = listener;

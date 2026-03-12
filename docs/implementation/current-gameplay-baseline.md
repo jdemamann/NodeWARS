@@ -91,6 +91,7 @@ See also:
 - when a new world unlocks, both its tutorial and its first real phase become available immediately
 - normal campaign progression can still flow into the next world's tutorial when crossing world boundaries
 - tutorial completion and next-phase resolution now go through canonical campaign-state helpers
+- debug mode only exposes manual world-visibility overrides; turning debug off clears those overrides and returns world visibility to normal progression
 - tutorial UI labels are localized through `i18n`, and tutorial progress only advances when the expected node or cut action is completed
 - late high-pressure authored phases can give the player more than one starting node
 - phase skip only unlocks after repeated defeats and stays blocked on tutorial, boss, and final phases

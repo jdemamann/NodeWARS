@@ -44,7 +44,7 @@ export function buildCreditsMarkup(T, isPortuguese) {
 
   html += '<div class="cred-sig">' +
     '<div class="cred-sig-name">Jonis Alves Demamann</div>' +
-    '<div class="cred-sig-contact"><a href="mailto:jonis@outlook.com">jonis@outlook.com</a></div>' +
+    '<div class="cred-sig-contact"><a href="https://x.com/jdemamann" target="_blank" rel="noopener noreferrer">𝕏 @jdemamann</a></div>' +
   '</div>';
   html += '<div class="cred-copy">© 2025 Jonis Alves Demamann · NODE WARS</div>';
   return html;

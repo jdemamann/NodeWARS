@@ -152,6 +152,7 @@ function wireButtons() {
   });
   $id(DOM_IDS.BTN_CREDITS)?.addEventListener('click', () => {
     buildCredits();
+    Music.playTrackById('stella');
     fadeGo(() => showScr('credits'));
   });
 
@@ -160,6 +161,7 @@ function wireButtons() {
     Music.playMenu(); fadeGo(() => showScr('menu'));
   });
   $id(DOM_IDS.BTN_CREDITS_BACK)?.addEventListener('click', () => {
+    Music.playMenu();
     fadeGo(() => showScr('menu'));
   });
   ['w2','w3','debug','sound','music','showFps'].forEach(key => {
@@ -356,7 +358,9 @@ function wireAudioBus() {
 
 /* ── Settings toggle ── */
 function toggleSetting(key) {
-  if (key === 'w2' || key === 'w3') {
+  if (key === 'debug') {
+    STATE.setDebugMode(!STATE.settings.debug);
+  } else if (key === 'w2' || key === 'w3') {
     const worldId = key === 'w2' ? 2 : 3;
     const currentEffectiveVisibility = STATE.isWorldUnlocked(worldId);
     const currentManualVisibility = STATE.settings[key];

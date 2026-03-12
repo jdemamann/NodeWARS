@@ -1,0 +1,27 @@
+Title: [track title]
+Author: [author name]
+Source file: source/mix.wav
+Duration seconds: [duration]
+BPM: [tempo]
+Key: [key]
+Time signature: [time signature]
+
+Structure:
+0:00 intro
+[fill manually]
+
+Mood:
+- [mood 1]
+- [mood 2]
+- [mood 3]
+
+Instrumentation:
+- drums: [notes]
+- bass: [notes]
+- harmony: [notes]
+- lead: [notes]
+
+Notes:
+- Generated from the Linux Audio Extraction Playbook
+- Confirm BPM and key manually if automated analysis is uncertain
+- Confirm section markers manually in a DAW or waveform editor

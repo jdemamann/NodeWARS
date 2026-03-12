@@ -49,6 +49,10 @@ Current grouped soundtrack map:
   - World 3 phases `29-32`
 - `THE NETWORK AWAKENS`
   - campaign ending
+- `STELLA`
+  - soundtrack player bonus track
+- `AQUEOUS`
+  - soundtrack player bonus track
 
 ## Notifications
 
@@ -103,8 +107,14 @@ The settings screen now includes a lightweight soundtrack player:
 - play / pause preview
 - next track
 
+The soundtrack player can also expose bonus tracks that are not assigned to the
+campaign timeline. `STELLA` currently lives in that bonus slot.
+
 This preview surface uses the same canonical `Music` module as the rest of the
 game, instead of a separate settings-only audio path.
+
+The Credits screen always switches to `STELLA` while it is open and restores
+the menu theme when returning to the main menu.
 
 ## Final campaign flow
 

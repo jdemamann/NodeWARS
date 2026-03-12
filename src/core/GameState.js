@@ -106,6 +106,23 @@ class GameState {
     store.set('nw_lang', lang);
   }
 
+  /*
+   * Debug mode exposes internal control surfaces, but manual world visibility
+   * overrides should disappear as soon as debug mode is turned off.
+   */
+  setDebugMode(enabled) {
+    this.settings.debug = !!enabled;
+    if (!this.settings.debug) this.clearManualWorldVisibilityOverrides();
+  }
+
+  /*
+   * World visibility overrides are only meant for explicit debug sessions.
+   */
+  clearManualWorldVisibilityOverrides() {
+    this.settings.w2 = null;
+    this.settings.w3 = null;
+  }
+
   resetProgress() {
     this.completed = 0;
     this.curLvl = 1;
@@ -188,7 +205,6 @@ class GameState {
   }
 
   isWorldUnlocked(worldId) {
-    if (this.settings.debug) return true;
     if (worldId <= 1) return true;
     const manualVisibility = this._getManualWorldVisibility(worldId);
     if (manualVisibility != null) return manualVisibility;
@@ -198,10 +214,10 @@ class GameState {
 
   isLevelUnlocked(levelConfig) {
     if (!levelConfig) return false;
-    if (this.settings.debug) return true;
 
     const worldId = levelConfig.worldId || levelConfig.tutorialWorldId || 1;
     if (!this.isWorldUnlocked(worldId)) return false;
+    if (this.settings.debug) return true;
     if (levelConfig.isTutorial) return true;
     if (levelConfig.id <= this.completed) return true;
 
@@ -272,6 +288,11 @@ class GameState {
       const value = normalizedSettings[settingKey];
       normalizedSettings[settingKey] = typeof value === 'boolean' ? value : null;
     });
+
+    if (!normalizedSettings.debug) {
+      normalizedSettings.w2 = null;
+      normalizedSettings.w3 = null;
+    }
 
     return normalizedSettings;
   }

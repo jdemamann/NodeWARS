@@ -27,6 +27,7 @@ It should stay short, current, and action-oriented.
 7. `docs/project/development-working-rhythm.md`
 8. `docs/project/operational-kanban.md`
 9. `docs/project/skill-usage-map.md`
+10. `docs/project/linux-audio-extraction-playbook.md`
 
 ## Code Structure
 
@@ -136,10 +137,12 @@ Planning / balance:
 - `docs/project/operational-kanban.md`
 - `docs/project/issue-intake-template.md`
 - `docs/project/campaign-balance-wave-b-plan.md`
+- `docs/project/linux-audio-extraction-playbook.md`
 - `docs/project/commentary-header-template.md`
 
 Domain agents:
 
+- `docs/agents/audio-reconstruction-agent.md`
 - `docs/agents/gameplay-systems-agent.md`
 - `docs/agents/ai-behavior-agent.md`
 - `docs/agents/campaign-level-agent.md`
@@ -162,6 +165,22 @@ Installed Codex skills:
 - `playwright-interactive`
 - `screenshot`
 - `spreadsheet`
+
+## Audio Reconstruction Workflow
+
+When rebuilding a soundtrack track from an authored audio file:
+
+1. read `docs/agents/audio-reconstruction-agent.md`
+2. follow `docs/project/linux-audio-extraction-playbook.md`
+3. keep the extraction package in:
+   - `tmp/audio-analysis/<track-slug>/`
+4. preserve the canonical package layout:
+   - `source/`
+   - `stems/`
+   - `midi/`
+   - `analysis/`
+   - `notes.txt`
+5. only then rewrite the procedural track in `src/audio/Music.js`
 
 ## Current Balance Context
 

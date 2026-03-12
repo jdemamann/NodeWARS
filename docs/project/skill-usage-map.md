@@ -171,6 +171,22 @@ Pair with:
 
 ---
 
+## Audio Reconstruction Mapping
+
+For authored soundtrack reconstruction from a source audio file:
+
+1. read `docs/agents/audio-reconstruction-agent.md`
+2. follow `docs/project/linux-audio-extraction-playbook.md`
+3. use the package layout in:
+   - `tmp/audio-analysis/<track-slug>/`
+4. use `doc` for the extraction report or wave summary if needed
+5. validate with:
+   - `node scripts/smoke-checks.mjs`
+   - `node scripts/commentary-policy.mjs`
+   - `npm run check` when the player or runtime lifecycle changes
+
+---
+
 ## Recommended Default Mapping
 
 ### For gameplay bugs
