@@ -9,6 +9,10 @@ import { NodeType, GAMEPLAY_RULES } from '../config/gameConfig.js';
 import { computeNodeRadius, computeStableNodeLevel } from '../math/simulationMath.js';
 import { bus } from '../core/EventBus.js';
 import { computeNodeDisplayRegenRate } from '../systems/EnergyBudget.js';
+import {
+  computeTentacleWarsGradeFromEnergy,
+  getTentacleWarsMaxTentacleSlots,
+} from '../tentaclewars/TwGradeTable.js';
 
 const { progression: PROGRESSION_RULES, world: WORLD_RULES } = GAMEPLAY_RULES;
 
@@ -48,6 +52,8 @@ export class GameNode {
     this.availPower = 0;
     this.inFlow     = 0;
     this.relayFeedBudget = 0;
+    this.twOverflowBudget = 0;
+    this.simulationMode = 'nodewars';
 
     /* Pulsar countdown (only relevant for NodeType.PULSAR) */
     this.spTimer    = type === NodeType.PULSAR ? 4 + Math.random() * 4 : 0;
@@ -69,10 +75,16 @@ export class GameNode {
   get level()   { return this._levelValue; }
   get dispE()   { return Math.floor(this.energy); }
   get isRelay() { return this.type === NodeType.RELAY; }
-  get maxSlots(){ return PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[this.level]; }
+  get maxSlots(){
+    return this.simulationMode === 'tentaclewars'
+      ? getTentacleWarsMaxTentacleSlots()
+      : PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[this.level];
+  }
 
   syncLevelFromEnergy() {
-    this._levelValue = computeStableNodeLevel(this.energy, this.maxE, this._levelValue);
+    this._levelValue = this.simulationMode === 'tentaclewars'
+      ? computeTentacleWarsGradeFromEnergy(this.energy, this._levelValue)
+      : computeStableNodeLevel(this.energy, this.maxE, this._levelValue);
     this._prevLvl = this._levelValue;
   }
 
@@ -112,7 +124,9 @@ export class GameNode {
     this.rot += dt * 0.065 * (this.level + 1);
 
     /* Level-up event */
-    const nextLevel = computeStableNodeLevel(this.energy, this.maxE, this._levelValue);
+    const nextLevel = this.simulationMode === 'tentaclewars'
+      ? computeTentacleWarsGradeFromEnergy(this.energy, this._levelValue)
+      : computeStableNodeLevel(this.energy, this.maxE, this._levelValue);
     if (nextLevel > this._prevLvl) {
       this.lvlFlash = 1;
       bus.emit('node:levelup', this);
@@ -122,6 +136,7 @@ export class GameNode {
 
     /* Auto-retract: very low energy while under attack */
     if (
+      this.simulationMode !== 'tentaclewars' &&
       this.underAttack > WORLD_RULES.AUTO_RETRACT_ATTACK_THRESHOLD &&
       this.energy < this.maxE * WORLD_RULES.AUTO_RETRACT_ENERGY_FRACTION &&
       this.owner !== 0

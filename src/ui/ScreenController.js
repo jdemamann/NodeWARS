@@ -19,6 +19,7 @@ import { buildCampaignEndingMarkup } from './campaignEndingView.js';
 import { buildStoryMarkup } from './storyScreenView.js';
 import { buildCreditsMarkup } from './creditsView.js';
 import { applyDebugSettingsVisibility, applySettingsToggleState } from './settingsView.js';
+import { buildTentacleWarsDebugMetrics } from '../tentaclewars/TwDebugMetrics.js';
 
 function $(id) { return document.getElementById(id); }
 
@@ -475,6 +476,7 @@ export function updateDebugInfo() {
   const el = $(DOM_IDS.DEBUG_INFO_TEXT); if (!el) return;
   const game = Screens._game;
   const renderStats = game?.renderStats;
+  const twDebugMetrics = buildTentacleWarsDebugMetrics(game);
   el.innerHTML = [
     'completed: ' + STATE.completed,
     'curLvl: '    + STATE.curLvl,
@@ -494,6 +496,11 @@ export function updateDebugInfo() {
         `render_load: n${renderStats.nodeCount} t${renderStats.tentCount} h${renderStats.hazardCount} p${renderStats.pulsarCount}`,
         `particles: orb ${renderStats.orbCount} free ${renderStats.freeOrbCount}`,
         `graphics_mode: ${renderStats.graphicsMode}`,
+      ] : []),
+      ...(twDebugMetrics ? [
+        `tw_packets: lanes ${twDebugMetrics.packetLaneCount} queued ${twDebugMetrics.queuedPacketCount} acc ${twDebugMetrics.packetAccumulatorUnits.toFixed(2)}`,
+        `tw_overflow: ready_nodes ${twDebugMetrics.overflowReadyNodeCount}`,
+        `tw_capture: contested ${twDebugMetrics.contestedNeutralNodeCount} pressure ${twDebugMetrics.contestedCapturePressure.toFixed(2)} threshold ${twDebugMetrics.leadingNeutralCaptureThreshold}`,
       ] : []),
     ] : []),
   ].join('<br>');

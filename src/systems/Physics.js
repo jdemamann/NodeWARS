@@ -7,7 +7,11 @@
    ================================================================ */
 
 import { TentState } from '../config/gameConfig.js';
-import { captureRelayFeedBudget, computeNodeTentacleFeedRate } from './EnergyBudget.js';
+import {
+  captureRelayFeedBudget,
+  captureTentacleWarsOverflowBudget,
+  computeNodeTentacleFeedRate,
+} from './EnergyBudget.js';
 
 export class Physics {
   /* ── outCount + tentFeedPerSec: computed once per frame ── */
@@ -20,6 +24,7 @@ export class Physics {
       /* Relay rule: only last frame's received flow can be forwarded this frame.
          Relays are infrastructure, not generators. */
       n.relayFeedBudget = captureRelayFeedBudget(n);
+      n.twOverflowBudget = captureTentacleWarsOverflowBudget(n);
       n.outCount = 0;
       n.inFlow   = 0;
     }

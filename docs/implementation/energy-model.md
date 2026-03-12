@@ -32,3 +32,11 @@ in one conceptual place.
 - shared helper: `src/systems/EnergyBudget.js`
 - node feed assignment: `src/systems/Physics.js`
 - source drain and per-tentacle usage: `src/entities/Tent.js`
+
+## TentacleWars Sandbox Notes
+
+- packet size stays at `1`
+- grade changes packet frequency, not packet size
+- hostile and neutral capture still reuse flowing lane energy instead of teleporting value
+- overflow in the current TentacleWars fidelity track is not equal-split
+- when a full TentacleWars cell receives support and has multiple outgoing lanes, the full overflow value is broadcast to each outgoing lane

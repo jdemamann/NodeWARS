@@ -78,6 +78,94 @@ Pair with:
 
 ---
 
+### `jupyter-notebook`
+
+Use for:
+
+- exploratory balancing
+- packet-model comparison
+- overflow and throughput analysis
+- audio extraction summaries
+- prototype data visualization
+
+Best fit in this project:
+
+- TentacleWars packet runtime tuning
+- overflow-mode comparison
+- grade-threshold analysis
+- soundtrack reconstruction analysis
+
+Pair with:
+
+- `docs/agents/gameplay-systems-agent.md`
+- `docs/agents/ai-behavior-agent.md`
+- `spreadsheet`
+
+---
+
+### `figma`
+
+Use for:
+
+- UI concepting
+- authored layout planning
+- debug editor mockups
+- screen composition exploration
+
+Best fit in this project:
+
+- TentacleWars mode presentation
+- future phase editor UI
+- mobile HUD cleanup studies
+
+Pair with:
+
+- `docs/agents/ui-ux-agent.md`
+- `docs/agents/render-visual-language-agent.md`
+
+---
+
+### `figma-implement-design`
+
+Use for:
+
+- translating approved Figma work into implementation
+- reducing design drift during UI waves
+
+Best fit in this project:
+
+- TentacleWars menu/sandbox UI
+- future phase editor implementation
+- structured HUD refinements
+
+Pair with:
+
+- `figma`
+- `docs/agents/ui-ux-agent.md`
+
+---
+
+### `pdf`
+
+Use for:
+
+- exporting formal project reports
+- packaging architecture and milestone documents
+- producing review-ready deliverables
+
+Best fit in this project:
+
+- TentacleWars architecture studies
+- milestone snapshots
+- handoff and review documents
+
+Pair with:
+
+- `doc`
+- `docs/agents/code-commentary-agent.md`
+
+---
+
 ### `playwright`
 
 Use for:
@@ -148,6 +236,27 @@ Pair with:
 
 ---
 
+### `sentry`
+
+Use for:
+
+- runtime error monitoring
+- release-time crash capture
+- production-only UI and input regression visibility
+
+Best fit in this project:
+
+- future Linux/Android packaging
+- browser-distributed builds
+- post-release health tracking
+
+Pair with:
+
+- `docs/agents/performance-build-agent.md`
+- `docs/agents/qa-checks-agent.md`
+
+---
+
 ### `spreadsheet`
 
 Use for:
@@ -212,12 +321,14 @@ Use:
 1. `develop-web-game`
 2. `spreadsheet`
 3. `doc`
+4. `jupyter-notebook`
 
 ### For documentation and operational work
 
 Use:
 
 1. `doc`
+2. `pdf` when a polished export is useful
 
 ### For visual direction work
 
@@ -226,6 +337,24 @@ Use:
 1. `imagegen`
 2. `screenshot`
 3. `develop-web-game`
+4. `figma` if the direction needs structured visual iteration
+
+### For TentacleWars systems analysis
+
+Use:
+
+1. `develop-web-game`
+2. `jupyter-notebook`
+3. `spreadsheet`
+4. `doc`
+
+### For release readiness and production monitoring
+
+Use:
+
+1. `sentry`
+2. `playwright`
+3. `doc`
 
 ---
 

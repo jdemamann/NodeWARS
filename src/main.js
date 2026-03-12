@@ -16,6 +16,7 @@ import {
   syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel, showCampaignEnding,
 } from './ui/ScreenController.js';
 import { LEVELS } from './config/gameConfig.js';
+import { buildTentacleWarsDebugMetrics } from './tentaclewars/TwDebugMetrics.js';
 
 function $id(id) { return document.getElementById(id); }
 
@@ -31,6 +32,7 @@ STATE.loadSettings();
   document.documentElement.dataset.font = id;
   document.documentElement.style.setProperty('--ui-zoom', STATE.settings.textZoom ?? 1.0);
   document.documentElement.dataset.theme = STATE.settings.theme || 'AURORA';
+  document.documentElement.dataset.debugLogoPreview = STATE.settings.debug ? 'on' : 'off';
 })();
 
 let game;
@@ -141,6 +143,10 @@ async function copyTextToClipboard(text) {
 function wireButtons() {
   /* Main menu */
   $id(DOM_IDS.BTN_PLAY)?.addEventListener('click', () => {
+    if (STATE.getGameMode() === 'tentaclewars') {
+      fadeGo(() => { game.enterSelectedMode(); });
+      return;
+    }
     fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); });
   });
   $id(DOM_IDS.BTN_STORY)?.addEventListener('click', () => { buildStory(); fadeGo(() => showScr('story')); });
@@ -192,6 +198,11 @@ function wireButtons() {
   $id(DOM_IDS.BTN_VIEW_ENDING)?.addEventListener('click', () => {
     const debugPreviewGame = game || Screens._game;
     fadeGo(() => showCampaignEnding(debugPreviewGame, { debugPreview: true }));
+  });
+  $id(DOM_IDS.BTN_MODE_CYCLE)?.addEventListener('click', () => {
+    STATE.setGameMode(STATE.getGameMode() === 'nodewars' ? 'tentaclewars' : 'nodewars');
+    STATE.saveSettings();
+    refreshSettingsUI();
   });
   $id(DOM_IDS.BTN_MUSIC_PREV)?.addEventListener('click', () => {
     Music.previousTrack();
@@ -252,10 +263,27 @@ function wireButtons() {
   $id(DOM_IDS.BTN_RESUME)?.addEventListener('click', () => {
     game.paused = false;
     showScr(null);
-    Music.playLevelTheme(game.cfg);
+    game.playCurrentModeMusic();
   });
-  $id(DOM_IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
-  $id(DOM_IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); }));
+  $id(DOM_IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => {
+    if (game.twMode.isSandboxActive()) {
+      Music.playMenu();
+      showScr('menu');
+      return;
+    }
+    syncWorldTab();
+    buildWorldTabs();
+    showScr('levels');
+  }));
+  $id(DOM_IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => {
+    game.paused = false;
+    showScr(null);
+    if (game.twMode.isSandboxActive()) {
+      game.loadTentacleWarsSandbox();
+      return;
+    }
+    game.loadLevel(STATE.curLvl);
+  }));
   $id(DOM_IDS.BTN_PSKIP)?.addEventListener('click', () => {
     const nextLevelId = STATE.getNextLevelId();
     if (STATE.canSkipLevel(game.cfg) && nextLevelId != null) {
@@ -360,6 +388,7 @@ function wireAudioBus() {
 function toggleSetting(key) {
   if (key === 'debug') {
     STATE.setDebugMode(!STATE.settings.debug);
+    document.documentElement.dataset.debugLogoPreview = STATE.settings.debug ? 'on' : 'off';
   } else if (key === 'w2' || key === 'w3') {
     const worldId = key === 'w2' ? 2 : 3;
     const currentEffectiveVisibility = STATE.isWorldUnlocked(worldId);
@@ -470,6 +499,7 @@ function bindMenuControlFeedback() {
 
 function buildDebugSnapshot() {
   const renderStats = game?.renderStats;
+  const twDebugMetrics = buildTentacleWarsDebugMetrics(game);
   return [
     `theme=${STATE.settings.theme}`,
     `graphics=${STATE.settings.graphicsMode}`,
@@ -492,6 +522,15 @@ function buildDebugSnapshot() {
       `render_orbs=${renderStats.orbCount}`,
       `render_free_orbs=${renderStats.freeOrbCount}`,
       `render_visual_events=${renderStats.visualEventCount}`,
+    ] : []),
+    ...(twDebugMetrics ? [
+      `tw_packet_lanes=${twDebugMetrics.packetLaneCount}`,
+      `tw_queued_packets=${twDebugMetrics.queuedPacketCount}`,
+      `tw_packet_accumulator=${twDebugMetrics.packetAccumulatorUnits.toFixed(2)}`,
+      `tw_overflow_ready_nodes=${twDebugMetrics.overflowReadyNodeCount}`,
+      `tw_contested_neutrals=${twDebugMetrics.contestedNeutralNodeCount}`,
+      `tw_capture_pressure=${twDebugMetrics.contestedCapturePressure.toFixed(2)}`,
+      `tw_leading_capture_threshold=${twDebugMetrics.leadingNeutralCaptureThreshold}`,
     ] : []),
   ].join('\n');
 }

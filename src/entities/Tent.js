@@ -17,6 +17,15 @@ import {
 import { bus } from '../core/EventBus.js';
 import { classifyTentacleCut, resolveGrowingTentacleCollision } from './TentRules.js';
 import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
+import { computeTentacleWarsBuildCost } from '../tentaclewars/TwTentacleEconomy.js';
+import { getTentacleWarsPacketRateForGrade } from '../tentaclewars/TwGradeTable.js';
+import { distributeTentacleWarsOverflow } from '../tentaclewars/TwEnergyModel.js';
+import { advanceTentacleWarsLaneRuntime } from '../tentaclewars/TwPacketFlow.js';
+import {
+  resolveTentacleWarsHostileCapture,
+  resolveTentacleWarsNeutralCapture,
+} from '../tentaclewars/TwCaptureRules.js';
+import { resolveTentacleWarsCutDistribution } from '../tentaclewars/TwCutRules.js';
 import {
   applyTentaclePayloadToTarget,
   applyTentacleFriendlyFlow,
@@ -32,12 +41,20 @@ export class Tent {
     this.distanceValue = computeDistance(sourceNode.x, sourceNode.y, targetNode.x, targetNode.y);
 
     /* Derived physics constants (computed once at creation) */
-    this.buildCost = buildCost ?? computeBuildCost(this.distanceValue);
+    this.buildCost = buildCost ?? (
+      sourceNode.simulationMode === 'tentaclewars'
+        ? computeTentacleWarsBuildCost(this.distanceValue)
+        : computeBuildCost(this.distanceValue)
+    );
     this.rate      = 5.5;            // kept for Orb spawning; no longer distance-based
     this.eff       = 1.0;            // heat loss removed; kept for renderer t.eff check
     this.travelDurationValue = computeTravelDuration(this.distanceValue);
     this.pipeCapacityValue   = 300;  // pipe buffer cap
-    this.maxBandwidth = (TIER_REGEN[sourceNode.level] ?? TIER_REGEN[0]) * GAME_BALANCE.TENTACLE_BANDWIDTH_TOLERANCE;
+    this.maxBandwidth = (
+      sourceNode.simulationMode === 'tentaclewars'
+        ? getTentacleWarsPacketRateForGrade(sourceNode.level)
+        : (TIER_REGEN[sourceNode.level] ?? TIER_REGEN[0])
+    ) * GAME_BALANCE.TENTACLE_BANDWIDTH_TOLERANCE;
 
     /* State machine */
     this.state    = TentState.GROWING;
@@ -57,6 +74,8 @@ export class Tent {
     this.pipeAge      = 0;
     this.startT       = 0;           // tail position for BURSTING state (0 = source end)
     this._burstPayload = 0;          // energy payload carried by a kamikaze burst
+    this.packetAccumulatorUnits = 0;
+    this.packetTravelQueue = [];
 
     /* Visual */
     this.flowRate    = 0;
@@ -64,6 +83,7 @@ export class Tent {
     this.cutFlash    = 0;
     this.age         = 0;
     this._orbTimer   = 0;
+    this.twCutRetraction = null;
 
     /* Scoring */
     this.playerRetract = false;
@@ -113,9 +133,23 @@ export class Tent {
     this._burstPayload = 0;
   }
 
+  /* Clear the TentacleWars cut-retraction runtime after the visual payout ends. */
+  _clearTentacleWarsCutRetraction() {
+    this.twCutRetraction = null;
+  }
+
   _clearPipeState() {
     this.energyInPipe = 0;
     this.pipeAge = 0;
+    this.packetAccumulatorUnits = 0;
+    this.packetTravelQueue = [];
+  }
+
+  /* Expose the economically committed lane payload for capture cleanup. */
+  getCommittedPayloadForOwnershipCleanup() {
+    return this.state === TentState.BURSTING
+      ? (this._burstPayload || 0)
+      : ((this.paidCost || 0) + (this.energyInPipe || 0));
   }
 
   _refundToSourceNode(sourceNode, amount) {
@@ -129,6 +163,12 @@ export class Tent {
     if (!targetNode.contest) targetNode.contest = {};
     if (!targetNode.contest[owner]) targetNode.contest[owner] = 0;
     targetNode.contest[owner] += amount;
+  }
+
+  /* Replace one owner's live neutral-capture total without disturbing others. */
+  _setNeutralContestContribution(targetNode, owner, amount) {
+    if (!targetNode.contest) targetNode.contest = {};
+    targetNode.contest[owner] = Math.max(0, amount || 0);
   }
 
   _cancelRivalContestProgress(targetNode, attackingOwner, cancelAmount) {
@@ -155,6 +195,23 @@ export class Tent {
   }
 
   _captureNeutralTarget(targetNode, newOwner, captureProgress) {
+    if (targetNode.simulationMode === 'tentaclewars') {
+      const neutralCapture = resolveTentacleWarsNeutralCapture(
+        captureProgress,
+        targetNode.captureThreshold || 0,
+        targetNode.energy,
+      );
+      applyOwnershipChange({
+        game: this.game,
+        node: targetNode,
+        newOwner,
+        startingEnergy: Math.min(targetNode.maxE, neutralCapture.nextEnergy),
+        previousOwner: targetNode.owner,
+        wasNeutralCapture: true,
+      });
+      return;
+    }
+
     const bonusEnergy = captureProgress - EMBRYO;
     applyOwnershipChange({
       game: this.game,
@@ -166,7 +223,33 @@ export class Tent {
     });
   }
 
-  _defeatEnemyTarget(targetNode, attackerOwner) {
+  /* Resolve hostile takeover starting energy under the active simulation mode. */
+  _defeatEnemyTarget(targetNode, attackerOwner, offensivePayload = 0) {
+    if (targetNode.simulationMode === 'tentaclewars') {
+      const releasedOutgoingEnergy = this.game?.tents
+        ?.filter(tentacle =>
+          tentacle !== this &&
+          tentacle.alive &&
+          tentacle.state !== TentState.RETRACTING &&
+          tentacle.effectiveSourceNode === targetNode
+        )
+        .reduce((sum, tentacle) => sum + (tentacle.getCommittedPayloadForOwnershipCleanup?.() || 0), 0) || 0;
+      const hostileCapture = resolveTentacleWarsHostileCapture(
+        Math.max(0, -targetNode.energy),
+        releasedOutgoingEnergy,
+      );
+      applyOwnershipChange({
+        game: this.game,
+        node: targetNode,
+        newOwner: attackerOwner,
+        startingEnergy: Math.min(targetNode.maxE, hostileCapture.nextEnergy),
+        previousOwner: targetNode.owner,
+        attackerOwner,
+        suppressOutgoingTentacleRefunds: true,
+      });
+      return;
+    }
+
     const overflowEnergy = Math.abs(targetNode.energy) * 0.10;
     applyOwnershipChange({
       game: this.game,
@@ -199,6 +282,47 @@ export class Tent {
       contestFlash: 0.6,
       damageMultiplier: 1,
     });
+  }
+
+  /* Progressive TentacleWars cut payout should refresh the hit flash, not stack it every frame. */
+  _applyTentacleWarsCutRetractionTargetEffect(targetNode, sourceNode, payloadAmount) {
+    this._applyPayloadToTarget(targetNode, sourceNode, payloadAmount, {
+      contestFlash: 0,
+      damageMultiplier: 1,
+    });
+    targetNode.cFlash = Math.max(targetNode.cFlash || 0, 0.6);
+  }
+
+  /* Release one frame of TentacleWars cut payload while the halves retract. */
+  _releaseTentacleWarsCutPayout(nextSourceFront, nextTargetFront) {
+    const cutRetraction = this.twCutRetraction;
+    if (!cutRetraction) return;
+
+    const sourceProgress = cutRetraction.initialSourceSpan > 0
+      ? clamp((cutRetraction.cutRatio - nextSourceFront) / cutRetraction.initialSourceSpan, 0, 1)
+      : 1;
+    const targetProgress = cutRetraction.initialTargetSpan > 0
+      ? clamp((nextTargetFront - cutRetraction.cutRatio) / cutRetraction.initialTargetSpan, 0, 1)
+      : 1;
+
+    const desiredSourceReleased = cutRetraction.sourceShare * sourceProgress;
+    const desiredTargetReleased = cutRetraction.targetShare * targetProgress;
+    const sourceDelta = desiredSourceReleased - cutRetraction.sourceReleased;
+    const targetDelta = desiredTargetReleased - cutRetraction.targetReleased;
+
+    if (sourceDelta > 0) this._refundToSourceNode(this.effectiveSourceNode, sourceDelta);
+    if (targetDelta > 0) {
+      this._applyTentacleWarsCutRetractionTargetEffect(
+        this.effectiveTargetNode,
+        this.effectiveSourceNode,
+        targetDelta,
+      );
+    }
+
+    cutRetraction.sourceReleased = desiredSourceReleased;
+    cutRetraction.targetReleased = desiredTargetReleased;
+    cutRetraction.sourceFront = nextSourceFront;
+    cutRetraction.targetFront = nextTargetFront;
   }
 
   _getRelayFlowMultiplier(sourceNode) {
@@ -244,18 +368,59 @@ export class Tent {
     }
   }
 
+  /* Collapse the lane after ownership loss without refunding its payload. */
+  collapseForOwnershipLoss() {
+    if (this.state === TentState.DEAD) return;
+    this._resolveClashPartnerOnCut(false);
+    this._clearEconomicPayload();
+    this.cutFlash = 0;
+    this.reachT = this.state === TentState.GROWING ? this.reachT : Math.max(this.reachT, 1);
+    this.state = TentState.RETRACTING;
+  }
+
+  /*
+   * Resolve a TentacleWars slice as a continuous geometric split.
+   *
+   * The full committed lane payload is conserved immediately: the source-side
+   * share returns to the source, and the target-side share lands at the
+   * destination through the mode-specific capture/combat path.
+   */
+  _applyTentacleWarsSliceCut(cutRatio, payload) {
+    const { effectiveCutRatio, sourceShare, targetShare } = resolveTentacleWarsCutDistribution(payload, cutRatio);
+
+    this._resolveClashPartnerOnCut(false);
+    this._clearPipeState();
+
+    this.state = TentState.RETRACTING;
+    this.reachT = effectiveCutRatio;
+    this.startT = 0;
+    this.twCutRetraction = {
+      cutRatio: effectiveCutRatio,
+      sourceShare,
+      targetShare,
+      sourceReleased: 0,
+      targetReleased: 0,
+      sourceFront: effectiveCutRatio,
+      targetFront: effectiveCutRatio,
+      initialSourceSpan: Math.max(effectiveCutRatio, 0.000001),
+      initialTargetSpan: Math.max(1 - effectiveCutRatio, 0.000001),
+    };
+    this._clearEconomicPayload();
+  }
+
   /**
    * kill(cutRatio)
    *
    * cutRatio = normalised position along the effective source→target axis where the cut landed.
    *   undefined / no param  → normal programmatic kill (retract, refund to source)
-   *   < 0.3  (near source)  → kamikaze burst: payload rushes to target as a BURSTING wave
-   *   > 0.7  (near target)  → defensive refund: payload returned to source immediately
-   *   0.3–0.7 (middle)      → split cut: source share refunds, target share lands immediately
+   *   TentacleWars slice    → immediate geometric split of full committed payload
+   *   NodeWARS < 0.3        → kamikaze burst: payload rushes to target as a BURSTING wave
+   *   NodeWARS > 0.7        → defensive refund: payload returned to source immediately
+   *   NodeWARS 0.3–0.7      → split cut: source share refunds, target share lands immediately
    *
    * Clash partner is handled before state changes:
-   *   kamikaze → partner is also killed (defence destroyed)
-   *   refund / retract / split → partner advances uncontested
+   *   NodeWARS kamikaze → partner is also killed (defence destroyed)
+   *   other cuts / retracts → partner advances uncontested
    */
   kill(cutRatio) {
     if (this.state === TentState.DEAD      ||
@@ -268,6 +433,12 @@ export class Tent {
 
     /* Calculate total energy in the pipe (Paid build cost + Energy in transit) */
     const payload = this.paidCost + (this.energyInPipe || 0);
+    const isTentacleWarsSlice = this.effectiveSourceNode?.simulationMode === 'tentaclewars' && cutRatio !== undefined;
+
+    if (isTentacleWarsSlice) {
+      this._applyTentacleWarsSliceCut(cutRatio, payload);
+      return;
+    }
 
     /* Cut zones (0.0 = source, 1.0 = target) */
     const { isKamikaze, isRefund, isMiddle } = classifyTentacleCut(cutRatio, CUT_RULES);
@@ -471,6 +642,26 @@ export class Tent {
 
   /* ── Retracting ── */
   _updateRetractingState(dt) {
+    if (this.twCutRetraction) {
+      const retractionStep = (GROW_PPS / this.distance) * dt;
+      const nextSourceFront = Math.max(0, this.twCutRetraction.sourceFront - retractionStep);
+      const nextTargetFront = Math.min(1, this.twCutRetraction.targetFront + retractionStep);
+
+      this._releaseTentacleWarsCutPayout(nextSourceFront, nextTargetFront);
+
+      const sourceDone = nextSourceFront <= 0.0001;
+      const targetDone = nextTargetFront >= 0.9999;
+      if (sourceDone && targetDone) {
+        const sourceRemainder = this.twCutRetraction.sourceShare - this.twCutRetraction.sourceReleased;
+        const targetRemainder = this.twCutRetraction.targetShare - this.twCutRetraction.targetReleased;
+        if (sourceRemainder > 0) this._refundToSourceNode(this.effectiveSourceNode, sourceRemainder);
+        if (targetRemainder > 0) this._applyImmediateTargetEffect(this.effectiveTargetNode, this.effectiveSourceNode, targetRemainder);
+        this._clearTentacleWarsCutRetraction();
+        this.state = TentState.DEAD;
+      }
+      return;
+    }
+
     this.reachT = Math.max(0, this.reachT - (GROW_PPS / this.distance) * dt);
     if (this.reachT <= 0) this.state = TentState.DEAD;
   }
@@ -489,6 +680,10 @@ export class Tent {
     const sourceNode = this.effectiveSourceNode;
     const targetNode = this.effectiveTargetNode;
     if (!this.source || !this.target) return;
+    if (sourceNode.simulationMode === 'tentaclewars') {
+      this._updateTentacleWarsActiveFlowState(sourceNode, targetNode, dt);
+      return;
+    }
 
     const feedRate = computeTentacleSourceFeedRate(sourceNode, this.maxBandwidth, dt);
 
@@ -534,6 +729,57 @@ export class Tent {
     this.flowRate  = this.flowRate * 0.80 + instantFlowRate * 0.20;
   }
 
+  /*
+   * TentacleWars lanes emit only whole packets. Fractional throughput stays in
+   * lane-local credit until it becomes a payable packet, and each packet keeps
+   * its own travel delay before any target effect resolves.
+   */
+  _updateTentacleWarsActiveFlowState(sourceNode, targetNode, dt) {
+    const baseThroughputPerSecond = computeTentacleSourceFeedRate(sourceNode, this.maxBandwidth, dt);
+    const outgoingTentacles = Math.max(1, sourceNode.outCount);
+    const overflowShareUnits = distributeTentacleWarsOverflow(
+      sourceNode.twOverflowBudget || 0,
+      outgoingTentacles,
+    ).laneOverflowShares[0] || 0;
+    const relayFlowMultiplier = this._getRelayFlowMultiplier(sourceNode);
+    const laneStep = advanceTentacleWarsLaneRuntime({
+      accumulatorUnits: this.packetAccumulatorUnits + overflowShareUnits,
+      throughputPerSecond: baseThroughputPerSecond,
+      deltaSeconds: dt,
+      sourceAvailableEnergy: sourceNode.energy,
+      queuedPacketTravelTimes: this.packetTravelQueue,
+      travelDurationSeconds: this.travelDuration,
+    });
+
+    this.packetAccumulatorUnits = laneStep.nextAccumulatorUnits;
+    this.packetTravelQueue = laneStep.nextQueuedPacketTravelTimes;
+
+    const emittedEnergy = laneStep.emittedPacketCount;
+    if (emittedEnergy > 0) {
+      sourceNode.energy = Math.max(0, sourceNode.energy - emittedEnergy);
+    }
+
+    this.energyInPipe = this.packetTravelQueue.length;
+    this.pipeAge = this.packetTravelQueue.length > 0
+      ? this.travelDuration - Math.min(...this.packetTravelQueue)
+      : 0;
+
+    let deliveredAmount = 0;
+    if (laneStep.deliveredPacketCount > 0) {
+      const deliveredFeedRate = laneStep.deliveredPacketCount / Math.max(dt, 0.001);
+      if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
+        deliveredAmount = this._applyFriendlyFlow(targetNode, deliveredFeedRate, relayFlowMultiplier, dt);
+      } else if (targetNode.owner === 0) {
+        deliveredAmount = this._applyNeutralCaptureFlow(targetNode, sourceNode, deliveredFeedRate, relayFlowMultiplier, dt);
+      } else {
+        deliveredAmount = this._applyEnemyAttackFlow(targetNode, sourceNode, deliveredFeedRate, relayFlowMultiplier, dt);
+      }
+    }
+
+    const instantFlowRate = deliveredAmount / Math.max(dt, 0.001);
+    this.flowRate = this.flowRate * 0.80 + instantFlowRate * 0.20;
+  }
+
   /* ── Clash (tug-of-war) ── */
 
   _prepareClashState(feedRate, dt) {
@@ -541,6 +787,13 @@ export class Tent {
     this.energyInPipe = Math.min(this.pipeCapacity, feedRate * this.travelDuration);
     const simulationTime = this.game?.time || 0;
     this.clashSpark = 0.7 + Math.sin(simulationTime * 12) * 0.3;
+
+    if (this.effectiveSourceNode?.simulationMode === 'tentaclewars') {
+      this.clashT = 0.5;
+      this.clashVisualT = 0.5;
+      this.clashApproachActive = false;
+      return;
+    }
 
     /* Init clashT from where this tent physically reached.
        Mid-air collisions: reachT is the actual collision point (0 < reachT < 1).
@@ -600,6 +853,15 @@ export class Tent {
   }
 
   _updateClashFront(opposingTentacle, feedRate, dt) {
+    if (this.effectiveSourceNode?.simulationMode === 'tentaclewars') {
+      this.clashT = 0.5;
+      this.clashVisualT = 0.5;
+      opposingTentacle.clashT = 0.5;
+      opposingTentacle.clashVisualT = 0.5;
+      opposingTentacle.clashSpark = this.clashSpark;
+      return;
+    }
+
     const { myForce, opposingForce } = this._computeClashForces(opposingTentacle, feedRate);
     this.clashT += (myForce - opposingForce) * GAME_BALANCE.CLASH_VOLATILITY * dt;
     opposingTentacle.clashT = 1 - this.clashT;
@@ -646,6 +908,11 @@ export class Tent {
        The other tent mirrors, preventing double-movement per frame. */
     if (!this._isCanonicalClashDriver()) return;
 
+    if (sourceNode.simulationMode === 'tentaclewars') {
+      this._updateClashFront(opposingTentacle, feedRate, dt);
+      return;
+    }
+
     if (this.clashApproachActive || opposingTentacle.clashApproachActive) {
       this._updateClashApproach(opposingTentacle, dt);
       return;
@@ -669,7 +936,7 @@ export class Tent {
     this._applyPayloadToTarget(targetNode, sourceNode, payload, {
       contestFlash: 0.8,
       burstPulse: 1.0,
-      damageMultiplier: GAME_BALANCE.SLICE_BURST_MULT,
+      damageMultiplier: sourceNode.simulationMode === 'tentaclewars' ? 1 : GAME_BALANCE.SLICE_BURST_MULT,
     });
 
     this.state = TentState.DEAD;

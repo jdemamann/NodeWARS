@@ -117,6 +117,44 @@ Protects:
 
 - long-run numerical stability
 
+### TentacleWars energy sanity
+
+```bash
+node scripts/tw-energy-sanity.mjs
+```
+
+Protects:
+
+- overflow mode
+- packet runtime
+- neutral and hostile capture helpers
+- TentacleWars refund rule
+
+### TentacleWars grade sanity
+
+```bash
+node scripts/tw-grade-sanity.mjs
+```
+
+Protects:
+
+- grade thresholds
+- grade hysteresis
+- Dominator throughput
+- TentacleWars slot cap
+
+### TentacleWars AI sanity
+
+```bash
+node scripts/tw-ai-sanity.mjs
+```
+
+Protects:
+
+- all-hostile default relation mode
+- purple slice pressure
+- canonical TentacleWars AI slice path
+
 ### Full local gate
 
 ```bash
@@ -187,6 +225,36 @@ Run:
 Add:
 
 - `campaign-sanity` if the change affects campaign pacing
+
+### TentacleWars fidelity waves
+
+Examples:
+
+- packet runtime
+- grade thresholds
+- overflow
+- TentacleWars-specific capture
+- TentacleWars AI
+- TentacleWars input fidelity
+
+Suggested agents:
+
+- `docs/agents/gameplay-systems-agent.md`
+- `docs/agents/ai-behavior-agent.md`
+- `docs/agents/qa-checks-agent.md`
+
+Run:
+
+- `smoke-checks`
+- `tw-energy-sanity`
+- `tw-grade-sanity`
+- `tw-ai-sanity`
+- `commentary-policy` when source files were changed
+
+Add:
+
+- `input-harness` when input behavior changes
+- `simulation-soak` when simulation math or sustained runtime changes
 
 ### Campaign / tutorial / progression
 

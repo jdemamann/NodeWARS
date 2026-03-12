@@ -34,6 +34,10 @@ Document the current project layout so gameplay, rendering, UI, and platform con
   - language strings and language switching
 - `src/levels`
   - fixed campaign authored layouts
+- `src/tentaclewars`
+  - isolated mode-specific runtime surfaces for the TentacleWars track
+  - early pure-core modules include `TwBalance.js`, `TwGradeTable.js`, `TwPacketFlow.js`, `TwTentacleEconomy.js`, `TwEnergyModel.js`, and `TwCaptureRules.js`
+  - sandbox/runtime surfaces now include `TwModeRuntime.js`, `TwSandboxConfig.js`, `TwSandboxRules.js`, `TwAI.js`, and `TwAIScoring.js`
 
 ## Naming Rules Applied
 

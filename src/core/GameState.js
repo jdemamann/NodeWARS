@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   sound: true,
   music: true,
   showFps: false,
+  gameMode: 'nodewars',
   fontId: 'exo2',
   textZoom: 1.0,
   graphicsMode: 'low',
@@ -28,6 +29,7 @@ const DEFAULT_SETTINGS = Object.freeze({
 
 const VALID_THEMES = new Set(['AURORA', 'SOLAR', 'GLACIER']);
 const VALID_FONTS = new Set(['orbitron', 'techno', 'rajdhani', 'exo2']);
+const VALID_GAME_MODES = new Set(['nodewars', 'tentaclewars']);
 
 class GameState {
   constructor() {
@@ -112,7 +114,28 @@ class GameState {
    */
   setDebugMode(enabled) {
     this.settings.debug = !!enabled;
-    if (!this.settings.debug) this.clearManualWorldVisibilityOverrides();
+    if (!this.settings.debug) {
+      this.clearManualWorldVisibilityOverrides();
+      this.settings.gameMode = 'nodewars';
+    }
+  }
+
+  /*
+   * Mode selection lives in state so menu flow and future mode-specific
+   * persistence continue to share one canonical switch.
+   */
+  setGameMode(modeId) {
+    this.settings.gameMode = VALID_GAME_MODES.has(modeId) ? modeId : 'nodewars';
+  }
+
+  /*
+   * Consumers should always read the active mode through this accessor so
+   * invalid persisted values never leak into menu or runtime decisions.
+   */
+  getGameMode() {
+    return VALID_GAME_MODES.has(this.settings.gameMode)
+      ? this.settings.gameMode
+      : 'nodewars';
   }
 
   /*
@@ -275,6 +298,10 @@ class GameState {
       ? normalizedSettings.fontId
       : DEFAULT_SETTINGS.fontId;
 
+    normalizedSettings.gameMode = VALID_GAME_MODES.has(normalizedSettings.gameMode)
+      ? normalizedSettings.gameMode
+      : DEFAULT_SETTINGS.gameMode;
+
     const zoom = Number(normalizedSettings.textZoom);
     normalizedSettings.textZoom = Number.isFinite(zoom)
       ? Math.max(0.5, Math.min(2.0, zoom))
@@ -292,6 +319,7 @@ class GameState {
     if (!normalizedSettings.debug) {
       normalizedSettings.w2 = null;
       normalizedSettings.w3 = null;
+      normalizedSettings.gameMode = 'nodewars';
     }
 
     return normalizedSettings;

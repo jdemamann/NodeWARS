@@ -10,16 +10,21 @@
      • phase-outcome overlay
    ================================================================ */
 
-import { GAMEPLAY_RULES, MAX_SLOTS } from '../config/gameConfig.js';
+import { GAMEPLAY_RULES } from '../config/gameConfig.js';
 import { ownerColor, ownerPanelTheme } from '../theme/ownerPalette.js';
 import { computeBuildCost, maxRange } from '../math/simulationMath.js';
 import { computeNodeDisplayRegenRate } from '../systems/EnergyBudget.js';
 import { getContestContributorOwners, getDisplayContestEntries } from '../systems/NeutralContest.js';
 import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
+import {
+  getTentacleWarsGradeDisplayName,
+  getTentacleWarsGradeDisplayThresholds,
+  getTentacleWarsSlotAvailability,
+} from '../tentaclewars/TwPresentationModel.js';
 import { drawRoundedRect } from './canvasPrimitives.js';
 import { getCanvasCopyFont, getCanvasDisplayFont } from '../theme/uiFonts.js';
 
-const { input: INPUT_TUNING, progression: PROGRESSION_RULES, render: RENDER_RULES } = GAMEPLAY_RULES;
+const { input: INPUT_TUNING, render: RENDER_RULES } = GAMEPLAY_RULES;
 
 function colorWithAlpha(hexColor, alpha) {
   const hex = hexColor.replace('#', '');
@@ -223,6 +228,7 @@ export class UIRenderer {
   static drawInfoPanel(ctx, game, W, H) {
     const n = game.hoverNode;
     if (!n || game.state !== 'playing') return;
+    const isTentacleWarsSandbox = game.twMode?.isSandboxActive?.() || false;
 
     const t          = game.time;
     const isRelay    = n.isRelay;
@@ -244,8 +250,8 @@ export class UIRenderer {
     const pulse = 0.55 + Math.sin(t * 6) * 0.3;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(ncx, ncy, n.radius + RENDER_RULES.UI.HOVER_RING_OFFSET_PX, 0, Math.PI * 2);
-    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.globalAlpha = pulse;
+    ctx.arc(ncx, ncy, n.radius + (isTentacleWarsSandbox ? 6 : RENDER_RULES.UI.HOVER_RING_OFFSET_PX), 0, Math.PI * 2);
+    ctx.strokeStyle = col; ctx.lineWidth = isTentacleWarsSandbox ? 1.35 : 2; ctx.globalAlpha = isTentacleWarsSandbox ? pulse * 0.72 : pulse;
     ctx.setLineDash(RENDER_RULES.UI.PANEL_CONNECTOR_DASH); ctx.stroke(); ctx.setLineDash([]);
     if (game.hoverPin) {
       ctx.beginPath();
@@ -258,15 +264,15 @@ export class UIRenderer {
     const lang = game._lang || 'en';
     const LABEL = lang === 'pt' ? {
       title_neutral:'CÉLULA NEUTRA', title_enemy:'CÉLULA INIMIGA', title_player:'CÉLULA ALIADA', title_relay:'RETRANSMISSOR',
-      level:'NÍVEL', energy:'ENERGIA', regen:'REGEN', slots:'SLOTS',
-      sent:'ENVIADOS', slots_free:'LIVRES', incoming:'ATACANDO',
+      level:'NÍVEL', tw_grade:'FORMA', energy:'ENERGIA', regen:'REGEN', slots:'SLOTS', tentacles:'TENTÁCULOS',
+      sent:'EM USO', slots_free:'LIVRES', incoming:'ATACANDO',
       capture:'CAPTURA', contested:'DISPUTADA', contest_leader:'LÍDER', contest_target:'META', threat:'AMEAÇA A VOCÊ',
       shield:'ESCUDO ATIVO', overflow:'TRANSBORDANDO', pin:'[clique p/ fixar]', relay_buffer:'BUFFER',
       flow_in:'ENTRADA', flow_out:'SAÍDA', under_attack:'SOB ATAQUE',
     } : {
       title_neutral:'NEUTRAL CELL', title_enemy:'ENEMY CELL', title_player:'FRIENDLY CELL', title_relay:'RELAY NODE',
-      level:'LEVEL', energy:'ENERGY', regen:'REGEN', slots:'SLOTS',
-      sent:'SENT', slots_free:'FREE', incoming:'ATTACKING YOU',
+      level:'LEVEL', tw_grade:'GRADE', energy:'ENERGY', regen:'REGEN', slots:'SLOTS', tentacles:'TENTACLES',
+      sent:'IN USE', slots_free:'FREE', incoming:'ATTACKING YOU',
       capture:'CAPTURE', contested:'CONTESTED', contest_leader:'LEADER', contest_target:'TARGET', threat:'THREAT TO YOU',
       shield:'SHIELD ACTIVE', overflow:'OVERFLOWING', pin:'[click to pin]', relay_buffer:'BUFFER',
       flow_in:'FLOW IN', flow_out:'FLOW OUT', under_attack:'UNDER ATTACK',
@@ -274,10 +280,15 @@ export class UIRenderer {
 
     const frenzyActive = game.frenzyTimer > 0 && n.owner === 1;
     const regen        = isNeutral ? 0 : +computeNodeDisplayRegenRate(n, frenzyActive).toFixed(1);
-    const totalSlots = PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[
-      Math.min(lvl, PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL.length - 1)
-    ];
+    const totalSlots = n.maxSlots;
     const activeSent   = game._utils.liveOut(n);
+    const isTentacleWarsNode = n.simulationMode === 'tentaclewars';
+    const twSlotAvailability = isTentacleWarsNode
+      ? getTentacleWarsSlotAvailability(n, activeSent)
+      : null;
+    const twGradeThresholds = isTentacleWarsNode
+      ? getTentacleWarsGradeDisplayThresholds(lvl)
+      : null;
     const incomingAtk  = game.tents.filter(t2 =>
       t2.alive && t2.source && t2.target &&
       (t2.state === 'active' || t2.state === 'advancing') &&
@@ -302,10 +313,20 @@ export class UIRenderer {
     };
 
     const rows = [];
-    rows.push({
-      label: LABEL.level,
-      value: isRelay ? 'RELAY' : lvl + ' / ' + (PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL.length - 1),
-    });
+    if (isRelay) {
+      rows.push({ label: LABEL.level, value: 'RELAY' });
+    } else if (isTentacleWarsNode) {
+      rows.push({
+        label: LABEL.tw_grade,
+        value: getTentacleWarsGradeDisplayName(lvl).toUpperCase(),
+        sub: `↑${twGradeThresholds.ascendThreshold} · ↓${twGradeThresholds.descendThreshold}`,
+      });
+    } else {
+      rows.push({
+        label: LABEL.level,
+        value: lvl.toString(),
+      });
+    }
     rows.push({ label: LABEL.energy, value: energy + ' / ' + maxE,
                 bar: { pct: fillPct / 100, col: ownerColor(n.owner, Math.min(lvl, 4)) } });
     if (isRelay) {
@@ -330,10 +351,21 @@ export class UIRenderer {
       if (eIn  > 0) rows.push({ label: LABEL.flow_in,  value: '+' + eIn  + ' e/s', accentCol:'#00ff9d' });
       if (eOut > 0) rows.push({ label: LABEL.flow_out, value: '-' + eOut + ' e/s', accentCol:'#ff7090' });
     }
-    rows.push({ label: LABEL.slots,
-      value: isNeutral ? '—' : activeSent + ' / ' + totalSlots,
-      sub: isNeutral ? null : (totalSlots - activeSent > 0 ? (totalSlots - activeSent) + ' ' + LABEL.slots_free : null)
-    });
+    rows.push(
+      isNeutral
+        ? { label: LABEL.slots, value: '—' }
+        : isTentacleWarsNode
+          ? {
+              label: LABEL.tentacles,
+              value: `${twSlotAvailability.availableSlots} ${LABEL.slots_free}`,
+              sub: twSlotAvailability.usedSlots > 0 ? `${twSlotAvailability.usedSlots} ${LABEL.sent}` : null,
+            }
+          : {
+              label: LABEL.slots,
+              value: activeSent + ' / ' + totalSlots,
+              sub: totalSlots - activeSent > 0 ? (totalSlots - activeSent) + ' ' + LABEL.slots_free : null,
+            }
+    );
     if (isPlayer && incomingAtk > 0) {
       rows.push({ label: LABEL.under_attack, value: incomingAtk + '×', accent: true, accentCol: '#ff3d5a' });
     }
@@ -380,7 +412,7 @@ export class UIRenderer {
       rows.push({ label: LABEL.shield, value: '◈', accent: true, accentCol: '#55faff' });
     }
 
-    const PW = RENDER_RULES.UI.PANEL_WIDTH_PX;
+    const PW = isTentacleWarsSandbox ? Math.max(180, RENDER_RULES.UI.PANEL_WIDTH_PX - 22) : RENDER_RULES.UI.PANEL_WIDTH_PX;
     const ROW = RENDER_RULES.UI.PANEL_ROW_HEIGHT_PX;
     const PAD = RENDER_RULES.UI.PANEL_PADDING_PX;
     const titleH = RENDER_RULES.UI.PANEL_TITLE_HEIGHT_PX;
@@ -391,13 +423,13 @@ export class UIRenderer {
     py = Math.max(RENDER_RULES.UI.PANEL_EDGE_MARGIN_PX, Math.min(H - PH - RENDER_RULES.UI.PANEL_EDGE_MARGIN_PX, py));
 
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 18;
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = isTentacleWarsSandbox ? 12 : 18;
     ctx.fillStyle   = colBg;
     ctx.beginPath(); drawRoundedRect(ctx, px, py, PW, PH, 7); ctx.fill();
     ctx.shadowBlur  = 0;
     ctx.strokeStyle = colBdr; ctx.lineWidth = 1.2;
     ctx.beginPath(); drawRoundedRect(ctx, px, py, PW, PH, 7); ctx.stroke();
-    ctx.fillStyle   = col; ctx.globalAlpha = 0.55;
+    ctx.fillStyle   = col; ctx.globalAlpha = isTentacleWarsSandbox ? 0.42 : 0.55;
     ctx.beginPath(); drawRoundedRect(ctx, px, py, PW, 3, { tl:7, tr:7, bl:0, br:0 }); ctx.fill();
     ctx.globalAlpha = 1;
     const title = isRelay ? LABEL.title_relay : isPlayer ? LABEL.title_player : isNeutral ? LABEL.title_neutral : LABEL.title_enemy;
@@ -409,7 +441,7 @@ export class UIRenderer {
     if (!game.hoverPin) {
       ctx.font = getCanvasCopyFont(7);
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.textAlign = 'right';
-      ctx.fillText(LABEL.pin, px + PW - PAD, py + 3 + titleH / 2);
+      if (!isTentacleWarsSandbox) ctx.fillText(LABEL.pin, px + PW - PAD, py + 3 + titleH / 2);
     } else {
       ctx.font = getCanvasCopyFont(7, 'bold');
       ctx.fillStyle = col; ctx.globalAlpha = 0.7; ctx.textAlign = 'right';
@@ -448,10 +480,12 @@ export class UIRenderer {
     /* Connector line */
     const cx2 = ncx + n.radius * (px < ncx ? -1 : 1) * 1;
     const px2  = px < ncx ? px + PW : px;
-    ctx.strokeStyle = colBdr; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.5;
-    ctx.setLineDash(RENDER_RULES.UI.PANEL_CONNECTOR_DASH);
-    ctx.beginPath(); ctx.moveTo(cx2, ncy); ctx.lineTo(px2, py + PH / 2); ctx.stroke();
-    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    if (!isTentacleWarsSandbox) {
+      ctx.strokeStyle = colBdr; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.5;
+      ctx.setLineDash(RENDER_RULES.UI.PANEL_CONNECTOR_DASH);
+      ctx.beginPath(); ctx.moveTo(cx2, ncy); ctx.lineTo(px2, py + PH / 2); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
     ctx.restore();
   }
 
@@ -526,7 +560,7 @@ export class UIRenderer {
     const maxReach = maxRange(game.sel.energy - 1, distanceCostMultiplier);
     const reachableDistance = Math.min(distanceToCursor, maxReach);
     const canFire  = game.sel.energy >= computeBuildCost(distanceToCursor) + distanceToCursor * distanceCostMultiplier + 1 &&
-                     game._utils.liveOut(game.sel) < MAX_SLOTS[game.sel.level] &&
+                     game._utils.liveOut(game.sel) < game.sel.maxSlots &&
                      (!snappedTargetNode || snappedTargetNode !== game.sel);
     const normalizedX = deltaX / distanceToCursor;
     const normalizedY = deltaY / distanceToCursor;

@@ -82,8 +82,21 @@ export class Renderer {
     game.freeOrbPool.draw(context);
 
     /* Nodes */
+    const showRangePreview = !!(
+      game._dragConnectSource ||
+      game._dragConnectActive ||
+      (game.sel && game.hoverNode && game.hoverNode !== game.sel)
+    );
     game.nodes.forEach(node =>
-      NodeRenderer.draw(context, node, game.time, game.sel, game.cfg ? game.cfg.distanceCostMultiplier : null, frenzyActive)
+      NodeRenderer.draw(
+        context,
+        node,
+        game.time,
+        game.sel,
+        game.cfg ? game.cfg.distanceCostMultiplier : null,
+        frenzyActive,
+        showRangePreview,
+      )
     );
 
     context.restore(); // end camera translate

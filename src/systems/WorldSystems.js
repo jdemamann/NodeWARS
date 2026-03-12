@@ -15,6 +15,11 @@ export class WorldSystems {
   /* Canonical world-layer entry point.
      These mechanics are intentionally kept outside the core energy/tentacle loop. */
   static update(game, dt) {
+    if (game.twMode?.isSandboxActive?.()) {
+      WorldSystems.updateCamera(game, dt);
+      return;
+    }
+
     WorldSystems.updateVortex(game, dt);
     WorldSystems.updatePulsar(game, dt);
     WorldSystems.updateRelay(game);

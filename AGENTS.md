@@ -160,10 +160,15 @@ Installed Codex skills:
 
 - `develop-web-game`
 - `doc`
+- `figma`
+- `figma-implement-design`
 - `imagegen`
+- `jupyter-notebook`
+- `pdf`
 - `playwright`
 - `playwright-interactive`
 - `screenshot`
+- `sentry`
 - `spreadsheet`
 
 ## Audio Reconstruction Workflow
@@ -194,6 +199,7 @@ When rebuilding a soundtrack track from an authored audio file:
 - Prefer small, test-backed changes.
 - Start each meaningful wave by checking the relevant domain agent and the check matrix.
 - If the task clearly matches an installed Codex skill, use the skill before ad-hoc work.
+- When the user reports a bug, do not start by fixing it. Start by adding or extending a test/guardrail that reproduces the bug, then fix it, then prove the fix with the passing test.
 - Keep source comments in English only.
 - If a touched `src/*.js` file still lacks a module header, add one in the same wave.
 - If a created or materially changed function in `src/*.js` lacks a short block header, add one in the same wave.
@@ -239,5 +245,6 @@ Treat changes there as gameplay-sensitive.
 1. evaluate whether `24 RELAY RACE` still needs structural support after Wave B tuning
 2. run playtest-driven tuning on the new AI tactical-state and enemy-slice wave
 3. keep expanding balance and micro-bug intake from live sessions
-4. keep the `TentacleWars` mode work isolated on its own branch and track it through `TASK-TW-001` to `TASK-TW-006`
+4. keep the `TentacleWars` mode work isolated on its own branch and use the sandbox playtest/tuning wave after `TASK-TW-006`
 5. prepare executable Linux/Android packaging only when port work becomes active
+6. after restarting with the new skills, update the skill-driven workflow and start `TASK-TW-007 Packet-Native Lane Runtime`

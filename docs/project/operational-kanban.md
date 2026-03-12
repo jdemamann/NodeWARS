@@ -16,20 +16,19 @@ Use it as the local source of truth when:
 
 - investigate additional tutorial playtest feedback once new sessions are recorded
 - evaluate whether `24 RELAY RACE` needs structural player opening support
-- prepare the dedicated `TentacleWars` mode branch and first prototype rollout
 
 ## Planned
 
-- `TASK-TW-001 TentacleWars Mode Skeleton`
-- `TASK-TW-002 TentacleWars Grade Table and Packet Core`
-- `TASK-TW-003 TentacleWars Tentacle Cost and Refund`
-- `TASK-TW-004 TentacleWars Overflow and Capture Core`
-- `TASK-TW-005 TentacleWars Sandbox Prototype`
-- `TASK-TW-006 TentacleWars AI Phase 1`
+- `TASK-TW-023 TentacleWars Grade Slot Table Reconciliation`
+- `TASK-TW-017 TentacleWars Controlled Scenario Presets`
+- `TASK-TW-020 TentacleWars Node Grade Silhouette Pass`
+- `TASK-TW-021 TentacleWars Tentacle Motion and Material Pass`
+- `TASK-TW-018 TentacleWars Sandbox Playtest and Tuning Wave B`
+- `TASK-TW-022 TentacleWars Visual Regression Matrix`
 
 ## In Progress
 
-- none
+- `TASK-TW-019 TentacleWars HUD and Card Fidelity Contract`
 
 ## Needs Validation
 
@@ -37,7 +36,24 @@ Use it as the local source of truth when:
 
 ## Done Recently
 
+- `TASK-TW-016 TentacleWars Fidelity Safety Rails`
+- `TASK-TW-015 TentacleWars Visual Density Wave B`
+- `TASK-TW-010 TentacleWars Lane and Packet Visual Language`
+- `TASK-TW-009 TentacleWars Sandbox Playtest and Tuning Wave A`
+- `TASK-TW-014 TentacleWars Focused Sanity Suites`
+- `TASK-TW-013 TentacleWars Draw-Connect Fidelity Input`
+- `TASK-TW-012 Browser Visual Validation Framework`
+- `TASK-TW-011 TentacleWars Sandbox UX and Debug Tools`
+- `TASK-TW-008 TentacleWars Capture Runtime Integration`
+- `TASK-TW-007 Packet-Native Lane Runtime`
+- `TASK-TW-006 TentacleWars AI Phase 1`
+- `TASK-TW-005 TentacleWars Sandbox Prototype`
+- `TASK-TW-004 TentacleWars Overflow and Capture Core`
+- `TASK-TW-003 TentacleWars Tentacle Cost and Refund`
+- `TASK-TW-002 TentacleWars Grade Table and Packet Core`
+
 - `TASK-041 AI Playtest and Tuning Matrix`
+- `TASK-TW-001 TentacleWars Mode Skeleton`
 - `TASK-040 Purple Faction Identity Wave`
 - `TASK-039 AI Structural Weakness Scoring`
 - `TASK-038 AI Tactical State Profiles`

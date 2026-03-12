@@ -81,6 +81,7 @@ export class BGRenderer {
     const world = game.cfg ? (game.cfg.worldId || 0) : 0;
     const t     = game.time;
     const highGraphics = STATE.settings.graphicsMode === 'high';
+    const isTentacleWarsSandbox = game.twMode?.isSandboxActive?.() || game.cfg?.isTentacleWarsSandbox;
 
     /* Resolve active theme — fall back to the canonical default UI theme. */
     const theme = THEMES[STATE.settings.theme] || THEMES.AURORA;
@@ -117,6 +118,28 @@ export class BGRenderer {
           });
       }
       ctx.globalAlpha = 1;
+    }
+
+    if (isTentacleWarsSandbox) {
+      const vignette = ctx.createRadialGradient(W * 0.52, H * 0.44, Math.min(W, H) * 0.06, W * 0.52, H * 0.44, Math.max(W, H) * 0.78);
+      vignette.addColorStop(0, 'rgba(0,24,44,0)');
+      vignette.addColorStop(1, 'rgba(2,8,18,0.46)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.save();
+      ctx.globalAlpha = highGraphics ? 0.5 : 0.28;
+      for (let i = 0; i < 16; i += 1) {
+        const phase = t * (0.08 + i * 0.01);
+        const x = (i * 137 + phase * 23) % (W + 40) - 20;
+        const y = (i * 91 + phase * 11) % (H + 40) - 20;
+        const radius = 1.2 + (i % 4) * 0.6;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = i % 3 === 0 ? 'rgba(0,229,255,0.09)' : 'rgba(192,64,255,0.06)';
+        ctx.fill();
+      }
+      ctx.restore();
     }
   }
 }

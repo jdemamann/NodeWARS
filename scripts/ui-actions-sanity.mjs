@@ -110,11 +110,14 @@ async function testSettingsControlsHaveI18nCoverage() {
   for (const key of ['setCopyDebug', 'setViewEnding', 'setReset', 'setMusicPlayer']) {
     assert.match(html, new RegExp(`data-t="${key}"`), `${key} should be rendered through i18n in index.html`);
   }
+
+  assert.match(html, /id="debugSettingsGroup"/, 'settings should expose a grouped debug settings card');
 }
 
 async function testScreenTransitionsUseNamedScreens() {
   const screenController = await read('src/ui/ScreenController.js');
   const mainSource = await read('src/main.js');
+  const gameSource = await read('src/core/Game.js');
 
   for (const screenName of ['menu', 'levels', 'story', 'result', 'ending', 'pause', 'settings', 'credits']) {
     assert.match(screenController, new RegExp(`${screenName}:\\s+DOM_IDS\\.`), `ScreenController should map the ${screenName} screen`);
@@ -127,6 +130,7 @@ async function testScreenTransitionsUseNamedScreens() {
   assert.match(mainSource, /BTN_CREDITS_BACK[\s\S]*Music\.playMenu\(\)/, 'leaving credits should restore the menu theme');
   assert.match(mainSource, /showScr\('menu'\)/, 'back buttons should still navigate to the menu screen');
   assert.match(screenController, /showScr\('ending'\)/, 'campaign completion should still navigate to the dedicated ending screen');
+  assert.match(gameSource, /enterSelectedMode\(\)\s*\{\s*showScr\(null\);/s, 'entering the selected mode should hide menu shells before gameplay starts');
 }
 
 async function testClipboardAndDebugPreviewFallbacksExist() {

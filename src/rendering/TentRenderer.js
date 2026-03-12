@@ -206,6 +206,214 @@ function colorWithAlpha(hexColor, alpha) {
   return `rgba(${red},${green},${blue},${alpha})`;
 }
 
+/* Draw the split TentacleWars cut retraction so both halves snap back visibly. */
+function drawTentacleWarsCutRetraction(ctx, tentacle, {
+  esx,
+  esy,
+  etx,
+  ety,
+  controlPoint,
+  color,
+  level,
+  renderNow,
+  highGraphics,
+}) {
+  const cutRetraction = tentacle.twCutRetraction;
+  if (!cutRetraction) return;
+
+  const segments = [
+    { start: 0, end: cutRetraction.sourceFront },
+    { start: cutRetraction.targetFront, end: 1 },
+  ].filter(segment => segment.end - segment.start > 0.003);
+
+  drawAttachmentRoot(ctx, esx, esy, color, Math.max(3, 2.6 + level * 0.4), highGraphics);
+  drawTargetGrip(ctx, etx, ety, color, Math.max(4, 5.2 + level * 0.3), renderNow, highGraphics);
+
+  segments.forEach(segment => {
+    ctx.save();
+    ctx.beginPath();
+    drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, segment.start, segment.end);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 10 + level * 0.8;
+    ctx.globalAlpha = 0.13;
+    sg(ctx, color, highGraphics ? 18 : 10);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    drawOrganicTaperedPath(
+      ctx,
+      esx,
+      esy,
+      controlPoint.x,
+      controlPoint.y,
+      etx,
+      ety,
+      segment.start,
+      segment.end,
+      1.8 + level * 0.18,
+      0.45,
+      highGraphics ? RENDER_RULES.TENTACLE.BEZIER_SEGMENTS : 8,
+      {
+        organicWobblePx: highGraphics ? RENDER_RULES.TENTACLE.ORGANIC_WOBBLE_PX * 0.35 : 0,
+        rootBulbScale: RENDER_RULES.TENTACLE.ROOT_BULB_SCALE,
+        midTaperScale: RENDER_RULES.TENTACLE.MID_TAPER_SCALE,
+        tipTaperScale: RENDER_RULES.TENTACLE.TIP_TAPER_SCALE,
+        time: renderNow,
+      },
+    );
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.84;
+    ctx.fill();
+    ctx.restore();
+
+    if (highGraphics) {
+      ctx.save();
+      ctx.beginPath();
+      drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, segment.start, segment.end);
+      ctx.strokeStyle = colorWithAlpha('#ffffff', 0.24);
+      ctx.lineWidth = 1.15;
+      sg(ctx, '#ffffff', 6);
+      ctx.stroke();
+      ctx.restore();
+    }
+  });
+}
+
+/* Overlay moving packet beads so TentacleWars lanes stay readable under overlap. */
+function drawTentacleWarsPacketMarkers(ctx, {
+  esx,
+  esy,
+  etx,
+  ety,
+  controlPoint,
+  color,
+  flowRatio,
+  renderNow,
+  laneStart,
+  laneEnd,
+  highGraphics,
+}) {
+  if (laneEnd - laneStart < 0.08) return;
+
+  const packetCount = highGraphics ? 4 : 3;
+  const drift = (renderNow * 0.00042 * (0.7 + flowRatio * 0.9)) % 1;
+  for (let packetIndex = 0; packetIndex < packetCount; packetIndex += 1) {
+    const phase = (drift + packetIndex / packetCount) % 1;
+    const laneT = laneStart + (laneEnd - laneStart) * phase;
+    const packetPoint = computeBezierPoint(laneT, esx, esy, controlPoint.x, controlPoint.y, etx, ety);
+    const packetRadius = highGraphics ? 3.1 + flowRatio * 1.3 : 2.5 + flowRatio * 0.9;
+    const tangentAhead = computeBezierPoint(Math.min(1, laneT + 0.01), esx, esy, controlPoint.x, controlPoint.y, etx, ety);
+    const packetAngle = Math.atan2(tangentAhead.y - packetPoint.y, tangentAhead.x - packetPoint.x);
+
+    ctx.save();
+    ctx.translate(packetPoint.x, packetPoint.y);
+    ctx.rotate(packetAngle);
+    ctx.beginPath();
+    ctx.ellipse(-packetRadius * 0.2, 0, packetRadius * 2.35, packetRadius * 1.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = colorWithAlpha('#02060d', 0.42);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(-packetRadius * 0.4, 0, packetRadius * 2, packetRadius * 1.25, 0, 0, Math.PI * 2);
+    ctx.fillStyle = colorWithAlpha(color, 0.18 + flowRatio * 0.08);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, packetRadius * 1.15, packetRadius * 0.82, 0, 0, Math.PI * 2);
+    ctx.fillStyle = colorWithAlpha(color, 0.92);
+    sg(ctx, color, highGraphics ? 9 : 5);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(packetRadius * 0.32, 0, Math.max(0.8, packetRadius * 0.34), 0, Math.PI * 2);
+    ctx.fillStyle = colorWithAlpha('#ffffff', 0.28);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* Give TentacleWars lanes a faint peristaltic halo so they read as tissue rather than UI wires. */
+function drawTentacleWarsMembranePulse(ctx, {
+  esx,
+  esy,
+  etx,
+  ety,
+  controlPoint,
+  color,
+  renderNow,
+  laneStart,
+  laneEnd,
+  flowRatio,
+}) {
+  if (laneEnd - laneStart < 0.15) return;
+
+  const pulseCenter = laneStart + (laneEnd - laneStart) * ((renderNow * 0.00024 * (0.7 + flowRatio * 0.8)) % 1);
+  const pulseSpan = 0.11 + flowRatio * 0.05;
+  const pulseStart = Math.max(laneStart, pulseCenter - pulseSpan * 0.5);
+  const pulseEnd = Math.min(laneEnd, pulseCenter + pulseSpan * 0.5);
+  if (pulseEnd - pulseStart < 0.03) return;
+
+  ctx.save();
+  ctx.beginPath();
+  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, pulseStart, pulseEnd);
+  ctx.strokeStyle = colorWithAlpha(color, 0.12 + flowRatio * 0.06);
+  ctx.lineWidth = 4.5 + flowRatio * 4.2;
+  sg(ctx, color, 9 + flowRatio * 7);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* Add a soft dark contour under TentacleWars lanes so dense overlaps stay separated. */
+function drawTentacleWarsLaneContour(ctx, {
+  esx,
+  esy,
+  etx,
+  ety,
+  controlPoint,
+  laneStart,
+  laneEnd,
+  flowRatio,
+  color,
+}) {
+  if (laneEnd - laneStart < 0.04) return;
+
+  ctx.save();
+  ctx.beginPath();
+  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
+  ctx.strokeStyle = colorWithAlpha('#02060d', 0.68 + flowRatio * 0.12);
+  ctx.lineWidth = 6.6 + flowRatio * 5.2;
+  ctx.stroke();
+
+  ctx.beginPath();
+  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
+  ctx.strokeStyle = colorWithAlpha(color, 0.22 + flowRatio * 0.08);
+  ctx.lineWidth = 4.9 + flowRatio * 3.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* Keep a colored inner spine on TentacleWars lanes so ownership stays readable in crowded corridors. */
+function drawTentacleWarsOwnershipSpine(ctx, {
+  esx,
+  esy,
+  etx,
+  ety,
+  controlPoint,
+  laneStart,
+  laneEnd,
+  color,
+  flowRatio,
+}) {
+  if (laneEnd - laneStart < 0.05) return;
+
+  ctx.save();
+  ctx.beginPath();
+  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
+  ctx.strokeStyle = colorWithAlpha(color, 0.72 + flowRatio * 0.14);
+  ctx.lineWidth = 1.5 + flowRatio * 1.05;
+  sg(ctx, color, 7 + flowRatio * 6);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export class TentRenderer {
   static draw(ctx, t) {
     if (t.state === TentState.DEAD) return;
@@ -217,9 +425,42 @@ export class TentRenderer {
     const src = t.reversed ? tg : s;
     const lvl = src.level;
     const col = tentCol(t);
+    const isTentacleWarsLane = t.effectiveSourceNode?.simulationMode === 'tentaclewars';
     const highGraphics = STATE.settings.graphicsMode === 'high';
     const segmentCount = highGraphics ? RENDER_RULES.TENTACLE.BEZIER_SEGMENTS : Math.max(6, Math.floor(RENDER_RULES.TENTACLE.BEZIER_SEGMENTS * 0.58));
     const renderNow = (t.game?.time || 0) * 1000;
+
+    if (t.twCutRetraction) {
+      drawTentacleWarsCutRetraction(ctx, t, {
+        esx,
+        esy,
+        etx,
+        ety,
+        controlPoint: cp,
+        color: col,
+        level: lvl,
+        renderNow,
+        highGraphics,
+      });
+
+      if (t.cutFlash > 0 && t.cutPoint !== undefined) {
+        const sp = computeBezierPoint(t.cutPoint, esx, esy, cp.x, cp.y, etx, ety);
+        const alpha = t.cutFlash;
+        const r2 = 18 + alpha * 14;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, r2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245,197,24,' + (alpha * 0.18) + ')';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, r2 * 0.45, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,' + (alpha * 0.9) + ')';
+        sg(ctx, '#f5c518', 20 * alpha);
+        ctx.fill();
+        ctx.restore();
+      }
+      return;
+    }
 
     const activeClashFront = t.clashVisualT ?? t.clashT;
     const isClash = activeClashFront != null;
@@ -247,9 +488,9 @@ export class TentRenderer {
 
     /* Flow intensity */
     const FR      = Math.min(t.flowRate / 18, 1);
-    const glowW   = 10 + FR * 14;
-    const glowA   = (0.055 + lvl * 0.014) + FR * 0.12;
-    const glowBlur= 16 + FR * 24;
+    const glowW   = isTentacleWarsLane ? 6 + FR * 8 : 10 + FR * 14;
+    const glowA   = isTentacleWarsLane ? (0.035 + lvl * 0.008) + FR * 0.06 : (0.055 + lvl * 0.014) + FR * 0.12;
+    const glowBlur= isTentacleWarsLane ? 10 + FR * 12 : 16 + FR * 24;
     const now     = renderNow;
 
     ctx.save();
@@ -268,7 +509,12 @@ export class TentRenderer {
       ctx.save();
       ctx.beginPath();
       drawBezierSegment(ctx, esx, esy, cp.x, cp.y, etx, ety, sT, visEnd);
-      ctx.strokeStyle = colorWithAlpha(col, atk && !isRev ? 0.22 + FR * 0.08 : 0.16 + FR * 0.05);
+      ctx.strokeStyle = colorWithAlpha(
+        col,
+        isTentacleWarsLane
+          ? (atk && !isRev ? 0.12 + FR * 0.04 : 0.09 + FR * 0.03)
+          : (atk && !isRev ? 0.22 + FR * 0.08 : 0.16 + FR * 0.05),
+      );
       ctx.lineWidth = membraneWidth;
       ctx.globalAlpha = 1;
       sg(ctx, col, 8 + FR * 10);
@@ -311,10 +557,14 @@ export class TentRenderer {
     }
 
     /* Tapered core body */
-    const baseW  = isAnim ? 1.1 : (isAdv ? 2 + lvl * 0.4 : atk && !isRev ? 1.8 + lvl * 0.28 : 1.3);
-    const baseA  = isAnim ? 0.48 : (isAdv ? 0.95 : atk && !isRev ? 0.88 : 0.5);
-    const fullW  = baseW + FR * (atk ? 2.5 : 1.5);
-    const alpha  = baseA + FR * (atk ? 0.08 : 0.18);
+    const baseW  = isTentacleWarsLane
+      ? (isAnim ? 0.95 : (isAdv ? 1.55 + lvl * 0.24 : atk && !isRev ? 1.35 + lvl * 0.18 : 1.05))
+      : (isAnim ? 1.1 : (isAdv ? 2 + lvl * 0.4 : atk && !isRev ? 1.8 + lvl * 0.28 : 1.3));
+    const baseA  = isTentacleWarsLane
+      ? (isAnim ? 0.42 : (isAdv ? 0.84 : atk && !isRev ? 0.74 : 0.46))
+      : (isAnim ? 0.48 : (isAdv ? 0.95 : atk && !isRev ? 0.88 : 0.5));
+    const fullW  = baseW + FR * (isTentacleWarsLane ? (atk ? 1.35 : 0.9) : (atk ? 2.5 : 1.5));
+    const alpha  = baseA + FR * (isTentacleWarsLane ? (atk ? 0.04 : 0.10) : (atk ? 0.08 : 0.18));
     /* Half-widths: thick at base, tapered at tip */
     const wBase  = fullW * (isAnim ? 0.8 : 1.2);
     const wTip   = Math.max(0.35, fullW * 0.18);
@@ -323,6 +573,19 @@ export class TentRenderer {
       drawAttachmentRoot(ctx, esx, esy, col, Math.max(3, wBase * 1.55), highGraphics);
       drawTargetGrip(ctx, etx, ety, col, Math.max(4, wTip * 5.4), now, highGraphics);
       drawTransferSignature(ctx, t, etx, ety, col, now, highGraphics);
+    }
+    if (isTentacleWarsLane) {
+      drawTentacleWarsLaneContour(ctx, {
+        esx,
+        esy,
+        etx,
+        ety,
+        controlPoint: cp,
+        laneStart: sT,
+        laneEnd: visEnd,
+        flowRatio: FR,
+        color: col,
+      });
     }
     ctx.save();
     if (!atk || isRev) {
@@ -354,7 +617,7 @@ export class TentRenderer {
     ctx.restore();
 
     /* Bright flow spine keeps the tentacle from reading as a flat tube. */
-    if (highGraphics && visEnd - sT > 0.02) {
+    if (!isTentacleWarsLane && highGraphics && visEnd - sT > 0.02) {
       ctx.save();
       ctx.beginPath();
       drawBezierSegment(ctx, esx, esy, cp.x, cp.y, etx, ety, Math.min(visEnd - 0.01, sT + 0.015), Math.max(sT + 0.02, visEnd * 0.985));
@@ -367,7 +630,7 @@ export class TentRenderer {
     }
 
     /* Animated flow pulses make active tentacles feel pressurised instead of static. */
-    if (highGraphics && t.state === TentState.ACTIVE && visEnd - sT > 0.18) {
+    if (!isTentacleWarsLane && highGraphics && t.state === TentState.ACTIVE && visEnd - sT > 0.18) {
       ctx.save();
       const pulseCount = RENDER_RULES.TENTACLE.FLOW_PULSE_COUNT;
       const pulseSpan = RENDER_RULES.TENTACLE.FLOW_PULSE_SPAN;
@@ -388,7 +651,7 @@ export class TentRenderer {
       ctx.restore();
     }
 
-    if (highGraphics && atk && !isRev && visEnd - sT > 0.12) {
+    if (!isTentacleWarsLane && highGraphics && atk && !isRev && visEnd - sT > 0.12) {
       ctx.save();
       for (let bandIndex = 0; bandIndex < 4; bandIndex += 1) {
         const bandCenter = sT + (visEnd - sT) * (0.12 + bandIndex * 0.18 + Math.sin(now * 0.002 + bandIndex) * 0.03);
@@ -405,7 +668,7 @@ export class TentRenderer {
       ctx.restore();
     }
 
-    if (highGraphics && !isClash && t.state === TentState.ACTIVE) {
+    if (!isTentacleWarsLane && highGraphics && !isClash && t.state === TentState.ACTIVE) {
       const sourceNode = t.effectiveSourceNode;
       const targetNode = t.effectiveTargetNode;
       if (sourceNode.isRelay && sourceNode.owner !== 0 && visEnd - sT > 0.18) {
@@ -428,6 +691,45 @@ export class TentRenderer {
         ctx.stroke();
         ctx.restore();
       }
+    }
+
+    if (isTentacleWarsLane && t.state === TentState.ACTIVE && !isClash) {
+      drawTentacleWarsOwnershipSpine(ctx, {
+        esx,
+        esy,
+        etx,
+        ety,
+        controlPoint: cp,
+        laneStart: Math.max(sT, 0.03),
+        laneEnd: Math.max(Math.max(sT, 0.03), visEnd * 0.985),
+        color: col,
+        flowRatio: FR,
+      });
+      drawTentacleWarsMembranePulse(ctx, {
+        esx,
+        esy,
+        etx,
+        ety,
+        controlPoint: cp,
+        color: col,
+        renderNow,
+        laneStart: Math.max(sT, 0.04),
+        laneEnd: Math.max(Math.max(sT, 0.04), visEnd * 0.96),
+        flowRatio: FR,
+      });
+      drawTentacleWarsPacketMarkers(ctx, {
+        esx,
+        esy,
+        etx,
+        ety,
+        controlPoint: cp,
+        color: col,
+        flowRatio: FR,
+        renderNow,
+        laneStart: Math.max(sT, 0.04),
+        laneEnd: Math.max(Math.max(sT, 0.04), visEnd * 0.96),
+        highGraphics,
+      });
     }
 
     /* Non-active tip dot — not shown during BURSTING (tail rushing to target, no stationary tip) */
@@ -506,16 +808,17 @@ export class TentRenderer {
       /* Pulsing outer ring */
       const pulse = 0.65 + Math.sin(now * 0.008) * 0.35;
       ctx.beginPath();
-      ctx.arc(sp.x, sp.y, (14 + spark * 8) * pulse, 0, Math.PI * 2);
-      ctx.strokeStyle = '#f5c518'; ctx.lineWidth = 1.5;
+      ctx.arc(sp.x, sp.y, (isTentacleWarsLane ? 11 + spark * 5 : 14 + spark * 8) * pulse, 0, Math.PI * 2);
+      ctx.strokeStyle = isTentacleWarsLane ? colorWithAlpha(col, 0.7) : '#f5c518';
+      ctx.lineWidth = isTentacleWarsLane ? 1.2 : 1.5;
       ctx.globalAlpha = spark * 0.55 * pulse;
-      sg(ctx, '#f5c518', 28);
+      sg(ctx, isTentacleWarsLane ? col : '#f5c518', isTentacleWarsLane ? 16 : 28);
       ctx.stroke();
 
       /* Mid ring */
       ctx.beginPath();
-      ctx.arc(sp.x, sp.y, 7 + spark * 5, 0, Math.PI * 2);
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.arc(sp.x, sp.y, isTentacleWarsLane ? 5.5 + spark * 3.5 : 7 + spark * 5, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = isTentacleWarsLane ? 1.35 : 2;
       ctx.globalAlpha = spark * 0.72;
       sg(ctx, '#fff', 14);
       ctx.stroke();
@@ -538,27 +841,27 @@ export class TentRenderer {
       }
 
       /* 8 spark rays, rotating */
-      const rayLen = 10 + spark * 12;
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2 + now * 0.004;
+      const rayLen = isTentacleWarsLane ? 6 + spark * 7 : 10 + spark * 12;
+      for (let i = 0; i < (isTentacleWarsLane ? 6 : 8); i++) {
+        const a = (i / (isTentacleWarsLane ? 6 : 8)) * Math.PI * 2 + now * 0.004;
         const r0 = 4, r1 = r0 + rayLen * (0.5 + spark * 0.5);
         ctx.beginPath();
         ctx.moveTo(sp.x + r0 * Math.cos(a), sp.y + r0 * Math.sin(a));
         ctx.lineTo(sp.x + r1 * Math.cos(a), sp.y + r1 * Math.sin(a));
-        ctx.strokeStyle = i % 2 === 0 ? '#f5c518' : col;
-        ctx.lineWidth = 1.2;
-        ctx.globalAlpha = spark * 0.55;
-        sg(ctx, '#f5c518', 10);
+        ctx.strokeStyle = isTentacleWarsLane ? (i % 2 === 0 ? '#ffffff' : col) : (i % 2 === 0 ? '#f5c518' : col);
+        ctx.lineWidth = isTentacleWarsLane ? 0.95 : 1.2;
+        ctx.globalAlpha = spark * (isTentacleWarsLane ? 0.42 : 0.55);
+        sg(ctx, isTentacleWarsLane ? col : '#f5c518', isTentacleWarsLane ? 6 : 10);
         ctx.stroke();
       }
 
       /* CLASH label (only from one side to avoid duplicate — draw from non-reversed only) */
       if (!isRev) {
-        ctx.font = getCanvasCopyFont(7);
+        ctx.font = getCanvasCopyFont(isTentacleWarsLane ? 8 : 7);
         ctx.fillStyle = '#f5c518';
-        ctx.globalAlpha = 0.78 + Math.sin(now * 0.006) * 0.22;
+        ctx.globalAlpha = (isTentacleWarsLane ? 0.92 : 0.78) + Math.sin(now * 0.006) * (isTentacleWarsLane ? 0.14 : 0.22);
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-        sg(ctx, '#f5c518', 8);
+        sg(ctx, '#f5c518', isTentacleWarsLane ? 14 : 8);
         ctx.fillText('CLASH', sp.x, sp.y - RENDER_RULES.TENTACLE.CLASH_LABEL_Y_OFFSET_PX);
       }
 

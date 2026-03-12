@@ -133,6 +133,10 @@ export function bindGameInputEvents(game) {
     }
 
     if (game._tapStart && !game.paused) {
+      if (game._dragConnectSource) {
+        game._extendMouseDrag(touchX, touchY);
+        return;
+      }
       if (shouldPromoteTapToSlice(game._tapStart, touchX, touchY, INPUT_TUNING.TOUCH_SLICE_DRAG_THRESHOLD_PX)) {
         // Touch drag is promoted through the same slice entry point as mouse
         // so gesture cleanup and frenzy rules stay shared.
@@ -154,6 +158,11 @@ export function bindGameInputEvents(game) {
       game._endSlice();
     } else if (game._tapStart && game.state === 'playing' && !game.paused) {
       const touchPoint = getCanvasPointFromClient(canvas, event.changedTouches[0].clientX, event.changedTouches[0].clientY);
+      const consumedByDrag = game._endMouseDrag(touchPoint.x, touchPoint.y);
+      if (consumedByDrag) {
+        game._clearTouchState();
+        return;
+      }
       if (shouldTriggerTapAction(
         game._tapStart,
         getMonotonicInputTimestamp(),

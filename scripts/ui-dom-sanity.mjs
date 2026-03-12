@@ -180,6 +180,8 @@ async function setupUiDomHarness() {
     DOM_IDS.SCREEN_PAUSE,
     DOM_IDS.SCREEN_SETTINGS,
     DOM_IDS.SCREEN_CREDITS,
+    DOM_IDS.DEBUG_SETTINGS_GROUP,
+    DOM_IDS.MODE_GROUP,
     DOM_IDS.WORLD_UNLOCK_GROUP,
     DOM_IDS.WORLD_TABS,
     DOM_IDS.LGRID,
@@ -199,6 +201,7 @@ async function setupUiDomHarness() {
     DOM_IDS.DEBUG_INFO_PANEL,
     DOM_IDS.TOG_W2,
     DOM_IDS.TOG_W3,
+    DOM_IDS.BTN_MODE_CYCLE,
     DOM_IDS.TOG_DEBUG,
     DOM_IDS.TOG_SOUND,
     DOM_IDS.TOG_MUSIC,
@@ -240,9 +243,13 @@ async function testRefreshSettingsUiReflectsEffectiveState() {
     STATE.settings.showFps = true;
     STATE.settings.graphicsMode = 'high';
     STATE.settings.theme = 'SOLAR';
+    STATE.setGameMode('tentaclewars');
 
     screenController.refreshSettingsUI();
 
+    assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_SETTINGS_GROUP).style.display, '', 'grouped debug settings card should be visible when debug mode is enabled');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.MODE_GROUP).style.display, '', 'mode controls should be visible when debug mode is enabled');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.BTN_MODE_CYCLE).textContent, 'TENTACLEWARS', 'mode toggle should reflect the selected TentacleWars track');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).textContent, 'ON', 'world 2 toggle should reflect natural campaign unlock');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).classList.contains('on'), true, 'world 2 toggle should gain ON styling when visible');
     assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_UNLOCK_GROUP).style.display, '', 'manual world unlock controls should be visible when debug mode is enabled');
@@ -260,6 +267,8 @@ async function testRefreshSettingsUiReflectsEffectiveState() {
     STATE.setDebugMode(false);
     screenController.refreshSettingsUI();
 
+    assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_SETTINGS_GROUP).style.display, 'none', 'grouped debug settings card should hide when debug mode is disabled');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.MODE_GROUP).style.display, 'none', 'mode controls should hide when debug mode is disabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).textContent, 'ON', 'once debug is disabled, world 2 should reflect natural campaign unlock again');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).classList.contains('on'), true, 'natural campaign unlock should restore the ON styling');
     assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_UNLOCK_GROUP).style.display, 'none', 'manual world unlock controls should hide when debug mode is disabled');

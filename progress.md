@@ -1,0 +1,266 @@
+Original prompt: faça isso. E especifique em quais fases essas musicas aparecem. No menu de notificação de cada musica, na descrição de cada musica que tá sendo tocada, coloque uma explicação curta sobre a alma da musica, não informações tenicas. Coloque sentimento.
+
+- Wave started: music direction refresh for non-menu tracks.
+- Constraints:
+  - `DRIFT SIGNAL` menu theme remains untouched.
+  - Popup copy should become emotional, not technical.
+  - Need explicit documentation of which phases use each track.
+- Completed:
+  - reworked non-menu pressure and boss tracks for stronger contrast
+  - removed technical BPM/loop metadata from the music popup
+  - rewrote PT/EN track descriptions to communicate feeling instead of audio jargon
+  - documented exact phase-to-track mapping in implementation docs
+  - added a Settings soundtrack player with previous / play-pause / next controls
+  - wired settings UI refresh to the canonical Music runtime state
+
+- TentacleWars branch progress:
+  - `TASK-TW-001` through `TASK-TW-006` are now implemented
+  - sandbox runtime exists and owns its own load / end-state / pause handling
+  - TentacleWars grade table, packet core, tentacle economy, overflow, and capture rules are isolated in `src/tentaclewars/`
+  - TentacleWars now has a first dedicated AI pass:
+    - `TwAI.js`
+    - `TwAIScoring.js`
+    - mode-aware hostility through `OwnerTeams.js`
+  - all current TentacleWars work is still branch-local and not merged into `main`
+- Suggested next step:
+  - playtest the TentacleWars sandbox and decide whether the next wave should target:
+    - packet-native runtime replacement
+    - TentacleWars-specific render/lane feel
+    - authored prototype content
+
+- Wave started: `TASK-TW-007 Packet-Native Lane Runtime`.
+- Completed:
+  - added a live TentacleWars lane-runtime helper in `src/tentaclewars/TwPacketFlow.js`
+  - moved TentacleWars active lanes in `src/entities/Tent.js` from continuous delivery to discrete packet emission + in-transit queue delivery
+  - kept `NodeWARS` on the prior continuous path
+  - aligned TentacleWars friendly support bookkeeping so prior-frame `inFlow` is stored as delivered packet energy instead of continuous rate
+  - separated TentacleWars base lane throughput from overflow credit in `src/systems/EnergyBudget.js`
+  - extended smoke coverage for live lane runtime emission and delayed packet delivery
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/commentary-policy.mjs`
+  - `node scripts/input-harness.mjs`
+  - `node scripts/simulation-soak.mjs`
+- Blocker / note:
+  - attempted to follow the `develop-web-game` skill loop with `web_game_playwright_client.js`, but the local Node environment could not resolve the `playwright` package for that client
+  - fallback browser validation via the local Playwright wrapper confirmed the app boots at `http://127.0.0.1:4173/index.html` with `0` console errors, but deeper automated UI navigation was unreliable in this session
+- Suggested next step:
+  - reopen the TentacleWars sandbox in a fully working browser automation session and confirm lane feel, packet cadence, and capture pacing before starting `TASK-TW-008`
+
+- Ops wave: imagegen environment bootstrap.
+- Completed:
+  - created local imagegen virtualenv at `.venv-imagegen`
+  - installed `openai` and `pillow` into that venv
+  - added `scripts/imagegen.sh` wrapper to run the skill script through the local venv
+  - added `.env.imagegen.example` and ignored `.env.imagegen` in git
+- Validation:
+  - `./scripts/imagegen.sh --help`
+  - `./scripts/imagegen.sh generate --prompt 'test image' --dry-run --out output/imagegen/test.png`
+- Remaining requirement:
+  - real image generation still needs the user to create `.env.imagegen` locally with `OPENAI_API_KEY=...`
+
+- Wave continued: `TASK-TW-008 TentacleWars Capture Runtime Integration`.
+- Completed:
+  - TentacleWars sandbox neutrals now derive `captureThreshold` from displayed neutral energy using the dedicated acquisition-cost helper
+  - TentacleWars active-lane neutral capture now stacks directly from delivered packet events instead of the NodeWARS continuous capture bridge
+  - TentacleWars active-lane hostile takeover now resolves from delivered packet events with reset-plus-carryover starting energy
+  - the live sandbox runtime now routes TentacleWars capture resolution through `TwCaptureRules.js` during sustained packet delivery
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+
+- Bugfix:
+  - TentacleWars neutral takeover no longer starts captured cells at `1` energy when the acquisition threshold is met exactly
+  - neutral capture now preserves the neutral node's displayed energy as the base of the captured cell, with any extra pressure added as carryover
+- Suggested next step:
+  - run a deeper TentacleWars sandbox playtest pass to validate neutral flip strength, hostile carryover feel, and whether burst/split cuts also need a fully mode-specific capture path before `TASK-TW-009`
+
+- Follow-up completed:
+  - TentacleWars burst/split immediate payload resolution now also uses mode-specific capture logic in `TentCombat.js`
+  - added smoke coverage for TentacleWars neutral split-capture and hostile burst-takeover payloads
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+
+- Conformance wave continued:
+  - removed the inherited NodeWARS burst multiplier from TentacleWars cut payload resolution
+  - TentacleWars hostile takeover now includes released outgoing lane payload during ownership cleanup carryover
+  - added `src/tentaclewars/TwCutRules.js` so TentacleWars explicit cuts resolve as a continuous geometric split of committed lane payload instead of the shared NodeWARS burst/refund zones
+  - updated smoke guardrails to prove:
+    - TentacleWars source-side cuts no longer enter `BURSTING`
+    - TentacleWars near-target cuts still deliver a forward share instead of becoming full refunds
+    - hostile cut takeover uses geometric payload plus released outgoing lane carryover
+  - documented a backlog item for `TASK-TW-012 Browser Visual Validation Framework` because browser automation is still not reliable enough for direct mechanic inspection
+
+- Proposal audit wave:
+  - audited `docs/project/tentacle-wars-mode-architecture-proposal-2026-03-11.md` against the live sandbox code
+  - confirmed the major mechanical pillars are now aligned:
+    - packet-native runtime
+    - linear build cost and full refund
+    - neutral acquisition threshold
+    - hostile reset plus carryover
+    - cut payload based on build energy plus in-transit energy
+    - all-hostile TentacleWars enemy relation mode by default
+  - removed one remaining structural divergence by adding `src/tentaclewars/TwNeutralCapture.js` and routing TentacleWars neutral capture bookkeeping through a mode-owned helper instead of the shared NodeWARS neutral contest system
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+
+- Backlog alignment:
+  - marked `TASK-TW-007`, `TASK-TW-008`, and `TASK-TW-011` as completed in the project backlog
+  - promoted the next TentacleWars development frontier to:
+    - `TASK-TW-009 TentacleWars Sandbox Playtest and Tuning Wave A`
+    - `TASK-TW-010 TentacleWars Lane and Packet Visual Language`
+    - `TASK-TW-012 Browser Visual Validation Framework`
+  - created two follow-up tasks from the architecture proposal:
+    - `TASK-TW-013 TentacleWars Draw-Connect Fidelity Input`
+    - `TASK-TW-014 TentacleWars Focused Sanity Suites`
+
+- Parallel mechanics review wave:
+  - audited the live sandbox against the strict TentacleWars docs through parallel gameplay, AI, UI/input, and QA passes
+  - corrected the TentacleWars slot cap so sandbox cells now stop at `3` outgoing tentacles instead of inheriting the higher NodeWARS progression table
+  - routed shared player click/preview slot checks through `sourceNode.maxSlots` so the TentacleWars slot cap is enforced consistently in gameplay and UI
+  - made the purple TentacleWars AI slice path materially more aggressive by lowering its pipe-ratio gate, score threshold, and cooldown
+  - updated TentacleWars overflow to follow the later follow-up answer:
+    - a full cell now broadcasts the whole overflow value to each outgoing lane instead of splitting it equally
+  - added smoke guardrails proving:
+    - TentacleWars slot cap stays within the original documented range
+    - TentacleWars purple AI actively fires the canonical slice path on an obvious charged hostile lane
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+
+- Fidelity completion wave:
+  - switched TentacleWars overflow from the earlier conservative split model to full broadcast per outgoing lane, following the later follow-up answer sheet
+  - added touch drag-connect support through the same canonical drag-connect path used by mouse gestures when a touch starts on a player-owned node
+  - added focused TentacleWars sanity suites:
+    - `scripts/tw-energy-sanity.mjs`
+    - `scripts/tw-grade-sanity.mjs`
+    - `scripts/tw-ai-sanity.mjs`
+  - added a local browser visual-validation workflow:
+    - `scripts/tw-visual-server.sh`
+    - `scripts/tw-visual-validation.sh`
+    - `docs/test-notes/tw-visual-validation.md`
+  - backlog alignment:
+    - marked `TASK-TW-012`, `TASK-TW-013`, and `TASK-TW-014` as completed
+- Validation:
+  - `node scripts/tw-energy-sanity.mjs`
+  - `node scripts/tw-grade-sanity.mjs`
+  - `node scripts/tw-ai-sanity.mjs`
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/input-harness.mjs`
+  - `node scripts/ui-actions-sanity.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+- 2026-03-12: Ran TentacleWars visual playtest Wave A through the browser loop. Captured sandbox start, passive AI pressure, forced player expansion, and forced player attack artifacts under `output/playwright/`. Notes recorded in `docs/test-notes/tw-playtest-wave-a-2026-03-12.md`. Main follow-up gaps: late-fight lane density readability, HUD mode identity still showing NODE WARS, pinned tooltip occlusion, and a still-needed dedicated slice-only visual pass.
+- 2026-03-12: Followed up the TentacleWars visual playtest with targeted HUD and lane-language validation. Confirmed in fresh browser captures that:
+  - the HUD now brands the sandbox as `TENTACLEWARS`
+  - the sandbox title now reads as a mode-specific prototype label
+  - owner-colored packet beads improve lane ownership readability under overlap
+  - reducing inherited white-heavy lane treatment makes active TentacleWars corridors less washed out
+  - remaining gap is now narrower and concentrated in very dense late-fight lane intersections rather than the general sandbox presentation
+- 2026-03-12: Completed a full TentacleWars visual identity pass and validated it in browser captures.
+  - nodes now read as softer circular cell membranes in the sandbox instead of inheriting the angular NodeWARS shell language
+  - active TentacleWars lanes now use elongated packet droplets and a faint membrane pulse so flow reads as organic rather than purely UI-driven
+  - clash visuals were tuned toward a tighter biotic compression point instead of a generic warning marker
+  - sandbox hover/info overlays were reduced in weight to preserve combat readability on mobile
+  - the earlier slice-adjacent visual bug was confirmed to come from stacked target `cFlash` during progressive TentacleWars cut payout and was fixed without changing mechanics
+  - visual validation artifacts:
+    - `output/playwright/tw-visual-identity-desktop-start.png`
+    - `output/playwright/tw-visual-identity-desktop-8s.png`
+    - `output/playwright/tw-visual-identity-mobile-start.png`
+    - `output/playwright/tw-visual-identity-mobile-8s.png`
+    - `output/playwright/mobile-bug-video-like-fixed.png`
+  - docs updated:
+    - `docs/test-notes/tw-visual-identity-pass-2026-03-12.md`
+    - `docs/project/task-backlog.md`
+    - `docs/project/operational-kanban.md`
+- 2026-03-12: Closed `TASK-TW-016 TentacleWars Fidelity Safety Rails`.
+  - sandbox `TentacleWars` now short-circuits world-layer gimmicks in `WorldSystems.update()` and keeps only camera follow active
+  - sandbox nodes no longer arm auto-retract, even when under the normal low-energy hostile-pressure threshold
+  - sandbox frenzy is now disabled in countdown, regen propagation, and player cut bookkeeping
+  - added smoke guardrails:
+    - `TentacleWars sandbox disables world-layer gimmicks`
+    - `TentacleWars sandbox disables frenzy and auto-retract`
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/simulation-soak.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-12: Closed `TASK-TW-015 TentacleWars Visual Density Wave B`.
+  - strengthened TentacleWars lane contour separation and ownership spine emphasis in `src/rendering/TentRenderer.js`
+  - added a darker packet underlay so moving payload stays readable when same-owner lanes bunch together
+  - browser captures for this wave:
+    - `output/playwright/tw-visual-density-wave-b-late.png`
+    - `output/playwright/tw-visual-density-wave-b-late-v2.png`
+    - `output/playwright/tw-visual-density-wave-b-clean.png`
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/ui-actions-sanity.mjs`
+    - `node scripts/simulation-soak.mjs`
+    - `node scripts/commentary-policy.mjs`
+- Next TentacleWars waves opened:
+  - `TASK-TW-017 TentacleWars Controlled Scenario Presets`
+  - `TASK-TW-018 TentacleWars Sandbox Playtest and Tuning Wave B`
+- 2026-03-12: Fixed a TentacleWars slot-cap UI leak after observing enemy cells reporting `3/2`.
+  - the sandbox mechanics already capped nodes through `GameNode.maxSlots` and `TwAI`, but the info panel and node badges were still reading the NodeWARS slot table directly
+  - updated `src/rendering/UIRenderer.js` and `src/rendering/NodeRenderer.js` to render slot totals from the mode-aware `n.maxSlots` getter
+  - extended `testTentacleWarsSlotCapStaysWithinOriginalRange` so future regressions catch mode-blind slot rendering
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/ui-dom-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-12: Re-reviewed the TentacleWars visual/state alignment after a card screenshot showed fidelity drift.
+  - evidence: `~/imgs/card.png`
+  - current gaps are broader than one bug:
+    - the card still shows NodeWARS-style level text (`0 / 5`) instead of a TentacleWars-owned grade presentation
+    - slot semantics in the card still show sent/total, while the desired surface should emphasize available slots for the current TentacleWars grade
+    - tentacles still read visually like a modified NodeWARS material instead of a fully settled TentacleWars presentation
+  - opened the next visual/fidelity waves:
+    - `TASK-TW-019 TentacleWars HUD and Card Fidelity Contract`
+    - `TASK-TW-023 TentacleWars Grade Slot Table Reconciliation`
+    - `TASK-TW-020 TentacleWars Node Grade Silhouette Pass`
+    - `TASK-TW-021 TentacleWars Tentacle Motion and Material Pass`
+    - `TASK-TW-022 TentacleWars Visual Regression Matrix`
+- 2026-03-12: Started `TASK-TW-019 TentacleWars HUD and Card Fidelity Contract`.
+  - added `src/tentaclewars/TwPresentationModel.js` so TentacleWars cards can render from a mode-owned presentation helper instead of leaking NodeWARS progression formatting
+  - TentacleWars info cards now show:
+    - named grade (`Spore`, `Embryo`, `Pulsar`, `Gamma`, `Solar`, `Dominator`)
+    - grade threshold band (`↑ ascend · ↓ descend`)
+    - available tentacles first, with used tentacles moved to secondary text
+  - added smoke guardrail:
+    - `TentacleWars info panel uses a mode-owned presentation contract`
+  - important remaining follow-up:
+    - local docs still do not freeze the exact per-grade slot-cap table, so I opened `TASK-TW-023 TentacleWars Grade Slot Table Reconciliation` to stop guessing if grades like `Embryo` should expose `2` instead of the current fixed `3`
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/ui-dom-sanity.mjs`
+    - `node scripts/ui-actions-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-12: Wrote a comparison report against the user-provided Android Tentacle Wars mechanic summary.
+  - file: `docs/project/tentaclewars-comparison-report-2026-03-12.md`
+  - purpose:
+    - compare the user report vs local TentacleWars docs vs current sandbox implementation
+    - identify which differences are already intentional project decisions
+    - identify which differences are still unresolved fidelity gaps
+  - key findings:
+    - strongest unresolved gaps are:
+      - grade-linked slot table
+      - economy model (`free production transfer` vs current source-spend packet budget)
+      - slice semantics (`segment burst` vs current geometric committed-payload split)
+    - current sandbox remains strongly aligned to the local project docs on:
+      - packet size `1`
+      - hostile reset `10`
+      - neutral acquisition threshold
+      - purple slice identity
+- 2026-03-12: Wrote a short decision brief to unblock the next TentacleWars implementation choice.
+  - file: `docs/project/tentaclewars-decision-brief-2026-03-12.md`
+  - the brief recommends:
+    - first deciding the authoritative slot table by grade
+    - keeping the current economy model for now
+    - keeping the current slice semantics for now
+  - intended use:
+    - review and approve before more TentacleWars mechanic changes

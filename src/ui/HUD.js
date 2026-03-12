@@ -25,6 +25,11 @@ export class HUD {
   }
 
   update(game) {
+    const brandElement = $(DOM_IDS.HBRAND);
+    if (brandElement) {
+      brandElement.textContent = game.twMode?.isSandboxActive?.() ? T('twModeLabel') : 'NODE WARS';
+    }
+
     /* Node counts */
     const playerNodeCount = game.nodes.filter(node => node.owner === 1).length;
     const neutralNodeCount = game.nodes.filter(node => node.owner === 0).length;
@@ -106,10 +111,13 @@ export class HUD {
         const el  = $(DOM_IDS.HLVL);
         if (el) el.textContent = levelText;
       }
-      if (levelConfig.name !== this._name) {
-        this._name = levelConfig.name;
+      const levelName = game.twMode?.isSandboxActive?.()
+        ? T('twSandboxTitle')
+        : levelConfig.name;
+      if (levelName !== this._name) {
+        this._name = levelName;
         const el   = $(DOM_IDS.HLN);
-        if (el) el.textContent = levelConfig.name;
+        if (el) el.textContent = levelName;
       }
     }
   }

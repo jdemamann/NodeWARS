@@ -8,6 +8,7 @@
 export const DOM_IDS = Object.freeze({
   /* HUD */
   HUD:        'hud',
+  HBRAND:     'hbrand',
   SP:         'sp',
   SN:         'sn',
   SE:         'se',
@@ -94,9 +95,12 @@ export const DOM_IDS = Object.freeze({
 
   /* Settings screen */
   SETTINGS_BODY:    'settingsBody',
+  DEBUG_SETTINGS_GROUP:'debugSettingsGroup',
   WORLD_UNLOCK_GROUP:'worldUnlockGroup',
+  MODE_GROUP:        'modeGroup',
   TOG_W2:           'togW2',
   TOG_W3:           'togW3',
+  BTN_MODE_CYCLE:   'btnModeCycle',
   TOG_DEBUG:        'togDebug',
   TOG_SOUND:        'togSound',
   TOG_MUSIC:        'togMusic',

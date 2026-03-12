@@ -79,14 +79,39 @@ function testDisablingDebugClearsManualWorldOverrides() {
     STATE.settings.debug = true;
     STATE.settings.w2 = true;
     STATE.settings.w3 = true;
+    STATE.setGameMode('tentaclewars');
     assert.equal(STATE.isWorldUnlocked(2), true, 'debug-time world override should expose World 2');
 
     STATE.setDebugMode(false);
 
     assert.equal(STATE.settings.w2, null, 'disabling debug should clear the World 2 override');
     assert.equal(STATE.settings.w3, null, 'disabling debug should clear the World 3 override');
+    assert.equal(STATE.getGameMode(), 'nodewars', 'disabling debug should reset the game mode to the stable live mode');
     assert.equal(STATE.isWorldUnlocked(2), false, 'after debug is disabled, World 2 should fall back to natural campaign progression');
     assert.equal(STATE.isWorldUnlocked(3), false, 'after debug is disabled, World 3 should fall back to natural campaign progression');
+  });
+}
+
+function testDebugModeCanExposeTentacleWarsTrack() {
+  withIsolatedState(() => {
+    STATE.setDebugMode(true);
+    STATE.setGameMode('tentaclewars');
+    assert.equal(STATE.getGameMode(), 'tentaclewars', 'debug mode should allow selecting the TentacleWars prototype track');
+  });
+}
+
+function testTentacleWarsModeSelectionPersistsWhileDebugStaysOn() {
+  withIsolatedState(() => {
+    STATE.setDebugMode(true);
+    STATE.setGameMode('tentaclewars');
+    STATE.saveSettings();
+
+    STATE.setGameMode('nodewars');
+    assert.equal(STATE.getGameMode(), 'nodewars', 'sanity precondition should allow flipping back to NodeWARS before reload');
+
+    STATE.loadSettings();
+    assert.equal(STATE.settings.debug, true, 'loading settings should preserve debug mode when it was explicitly enabled');
+    assert.equal(STATE.getGameMode(), 'tentaclewars', 'loading settings should restore the persisted TentacleWars selection while debug mode stays on');
   });
 }
 
@@ -107,6 +132,8 @@ const tests = [
   ['tutorial completion uses canonical progression', testTutorialCompletionUsesCanonicalProgression],
   ['manual world overrides remain effective', testManualWorldOverridesRemainEffective],
   ['disabling debug clears manual world overrides', testDisablingDebugClearsManualWorldOverrides],
+  ['debug mode can expose the TentacleWars track', testDebugModeCanExposeTentacleWarsTrack],
+  ['TentacleWars mode selection persists while debug stays on', testTentacleWarsModeSelectionPersistsWhileDebugStaysOn],
   ['skip rule and fail streak flow stay canonical', testSkipRuleAndFailStreakFlow],
 ];
 
