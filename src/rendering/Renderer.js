@@ -71,6 +71,11 @@ export class Renderer {
       game.pulsars.forEach(pulsar => HazardRenderer.drawPulsar(context, pulsar));
     }
 
+    /* TentacleWars static blockers */
+    if (game.twObstacles) {
+      game.twObstacles.forEach(obstacle => HazardRenderer.drawTentacleWarsObstacle(context, obstacle, game.time));
+    }
+
     /* Tentacles */
     const frenzyActive = game.frenzyTimer > 0;
     game.tents.forEach(tentacle => TentRenderer.draw(context, tentacle));

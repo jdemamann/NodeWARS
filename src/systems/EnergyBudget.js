@@ -9,6 +9,7 @@
 import { TIER_REGEN, GAME_BALANCE } from '../config/gameConfig.js';
 import { getTentacleWarsPacketRateForGrade } from '../tentaclewars/TwGradeTable.js';
 import { canTentacleWarsOverflow, distributeTentacleWarsOverflow } from '../tentaclewars/TwEnergyModel.js';
+import { TW_BALANCE } from '../tentaclewars/TwBalance.js';
 
 export function captureRelayFeedBudget(node) {
   return node.isRelay ? (node.inFlow || 0) : 0;
@@ -42,7 +43,8 @@ export function computeNodeSourceBudget(node) {
 export function computeNodeTentacleFeedRate(node) {
   if (node.simulationMode === 'tentaclewars') {
     const outgoingTentacles = Math.max(1, node.outCount);
-    return computeNodeSourceBudget(node) / outgoingTentacles;
+    const selfFraction = TW_BALANCE.TW_SELF_REGEN_FRACTION ?? 0;
+    return computeNodeSourceBudget(node) * (1 - selfFraction) / outgoingTentacles;
   }
 
   const outgoingTentacles = Math.max(1, node.outCount);

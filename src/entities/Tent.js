@@ -43,7 +43,7 @@ export class Tent {
     /* Derived physics constants (computed once at creation) */
     this.buildCost = buildCost ?? (
       sourceNode.simulationMode === 'tentaclewars'
-        ? computeTentacleWarsBuildCost(this.distanceValue)
+        ? computeTentacleWarsBuildCost(this.distanceValue, undefined, sourceNode?.twCostNormalizer)
         : computeBuildCost(this.distanceValue)
     );
     this.rate      = 5.5;            // kept for Orb spawning; no longer distance-based
@@ -765,6 +765,10 @@ export class Tent {
       : 0;
 
     let deliveredAmount = 0;
+    if (!areAlliedOwners(targetNode.owner, sourceNode.owner) && targetNode.owner !== 0) {
+      // Packetized hostile lanes should keep pressure visible between impacts.
+      targetNode.underAttack = Math.max(targetNode.underAttack || 0, 1);
+    }
     if (laneStep.deliveredPacketCount > 0) {
       const deliveredFeedRate = laneStep.deliveredPacketCount / Math.max(dt, 0.001);
       if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
@@ -789,9 +793,14 @@ export class Tent {
     this.clashSpark = 0.7 + Math.sin(simulationTime * 12) * 0.3;
 
     if (this.effectiveSourceNode?.simulationMode === 'tentaclewars') {
-      this.clashT = 0.5;
-      this.clashVisualT = 0.5;
-      this.clashApproachActive = false;
+      /* Preserve the approach animation when it is already in progress so
+         the visual and logical clash fronts animate toward the midpoint
+         instead of snapping there instantly. Only pin once the approach has
+         already completed. */
+      if (!this.clashApproachActive) {
+        this.clashT = 0.5;
+        this.clashVisualT = 0.5;
+      }
       return;
     }
 
@@ -855,9 +864,12 @@ export class Tent {
   _updateClashFront(opposingTentacle, feedRate, dt) {
     if (this.effectiveSourceNode?.simulationMode === 'tentaclewars') {
       this.clashT = 0.5;
-      this.clashVisualT = 0.5;
       opposingTentacle.clashT = 0.5;
-      opposingTentacle.clashVisualT = 0.5;
+      /* Only snap visual front when no approach animation is running on either side. */
+      if (!this.clashApproachActive && !opposingTentacle.clashApproachActive) {
+        this.clashVisualT = 0.5;
+        opposingTentacle.clashVisualT = 0.5;
+      }
       opposingTentacle.clashSpark = this.clashSpark;
       return;
     }
@@ -908,13 +920,16 @@ export class Tent {
        The other tent mirrors, preventing double-movement per frame. */
     if (!this._isCanonicalClashDriver()) return;
 
-    if (sourceNode.simulationMode === 'tentaclewars') {
-      this._updateClashFront(opposingTentacle, feedRate, dt);
+    /* In TentacleWars the approach animation must run before the front is locked
+       at midpoint.  Check clashApproachActive first so the approach path is not
+       short-circuited by the TW-specific front update. */
+    if (this.clashApproachActive || opposingTentacle.clashApproachActive) {
+      this._updateClashApproach(opposingTentacle, dt);
       return;
     }
 
-    if (this.clashApproachActive || opposingTentacle.clashApproachActive) {
-      this._updateClashApproach(opposingTentacle, dt);
+    if (sourceNode.simulationMode === 'tentaclewars') {
+      this._updateClashFront(opposingTentacle, feedRate, dt);
       return;
     }
 

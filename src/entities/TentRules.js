@@ -38,6 +38,13 @@ export function resolveGrowingTentacleCollision(tentacle, tents) {
     opposingTentacle.pipeAge = opposingTentacle.reachT * opposingTentacle.travelDuration;
     tentacle.clashPartner = opposingTentacle;
     opposingTentacle.clashPartner = tentacle;
+    /* In TentacleWars, animate the visual clash front from the collision point
+       toward the midpoint so the "meeting" moment is visible rather than
+       snapping instantly to 0.5. */
+    if (tentacle.effectiveSourceNode?.simulationMode === 'tentaclewars') {
+      tentacle.initializeFreshClashVisual(tentacle.reachT);
+      opposingTentacle.initializeFreshClashVisual(opposingTentacle.reachT);
+    }
     return true;
   }
 

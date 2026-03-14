@@ -19,23 +19,104 @@ Use it as the local source of truth when:
 
 ## Planned
 
-- `TASK-TW-023 TentacleWars Grade Slot Table Reconciliation`
-- `TASK-TW-017 TentacleWars Controlled Scenario Presets`
-- `TASK-TW-020 TentacleWars Node Grade Silhouette Pass`
-- `TASK-TW-021 TentacleWars Tentacle Motion and Material Pass`
-- `TASK-TW-018 TentacleWars Sandbox Playtest and Tuning Wave B`
-- `TASK-TW-022 TentacleWars Visual Regression Matrix`
+Phase A — Pre-Implementation Design:
+- `TASK-TWL-001 TentacleWars Campaign Product Spec` ← **done**
+- `TASK-TWL-002 TentacleWars Level Data Schema` (co-developed with schema tests)
+- `TASK-TWL-003 TentacleWars Progression and Score Spec` (blocks TWL-005, TWL-006)
+- `TASK-TWL-004 TentacleWars Obstacle Spec` (must close complexity decision)
+
+Phase B — Runtime and Tooling:
+- none
+
+Phase C — World 1:
+- none
+
+Phase D — World 2:
+- `TASK-TWL-010 TentacleWars World 2 Authoring Pack`
+- `TASK-TWL-011 TentacleWars World 2 Playtest and Reconstruction Review`
+
+Phase E — World 3:
+- `TASK-TWL-012 TentacleWars World 3 Authoring Pack`
+- `TASK-TWL-013 TentacleWars World 3 Playtest and Reconstruction Review`
+
+Phase F — World 4:
+- `TASK-TWL-014 TentacleWars World 4 Authoring Pack`
+- `TASK-TWL-015 TentacleWars World 4 Playtest and Reconstruction Review`
+
+Phase G — Polish Final:
+- `TASK-TWL-018 TentacleWars Phase Editor Feasibility Review`
 
 ## In Progress
 
-- `TASK-TW-019 TentacleWars HUD and Card Fidelity Contract`
+- none
 
 ## Needs Validation
 
-- none
+- `TASK-TWL-009 TentacleWars World 1 Playtest and Reconstruction Review`
+  - reconstruction complete (TWL-009 + TWL-009b): mechanics, energyCap, initialEnergy all correct
+  - remaining: live playtest of W1-01..W1-05 in browser to validate feel under corrected model
+  - static checks all pass: 9/9 + 85/85 + 1/1
+  - can be closed to Done after one live session confirms W1-01..W1-05 feel correct
 
 ## Done Recently
 
+- `TASK-TWL-009b TentacleWars World 1 energyCap Alignment Pass`
+  - output: `src/tentaclewars/levels/TwWorld1.js` (W1-06..W1-20 corrected), `docs/tentaclewars/tw-balance-matrix.csv`
+  - validation: 9/9 + 85/85 + 1/1 PASS
+  - all 15 caps corrected to original PL curve; W1-16 cap=30 range-constraint mechanic restored
+
+- `TASK-TWL-008b TentacleWars World 1 Complete`
+  - output: `src/tentaclewars/levels/TwWorld1.js` (W1-01..W1-20), gate doc
+  - validation: 9/9 + 4/4 + 2/2 + 84/84 PASS
+  - World 1 authored end-to-end, curve verified
+
+- `TASK-TWL-008a TentacleWars World 1 Prototype`
+  - output: `src/tentaclewars/levels/TwWorld1.js` (W1-01..W1-05), gate doc
+  - validation: 2/2 + 8/8 + 4/4 + 5/5 + 2/2 + 84/84 PASS
+  - pipeline gate confirmed — TWL-008b open
+
+- `TASK-TWL-016 TentacleWars Level Preview and Jump Tools`
+  - output: `src/tentaclewars/TwCampaignPreview.js`, `scripts/tw-preview-jump-sanity.mjs`
+  - validation: 5/5 + 84/84 PASS
+
+- `TASK-TWL-017 TentacleWars Spreadsheet Balance Matrix`
+  - output: `docs/tentaclewars/tw-balance-matrix.csv`, `scripts/tw-balance-matrix-sanity.mjs`
+  - validation: 2/2 PASS
+
+- `TASK-TWL-006 TentacleWars Campaign State Namespace`
+  - output: `src/core/GameState.js`, `src/tentaclewars/TwModeRuntime.js`, `scripts/game-state-progression-sanity.mjs`
+  - validation: 11/11 + 9/9 + 84/84 PASS
+
+- `TASK-TWL-005 TentacleWars Campaign Loader`
+  - output: `src/tentaclewars/TwCampaignLoader.js`, `TwObstacleRuntime.js`, `scripts/tw-campaign-loader-sanity.mjs`
+  - validation: 4/4 + 6/6 + 84/84 PASS
+
+- `TASK-TWL-007 TentacleWars Campaign Sanity Suite`
+  - output: `src/tentaclewars/TwCampaignFixtures.js`, `scripts/tw-campaign-sanity.mjs`
+  - validation: 6/6 + 2/2 PASS
+
+- `TASK-TWL-004 TentacleWars Obstacle Spec`
+  - output: `docs/tentaclewars/tw-obstacle-spec.md`
+  - decision: Option A (static circles), no TWL-004b needed for W1-2
+
+- `TASK-TWL-003 TentacleWars Progression and Score Spec`
+  - output: `docs/tentaclewars/tw-progression-score-spec.md`
+  - validation: all blocking criteria confirmed
+
+- `TASK-TWL-002 TentacleWars Level Data Schema`
+  - output: `src/tentaclewars/TwLevelSchema.js`, `docs/tentaclewars/tw-level-data-schema.md`, `scripts/tw-level-schema-sanity.mjs`
+  - validation: `node scripts/tw-level-schema-sanity.mjs` → 2/2 PASS
+
+- `TASK-TWL-001 TentacleWars Campaign Product Spec`
+  - output: `docs/tentaclewars/tw-campaign-product-spec.md`
+
+- `TASK-TW-022 TentacleWars Visual Regression Matrix`
+- `TASK-TW-021 TentacleWars Tentacle Motion and Material Pass`
+- `TASK-TW-020 TentacleWars Node Grade Silhouette Pass`
+- `TASK-TW-019 TentacleWars HUD and Card Fidelity Contract`
+- `TASK-TW-018 TentacleWars Sandbox Playtest and Tuning Wave B`
+- `TASK-TW-017 TentacleWars Controlled Scenario Presets`
+- `TASK-TW-023 TentacleWars Grade Slot Table Reconciliation`
 - `TASK-TW-016 TentacleWars Fidelity Safety Rails`
 - `TASK-TW-015 TentacleWars Visual Density Wave B`
 - `TASK-TW-010 TentacleWars Lane and Packet Visual Language`

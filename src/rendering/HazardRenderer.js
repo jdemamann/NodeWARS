@@ -16,6 +16,103 @@ function sg(ctx, color, blur) {
 }
 
 export class HazardRenderer {
+  /* Draws the static TentacleWars campaign obstacle family. */
+  static drawTentacleWarsObstacle(ctx, obstacle, time = 0) {
+    if (obstacle.kind === 'capsule') {
+      HazardRenderer._drawTentacleWarsCapsule(ctx, obstacle);
+      return;
+    }
+    HazardRenderer._drawTentacleWarsCircle(ctx, obstacle, time);
+  }
+
+  /* Draws the static circular obstacle shell used in early TW layouts. */
+  static _drawTentacleWarsCircle(ctx, obstacle, time = 0) {
+    const pulse = 0.62 + Math.sin(time * 1.7 + obstacle.x * 0.01) * 0.08;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(obstacle.x, obstacle.y, obstacle.r, 0, Math.PI * 2);
+    const gradient = ctx.createRadialGradient(
+      obstacle.x,
+      obstacle.y,
+      obstacle.r * 0.15,
+      obstacle.x,
+      obstacle.y,
+      obstacle.r,
+    );
+    gradient.addColorStop(0, 'rgba(28,42,56,0.42)');
+    gradient.addColorStop(0.7, 'rgba(16,26,38,0.28)');
+    gradient.addColorStop(1, 'rgba(10,18,28,0)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(obstacle.x, obstacle.y, obstacle.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(112, 196, 214, ${0.36 * pulse})`;
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([5, 8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.arc(obstacle.x, obstacle.y, obstacle.r * 0.72, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.09 * pulse})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* Draws a static capsule blocker to match the authored TW obstacle spec. */
+  static _drawTentacleWarsCapsule(ctx, obstacle) {
+    const { ax, ay, bx, by, r } = obstacle;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.0001) return;
+
+    const nx = -dy / len;
+    const ny = dx / len;
+    const startAngle = Math.atan2(ny, nx);
+    const endAngle = startAngle + Math.PI;
+
+    const x1 = ax + nx * r;
+    const y1 = ay + ny * r;
+    const x2 = bx + nx * r;
+    const y2 = by + ny * r;
+    const x3 = bx - nx * r;
+    const y3 = by - ny * r;
+    const x4 = ax - nx * r;
+    const y4 = ay - ny * r;
+
+    ctx.save();
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.arc(bx, by, r, startAngle, endAngle, false);
+    ctx.lineTo(x4, y4);
+    ctx.arc(ax, ay, r, endAngle, startAngle, false);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(18, 28, 40, 0.52)';
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(210, 225, 235, 0.72)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    const gradient = ctx.createLinearGradient(ax, ay, bx, by);
+    gradient.addColorStop(0, 'rgba(255,255,255,0)');
+    gradient.addColorStop(0.5, 'rgba(210,225,235,0.18)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = Math.max(1, r * 0.22);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   /* ── W2: Vortex hazards ── */
   static drawVortex(ctx, hz, time) {
     const x = hz.x, y = hz.y, r = hz.r, ph = hz.phase;

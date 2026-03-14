@@ -81,7 +81,7 @@ export class BGRenderer {
     const world = game.cfg ? (game.cfg.worldId || 0) : 0;
     const t     = game.time;
     const highGraphics = STATE.settings.graphicsMode === 'high';
-    const isTentacleWarsSandbox = game.twMode?.isSandboxActive?.() || game.cfg?.isTentacleWarsSandbox;
+    const isTentacleWarsMode = game.twMode?.isTentacleWarsActive?.() || game.cfg?.isTentacleWarsCampaign || game.cfg?.isTentacleWarsSandbox;
 
     /* Resolve active theme — fall back to the canonical default UI theme. */
     const theme = THEMES[STATE.settings.theme] || THEMES.AURORA;
@@ -120,7 +120,7 @@ export class BGRenderer {
       ctx.globalAlpha = 1;
     }
 
-    if (isTentacleWarsSandbox) {
+    if (isTentacleWarsMode) {
       const vignette = ctx.createRadialGradient(W * 0.52, H * 0.44, Math.min(W, H) * 0.06, W * 0.52, H * 0.44, Math.max(W, H) * 0.78);
       vignette.addColorStop(0, 'rgba(0,24,44,0)');
       vignette.addColorStop(1, 'rgba(2,8,18,0.46)');

@@ -56,11 +56,14 @@ export function getTentacleWarsPacketRateForGrade(gradeIndex, balance = TW_BALAN
 }
 
 /*
- * TentacleWars supports up to three simultaneous outgoing tentacles per cell
- * in the current fidelity target, independent of the NodeWARS slot table.
+ * TentacleWars owns its outgoing-slot progression by grade so gameplay,
+ * AI, and UI can all read the same authoritative slot-cap table.
  */
-export function getTentacleWarsMaxTentacleSlots(balance = TW_BALANCE) {
-  return balance.MAX_TENTACLE_SLOTS || 3;
+export function getTentacleWarsMaxTentacleSlots(gradeIndex = 0, balance = TW_BALANCE) {
+  const highestGradeIndex = TW_GRADE_NAMES.length - 1;
+  const clampedGradeIndex = clamp(gradeIndex, 0, highestGradeIndex);
+  const slotCaps = balance.GRADE_MAX_TENTACLE_SLOTS || [];
+  return slotCaps[Math.min(clampedGradeIndex, slotCaps.length - 1)] || 1;
 }
 
 /*
@@ -74,5 +77,6 @@ export function buildTentacleWarsGradeTable(balance = TW_BALANCE) {
     ascendThreshold: balance.GRADE_ASCEND_THRESHOLDS[gradeIndex],
     descendThreshold: balance.GRADE_DESCEND_THRESHOLDS[gradeIndex],
     packetRatePerSecond: getTentacleWarsPacketRateForGrade(gradeIndex, balance),
+    maxTentacleSlots: getTentacleWarsMaxTentacleSlots(gradeIndex, balance),
   }));
 }

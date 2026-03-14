@@ -15,7 +15,7 @@ export class WorldSystems {
   /* Canonical world-layer entry point.
      These mechanics are intentionally kept outside the core energy/tentacle loop. */
   static update(game, dt) {
-    if (game.twMode?.isSandboxActive?.()) {
+    if (game.twMode?.isTentacleWarsActive?.()) {
       WorldSystems.updateCamera(game, dt);
       return;
     }

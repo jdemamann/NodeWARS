@@ -6,8 +6,10 @@
    decoupled from preview logic.
    ================================================================ */
 
-import { computeTentacleBuildCost } from './TentacleCommands.js';
+import { canCreateTentacleConnection, computeTentacleBuildCost, findTentacleBuildBlocker } from './TentacleCommands.js';
 import { findToggleableTentacle, getTentacleSlotUsage } from './PlayerTentacleInteraction.js';
+import { TentState } from '../config/gameConfig.js';
+import { areHostileOwners } from '../systems/OwnerTeams.js';
 
 export function buildPlayerTentaclePreview({
   selectedNode,
@@ -15,6 +17,7 @@ export function buildPlayerTentaclePreview({
   tents,
   liveOut,
   distanceCostMultiplier,
+  obstacles = [],
 }) {
   if (!selectedNode || !hoveredNode || selectedNode === hoveredNode) return null;
 
@@ -33,10 +36,28 @@ export function buildPlayerTentaclePreview({
 
   const roundedBuildCost = Math.ceil(buildCost.baseBuildCost);
   const roundedRangeSurcharge = Math.ceil(buildCost.rangeSurcharge);
-  const roundedTotalBuildCost = Math.ceil(buildCost.totalBuildCost);
+  /* In TentacleWars, a counter-tentacle toward an active hostile only needs to
+     reach the clash midpoint, so the effective cost is half the route cost. */
+  let effectiveTotalBuildCost = buildCost.totalBuildCost;
+  let isClashRoute = false;
+  if (selectedNode.simulationMode === 'tentaclewars') {
+    isClashRoute = tents.some(t =>
+      t.alive &&
+      t.state === TentState.ACTIVE &&
+      t.effectiveSourceNode === hoveredNode &&
+      t.effectiveTargetNode === selectedNode &&
+      areHostileOwners(t.effectiveSourceNode.owner, selectedNode.owner),
+    );
+    if (isClashRoute) effectiveTotalBuildCost = buildCost.totalBuildCost * 0.5;
+  }
+  const roundedTotalBuildCost = Math.ceil(effectiveTotalBuildCost);
   const availableEnergy = Math.floor(selectedNode.energy);
   const canAffordBuild = availableEnergy >= roundedTotalBuildCost + 1;
-  const canBuildTentacle = canAffordBuild && tentacleSlotUsage.hasFreeSlot;
+  const blockingObstacle = findTentacleBuildBlocker(selectedNode, hoveredNode, obstacles);
+  const canBuildTentacle =
+    canAffordBuild &&
+    tentacleSlotUsage.hasFreeSlot &&
+    canCreateTentacleConnection(selectedNode, hoveredNode, obstacles);
 
   return {
     type: 'build_new_tentacle',
@@ -46,6 +67,8 @@ export function buildPlayerTentaclePreview({
     availableEnergy,
     canAffordBuild,
     canBuildTentacle,
+    isClashRoute,
+    isBlockedByObstacle: !!blockingObstacle,
     activeOutgoingTentacles: tentacleSlotUsage.activeOutgoingTentacles,
     maxTentacleSlots: tentacleSlotUsage.maxTentacleSlots,
   };

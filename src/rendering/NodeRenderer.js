@@ -16,6 +16,14 @@ import { getCanvasCopyFont, getCanvasDisplayFont } from '../theme/uiFonts.js';
 const { render: RENDER_RULES } = GAMEPLAY_RULES;
 
 const SIDES = [0,3,4,6,8,10];
+const TW_GRADE_VISUALS = [
+  { follicles: 4, follicleScale: 0.18, shellScale: 1.02, orbitals: 0, orbitalRadiusScale: 0, orbitalDotScale: 0 },
+  { follicles: 7, follicleScale: 0.24, shellScale: 1.08, orbitals: 1, orbitalRadiusScale: 0.82, orbitalDotScale: 0.09 },
+  { follicles: 10, follicleScale: 0.29, shellScale: 1.13, orbitals: 2, orbitalRadiusScale: 0.92, orbitalDotScale: 0.08 },
+  { follicles: 13, follicleScale: 0.34, shellScale: 1.18, orbitals: 3, orbitalRadiusScale: 1.02, orbitalDotScale: 0.075 },
+  { follicles: 17, follicleScale: 0.38, shellScale: 1.24, orbitals: 3, orbitalRadiusScale: 1.12, orbitalDotScale: 0.085 },
+  { follicles: 22, follicleScale: 0.42, shellScale: 1.28, orbitals: 4, orbitalRadiusScale: 1.18, orbitalDotScale: 0.09 },
+];
 
 function nodeCol(n) {
   return ownerColor(n.owner, n.level, '#5a6878');
@@ -60,6 +68,60 @@ function drawNodeSurfaceShape(ctx, x, y, radius, sides, angle, forceCircle = fal
   drawNodeHull(ctx, x, y, radius, sides, angle);
 }
 
+/* Use the below-node marker row as the persistent tentacle-slot indicator. */
+function drawPersistentSlotMarkers(ctx, node, radius, color) {
+  if (node.owner === 0) return;
+
+  const totalSlots = node.maxSlots;
+  const usedSlots = Math.max(0, Math.min(totalSlots, node.outCount));
+  const gapPx = 8;
+  const markerRadius = 2.6;
+  const markersWidth = (totalSlots - 1) * gapPx;
+
+  for (let slotIndex = 0; slotIndex < totalSlots; slotIndex += 1) {
+    const markerX = node.x - markersWidth / 2 + slotIndex * gapPx;
+    const markerY = node.y + radius + 8;
+    ctx.beginPath();
+    ctx.arc(markerX, markerY, markerRadius, 0, Math.PI * 2);
+    if (slotIndex < usedSlots) {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.82;
+      ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(6,17,31,0.92)';
+      ctx.fill();
+      ctx.strokeStyle = colorWithAlpha(color, 0.62);
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.95;
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* NodeWARS keeps level readability through a compact badge above the node. */
+function drawNodeWarsLevelBadge(ctx, node, radius, color, level) {
+  if (node.owner === 0 || level <= 0) return;
+
+  const badgeText = `LVL ${level}`;
+  ctx.save();
+  ctx.font = getCanvasCopyFont(7, 'bold');
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = colorWithAlpha('#06111f', 0.88);
+  ctx.strokeStyle = colorWithAlpha(color, 0.48);
+  ctx.lineWidth = 1;
+  const badgeY = node.y - radius - 10;
+  const badgeWidth = 26;
+  const badgeHeight = 11;
+  ctx.fillRect(node.x - badgeWidth / 2, badgeY - badgeHeight / 2, badgeWidth, badgeHeight);
+  ctx.strokeRect(node.x - badgeWidth / 2, badgeY - badgeHeight / 2, badgeWidth, badgeHeight);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.88;
+  ctx.fillText(badgeText, node.x, badgeY + 0.5);
+  ctx.restore();
+}
+
 /** Apply shadow only when high-graphics mode is on. */
 function sg(ctx, color, blur) {
   if (STATE.settings.graphicsMode === 'high') {
@@ -95,11 +157,12 @@ export class NodeRenderer {
     }
 
     const col = nodeCol(n);
+    const twVisual = TW_GRADE_VISUALS[Math.min(lvl, TW_GRADE_VISUALS.length - 1)];
 
     /* Follicles */
     if (n.owner !== 0) {
-      const fc = isTentacleWarsNode ? [5,8,11,14,17,20][Math.min(lvl, 5)] : [4,7,11,15,20,28][Math.min(lvl, 5)];
-      const fl = r * (isTentacleWarsNode ? 0.28 : 0.38);
+      const fc = isTentacleWarsNode ? twVisual.follicles : [4,7,11,15,20,28][Math.min(lvl, 5)];
+      const fl = r * (isTentacleWarsNode ? twVisual.follicleScale : 0.38);
       ctx.save();
       for (let i = 0; i < fc; i++) {
         const base = (i / fc) * Math.PI * 2 + ang * 0.7;
@@ -121,18 +184,52 @@ export class NodeRenderer {
     }
 
     if (isTentacleWarsNode && n.owner !== 0) {
+      const energyFraction = Math.max(0, Math.min(1, n.energy / Math.max(1, n.maxE)));
+      const energyArcStart = -Math.PI / 2;
+      const energyArcEnd = energyArcStart + energyFraction * Math.PI * 2;
       ctx.save();
       ctx.beginPath();
-      ctx.arc(n.x, n.y, r * 1.18, 0, Math.PI * 2);
+      ctx.arc(n.x, n.y, r * twVisual.shellScale, 0, Math.PI * 2);
       ctx.strokeStyle = colorWithAlpha(col, 0.16 + lvl * 0.02);
       ctx.lineWidth = 1.2;
       sg(ctx, col, 10);
       ctx.stroke();
+
+      // Adaptation for auditability: this energy display is clearer than the
+      // current subtle ring, but it is not yet confirmed as literal original
+      // TentacleWars behavior.
       ctx.beginPath();
-      ctx.arc(n.x, n.y, r * 0.88, 0, Math.PI * 2);
-      ctx.strokeStyle = colorWithAlpha('#ffffff', 0.08 + (n.energy / Math.max(1, n.maxE)) * 0.14);
-      ctx.lineWidth = 0.9;
+      ctx.arc(n.x, n.y, r * 0.84, 0, Math.PI * 2);
+      ctx.strokeStyle = colorWithAlpha('#ffffff', 0.10);
+      ctx.lineWidth = 2.2;
       ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r * 0.84, energyArcStart, energyArcEnd);
+      ctx.strokeStyle = n.owner > 1
+        ? colorWithAlpha(col, 0.45 + energyFraction * 0.25)
+        : colorWithAlpha('#ffffff', 0.45 + energyFraction * 0.25);
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      for (let orbitalIndex = 0; orbitalIndex < twVisual.orbitals; orbitalIndex += 1) {
+        const orbitalAngle = ang * 0.55 + time * 0.35 + (orbitalIndex / twVisual.orbitals) * Math.PI * 2;
+        const orbitalRadius = r * twVisual.orbitalRadiusScale;
+        const orbitalDotRadius = Math.max(2, r * twVisual.orbitalDotScale);
+        const orbitalX = n.x + Math.cos(orbitalAngle) * orbitalRadius;
+        const orbitalY = n.y + Math.sin(orbitalAngle) * orbitalRadius;
+        ctx.beginPath();
+        ctx.arc(orbitalX, orbitalY, orbitalDotRadius, 0, Math.PI * 2);
+        ctx.fillStyle = colorWithAlpha('#06111f', 0.78);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(orbitalX, orbitalY, orbitalDotRadius * 0.7, 0, Math.PI * 2);
+        ctx.fillStyle = colorWithAlpha(col, 0.46 + lvl * 0.05);
+        sg(ctx, col, 6);
+        ctx.fill();
+      }
       ctx.restore();
     }
 
@@ -533,21 +630,16 @@ export class NodeRenderer {
     if (!n.inFog) ctx.fillText(n.dispE, n.x, n.y);
     ctx.restore();
 
-    /* Level dots */
-    if (lvl > 0) {
-      const dw = (lvl - 1) * 7;
-      for (let i = 0; i < lvl; i++) {
-        ctx.beginPath();
-        ctx.arc(n.x - dw / 2 + i * 7, n.y + r + 8, 2.2, 0, Math.PI * 2);
-        ctx.fillStyle   = col;
-        ctx.globalAlpha = 0.7;
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
+    /* Both modes now use the below-node channel for slot occupancy. */
+    drawPersistentSlotMarkers(ctx, n, r, col);
+
+    /* NodeWARS keeps level readability on a separate above-node badge. */
+    if (!isTentacleWarsNode) {
+      drawNodeWarsLevelBadge(ctx, n, r, col, lvl);
     }
 
-    /* Out-count indicator */
-    if (n.owner !== 0 && n.outCount > 0) {
+    /* Keep the old out-count badge only for NodeWARS as secondary debug-like telemetry. */
+    if (!isTentacleWarsNode && n.owner !== 0 && n.outCount > 0) {
       const mx = n.maxSlots;
       ctx.save();
       ctx.font          = getCanvasCopyFont(7);
@@ -555,7 +647,7 @@ export class NodeRenderer {
       ctx.globalAlpha   = 0.6;
       ctx.textAlign     = 'center';
       ctx.textBaseline  = 'middle';
-      ctx.fillText('\u2192' + n.outCount + '/' + mx, n.x, n.y - r - 10);
+      ctx.fillText('\u2192' + n.outCount + '/' + mx, n.x, n.y - r - 23);
       ctx.restore();
     }
 

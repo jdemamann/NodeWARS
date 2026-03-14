@@ -29,6 +29,18 @@ export function getTentacleWarsGradeDisplayThresholds(gradeIndex) {
   };
 }
 
+/* Return the full grade presentation payload for TentacleWars cards and HUD. */
+export function getTentacleWarsGradePresentation(gradeIndex) {
+  const gradeEntry = TW_GRADE_TABLE[Math.max(0, Math.min(gradeIndex, TW_GRADE_TABLE.length - 1))];
+  return {
+    displayName: toDisplayCase(gradeEntry.gradeName),
+    ascendThreshold: gradeEntry.ascendThreshold,
+    descendThreshold: gradeEntry.descendThreshold,
+    packetRatePerSecond: gradeEntry.packetRatePerSecond,
+    maxTentacleSlots: gradeEntry.maxTentacleSlots,
+  };
+}
+
 /* Present slot availability using TentacleWars semantics: remaining capacity first. */
 export function getTentacleWarsSlotAvailability(node, activeOutgoingTentacles) {
   const totalSlots = node?.maxSlots || 0;

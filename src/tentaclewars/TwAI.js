@@ -9,6 +9,7 @@
 
 import { NodeType, TentState } from '../config/gameConfig.js';
 import { Tent } from '../entities/Tent.js';
+import { canCreateTentacleConnection } from '../input/TentacleCommands.js';
 import { computeDistance } from '../math/simulationMath.js';
 import { areHostileOwners } from '../systems/OwnerTeams.js';
 import { TW_BALANCE } from './TwBalance.js';
@@ -61,6 +62,8 @@ export class TwAI {
    * can be reused as-is while the rest of the mode-specific simulation grows.
    */
   _createTentacleMove(sourceNode, targetNode, buildCost) {
+    if (!canCreateTentacleConnection(sourceNode, targetNode, this.game.twObstacles)) return;
+
     const tentacle = new Tent(sourceNode, targetNode, buildCost);
     tentacle.game = this.game;
     sourceNode.outCount = (sourceNode.outCount || 0) + 1;
@@ -100,9 +103,10 @@ export class TwAI {
           tentacle.target === targetNode
         );
         if (directLaneExists) return;
+        if (!canCreateTentacleConnection(sourceNode, targetNode, this.game.twObstacles)) return;
 
         const distance = computeDistance(sourceNode.x, sourceNode.y, targetNode.x, targetNode.y);
-        const buildCost = computeTentacleWarsBuildCost(distance);
+        const buildCost = computeTentacleWarsBuildCost(distance, undefined, sourceNode?.twCostNormalizer);
         if (sourceNode.energy < buildCost + 1) return;
 
         const score = buildTentacleWarsMoveScore({

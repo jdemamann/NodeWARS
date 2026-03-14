@@ -15,9 +15,10 @@ import { TW_BALANCE } from './TwBalance.js';
  * fixed base cost in this mode, which keeps long lanes expensive while
  * preserving very short lane affordability.
  */
-export function computeTentacleWarsBuildCost(distancePixels, balance = TW_BALANCE) {
+export function computeTentacleWarsBuildCost(distancePixels, balance = TW_BALANCE, costNormalizer = 1) {
   const safeDistancePixels = Number.isFinite(distancePixels) ? Math.max(0, distancePixels) : 0;
-  return safeDistancePixels * balance.TENTACLE_COST_PER_PIXEL;
+  const safeCostNormalizer = Number.isFinite(costNormalizer) ? Math.max(0, costNormalizer) : 1;
+  return safeDistancePixels * balance.TENTACLE_COST_PER_PIXEL * safeCostNormalizer;
 }
 
 /*

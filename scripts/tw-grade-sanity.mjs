@@ -10,13 +10,17 @@ import {
 
 function testTentacleWarsGradeTable() {
   const gradeTable = buildTentacleWarsGradeTable();
+  const slotCaps = gradeTable.map(entry => entry.maxTentacleSlots);
 
   assert.equal(TW_GRADE_NAMES.length, 6, 'TentacleWars should expose six grades including Dominator');
   assert.equal(gradeTable[0].ascendThreshold, 15, 'Grade 1 ascend threshold should stay at fifteen');
   assert.equal(gradeTable[5].ascendThreshold, 180, 'Dominator ascend threshold should stay at one-hundred-eighty');
   assert.equal(gradeTable[5].descendThreshold, 160, 'Dominator descend threshold should stay at one-hundred-sixty');
   assert.equal(getTentacleWarsPacketRateForGrade(5), 6, 'Dominator should emit double the grade-five packet rate');
-  assert.equal(getTentacleWarsMaxTentacleSlots(), 3, 'TentacleWars should cap cells at three outgoing tentacles');
+  assert.deepEqual(slotCaps, [1, 2, 2, 2, 3, 3], 'TentacleWars should freeze the authoritative slot table by grade');
+  assert.equal(getTentacleWarsMaxTentacleSlots(0), 1, 'Spore should allow one outgoing tentacle');
+  assert.equal(getTentacleWarsMaxTentacleSlots(1), 2, 'Embryo should allow two outgoing tentacles');
+  assert.equal(getTentacleWarsMaxTentacleSlots(4), 3, 'Solar should allow three outgoing tentacles');
 }
 
 function testTentacleWarsGradeHysteresis() {

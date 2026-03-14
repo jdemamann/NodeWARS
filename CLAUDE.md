@@ -1,0 +1,1 @@
+/home/jonis/.claude/projects/nodewars-v2-codex/AGENTS.md

@@ -8,9 +8,11 @@
    ================================================================ */
 
 import { T } from '../localization/i18n.js';
+import { STATE } from '../core/GameState.js';
 import { Music } from '../audio/Music.js';
 import { DOM_IDS } from '../ui/DomIds.js';
 import { showNotification, showScr, showToast } from '../ui/ScreenController.js';
+import { buildTentacleWarsCampaignConfig } from './TwCampaignLoader.js';
 import { buildTentacleWarsSandboxConfig } from './TwSandboxConfig.js';
 import { computeTentacleWarsSandboxOutcome } from './TwSandboxRules.js';
 
@@ -34,6 +36,11 @@ export class TwModeRuntime {
     return !!levelConfig?.isTentacleWarsSandbox;
   }
 
+  /* TentacleWars mode can now run as either the sandbox or authored campaign. */
+  isTentacleWarsConfig(levelConfig) {
+    return !!(levelConfig?.isTentacleWarsSandbox || levelConfig?.isTentacleWarsCampaign);
+  }
+
   /*
    * The active sandbox check is the single truth for pause, restart, and
    * end-state branches that must stay out of campaign progression flow.
@@ -42,9 +49,24 @@ export class TwModeRuntime {
     return this.isSandboxConfig(this.game.cfg);
   }
 
+  /* Shared mode predicate for render, HUD, and simulation branches. */
+  isTentacleWarsActive() {
+    return this.isTentacleWarsConfig(this.game.cfg);
+  }
+
+  /* Separate check so campaign placeholder flow can stay out of NW results. */
+  isCampaignActive() {
+    return !!this.game.cfg?.isTentacleWarsCampaign;
+  }
+
   /* Build a fresh sandbox config for each prototype run. */
   buildSandboxConfig() {
     return buildTentacleWarsSandboxConfig();
+  }
+
+  /* Campaign configs reuse the shared Game loader shell with authored data. */
+  buildCampaignConfig(levelData, width = this.game.W, height = this.game.H) {
+    return buildTentacleWarsCampaignConfig(levelData, width, height);
   }
 
   /*
@@ -62,6 +84,11 @@ export class TwModeRuntime {
   playSandboxMusic(levelConfig = this.game.cfg) {
     const trackId = levelConfig?.soundtrackTrackId || 'stella';
     Music.playTrackById(trackId);
+  }
+
+  /* Campaign levels can reuse the same mode-owned track routing for now. */
+  playTentacleWarsMusic(levelConfig = this.game.cfg) {
+    this.playSandboxMusic(levelConfig);
   }
 
   /*
@@ -132,6 +159,45 @@ export class TwModeRuntime {
     if (mainMenuButton) mainMenuButton.textContent = T('mainMenu');
     if (pauseSaveElement) pauseSaveElement.textContent = T('twSandboxPauseStatus');
 
+    showScr('pause');
+  }
+
+  /* Phase-B campaign levels should not flow into NodeWARS progression yet. */
+  finishCampaignLevel(win) {
+    if (this.game.done) return;
+
+    this.game.done = true;
+    this.game.paused = true;
+    this.game.phaseOutcome = win ? 'win' : 'lose';
+    const levelId = this.game.cfg?.twLevelId || this.game.cfg?.id;
+
+    if (win) {
+      STATE.recordTentacleWarsLevelWin(levelId, this.game.scoreTime, this.game.cfg?.par);
+    } else {
+      STATE.recordTentacleWarsLevelLoss(levelId);
+    }
+
+    const pauseInfoElement = $(DOM_IDS.PINFO);
+    const resumeButton = $(DOM_IDS.BTN_RESUME);
+    const restartButton = $(DOM_IDS.BTN_PRR);
+    const phaseSelectButton = $(DOM_IDS.BTN_PRL);
+    const skipButton = $(DOM_IDS.BTN_PSKIP);
+    const mainMenuButton = $(DOM_IDS.BTN_PMENU);
+    const pauseSaveElement = $(DOM_IDS.PPSAVE);
+
+    if (pauseInfoElement) pauseInfoElement.textContent = `${this.game.cfg?.twLevelId || this.game.cfg?.id} — ${win ? T('phaseClear') : T('annihilated')}`;
+    if (resumeButton) resumeButton.style.display = 'none';
+    if (restartButton) restartButton.textContent = T('restart');
+    if (phaseSelectButton) phaseSelectButton.style.display = 'none';
+    if (skipButton) skipButton.style.display = 'none';
+    if (mainMenuButton) mainMenuButton.textContent = T('mainMenu');
+    if (pauseSaveElement) {
+      pauseSaveElement.textContent = win
+        ? `TentacleWars progress saved · next ${STATE.getTentacleWarsCurrentLevel()}`
+        : `TentacleWars fail streak ${STATE.getTentacleWarsLevelFailStreak(levelId)}x`;
+    }
+
+    showToast(win ? T('phaseClear') : T('annihilated'));
     showScr('pause');
   }
 }

@@ -955,9 +955,9 @@ async function testTentacleWarsTentacleEconomyCore() {
     computeTentacleWarsRefundValue,
   } = await load('src/tentaclewars/TwTentacleEconomy.js');
 
-  assert.equal(TW_BALANCE.TENTACLE_COST_PER_PIXEL, 0.03, 'TentacleWars should expose its own distance-only tentacle cost slope');
+  assert.equal(TW_BALANCE.TENTACLE_COST_PER_PIXEL, 0.20, 'TentacleWars should expose its own distance-only tentacle cost slope');
   assert.equal(computeTentacleWarsBuildCost(0), 0, 'zero-length TentacleWars lanes should have zero build cost');
-  assert.equal(computeTentacleWarsBuildCost(200), 6, 'TentacleWars build cost should stay linear with distance and have no base cost');
+  assert.equal(computeTentacleWarsBuildCost(200), 40, 'TentacleWars build cost should stay linear with distance and have no base cost');
 
   const firstCommit = commitTentacleWarsGrowthBudget(0, 2.5, 1.25, 6);
   assert.equal(firstCommit.committedEnergy, 1.25, 'TentacleWars growth should only commit the source energy that is actually available this step');
@@ -1026,9 +1026,10 @@ async function testTentacleWarsSandboxPrototypeBoundary() {
   assert.match(sandboxConfigSource, /isTentacleWarsSandbox:\s*true/, 'TentacleWars should expose a dedicated sandbox config');
   assert.match(sandboxConfigSource, /soundtrackTrackId:\s*'stella'/, 'TentacleWars sandbox should ship with a dedicated soundtrack id');
   assert.match(gameSource, /loadTentacleWarsSandbox\(\)/, 'Game should expose a dedicated TentacleWars sandbox loader');
+  assert.match(gameSource, /loadTentacleWarsCampaignLevel\(levelData\)/, 'Game should expose a TentacleWars campaign loader entry point');
   assert.match(gameSource, /_loadConfiguredLevel\(cfg, \{ persistCurrentLevel = false \} = \{\}\)/, 'Game should centralize config loading for campaign and sandbox entries');
   assert.match(gameSource, /this\.twMode\.checkSandboxEndState\(\)/, 'TentacleWars sandbox should own its own end-state flow');
-  assert.match(gameSource, /this\.cfg\.isTentacleWarsSandbox/, 'Game should branch on sandbox config instead of pretending it is a campaign level');
+  assert.match(twModeSource, /isTentacleWarsConfig\(levelConfig\)/, 'TentacleWars runtime should expose a mode-wide config predicate beyond the sandbox');
   assert.match(twModeSource, /enterSandboxPrototype\(\)/, 'TentacleWars runtime should enter the sandbox prototype, not a placeholder');
   assert.match(mainSource, /if \(game\.twMode\.isSandboxActive\(\)\)/, 'pause controls should restart and exit the sandbox without campaign leakage');
 }
@@ -1036,7 +1037,7 @@ async function testTentacleWarsSandboxPrototypeBoundary() {
 async function testTentacleWarsSandboxDisablesWorldLayerGimmicks() {
   const worldSystemsSource = await fs.readFile(path.join(ROOT, 'src/systems/WorldSystems.js'), 'utf8');
 
-  assert.match(worldSystemsSource, /if \(game\.twMode\?\.isSandboxActive\?\.\(\)\) \{\s*WorldSystems\.updateCamera\(game, dt\);\s*return;\s*\}/, 'TentacleWars sandbox should short-circuit world-layer gimmicks and keep only camera updates');
+  assert.match(worldSystemsSource, /if \(game\.twMode\?\.isTentacleWarsActive\?\.\(\)\) \{\s*WorldSystems\.updateCamera\(game, dt\);\s*return;\s*\}/, 'TentacleWars mode should short-circuit world-layer gimmicks and keep only camera updates');
   assert.match(worldSystemsSource, /WorldSystems\.updateVortex\(game, dt\);/, 'world systems should still keep the canonical vortex entry for NodeWARS');
   assert.match(worldSystemsSource, /WorldSystems\.updatePulsar\(game, dt\);/, 'world systems should still keep the canonical pulsar entry for NodeWARS');
   assert.match(worldSystemsSource, /WorldSystems\.updateAutoRetract\(game\);/, 'world systems should still keep the canonical auto-retract entry for NodeWARS');
@@ -1054,9 +1055,9 @@ async function testTentacleWarsSandboxDisablesFrenzyAndAutoRetract() {
   twNode.update(0.1, true);
   assert.equal(twNode.autoRetract, false, 'TentacleWars sandbox nodes should never arm auto-retract even while under attack and below the normal threshold');
 
-  assert.match(gameSource, /if \(!isTentacleWarsSandbox && this\.frenzyTimer > 0\)/, 'TentacleWars sandbox should skip the frenzy countdown branch during update');
-  assert.match(gameSource, /const frenzyActive = !isTentacleWarsSandbox && this\.frenzyTimer > 0;/, 'TentacleWars sandbox should not pass frenzy regen to node updates');
-  assert.match(gameSource, /_recordPlayerFrenzyCut\(sliceCut\) \{\s*if \(this\.twMode\.isSandboxActive\(\)\) return;/, 'TentacleWars sandbox should ignore player frenzy cut bookkeeping entirely');
+  assert.match(gameSource, /if \(!isTentacleWarsMode && this\.frenzyTimer > 0\)/, 'TentacleWars mode should skip the frenzy countdown branch during update');
+  assert.match(gameSource, /const frenzyActive = !isTentacleWarsMode && this\.frenzyTimer > 0;/, 'TentacleWars mode should not pass frenzy regen to node updates');
+  assert.match(gameSource, /_recordPlayerFrenzyCut\(sliceCut\) \{\s*if \(this\.twMode\.isTentacleWarsActive\(\)\) return;/, 'TentacleWars mode should ignore player frenzy cut bookkeeping entirely');
 }
 
 async function testTentacleWarsAiPhaseOneBoundary() {
@@ -1113,25 +1114,48 @@ async function testTentacleWarsAiPhaseOneBoundary() {
 async function testTentacleWarsSlotCapStaysWithinOriginalRange() {
   const { GameNode } = await load('src/entities/GameNode.js');
   const { getTentacleSlotUsage } = await load('src/input/PlayerTentacleInteraction.js');
+  const { getTentacleWarsMaxTentacleSlots, buildTentacleWarsGradeTable } = await load('src/tentaclewars/TwGradeTable.js');
   const nodeRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/NodeRenderer.js'), 'utf8');
   const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
+  const gradeTable = buildTentacleWarsGradeTable();
 
-  const twNode = new GameNode(0, 0, 0, 180, 1);
-  twNode.maxE = 180;
-  twNode.simulationMode = 'tentaclewars';
-  twNode.syncLevelFromEnergy();
+  assert.deepEqual(
+    gradeTable.map(entry => entry.maxTentacleSlots),
+    [1, 2, 2, 2, 3, 3],
+    'TentacleWars should expose the authoritative slot-cap table by grade'
+  );
+  assert.equal(getTentacleWarsMaxTentacleSlots(0), 1, 'TentacleWars Spore cells should cap at one outgoing tentacle');
+  assert.equal(getTentacleWarsMaxTentacleSlots(1), 2, 'TentacleWars Embryo cells should cap at two outgoing tentacles');
+  assert.equal(getTentacleWarsMaxTentacleSlots(5), 3, 'TentacleWars Dominator cells should cap at three outgoing tentacles');
 
-  assert.equal(twNode.maxSlots, 3, 'TentacleWars nodes should cap outgoing tentacles at three');
+  const embryoNode = new GameNode(0, 0, 0, 40, 1);
+  embryoNode.maxE = 200;
+  embryoNode.simulationMode = 'tentaclewars';
+  embryoNode.syncLevelFromEnergy();
 
-  const slotUsage = getTentacleSlotUsage(twNode, () => 2);
-  assert.equal(slotUsage.maxTentacleSlots, 3, 'TentacleWars click and preview helpers should use the mode-specific three-tentacle cap');
-  assert.equal(slotUsage.hasFreeSlot, true, 'TentacleWars should still allow the third outgoing tentacle');
+  assert.equal(embryoNode.level, 1, 'TentacleWars Embryo sample should resolve into grade index one');
+  assert.equal(embryoNode.maxSlots, 2, 'TentacleWars Embryo nodes should expose two outgoing tentacles');
 
-  const fullSlotUsage = getTentacleSlotUsage(twNode, () => 3);
-  assert.equal(fullSlotUsage.hasFreeSlot, false, 'TentacleWars should block a fourth outgoing tentacle');
+  const slotUsage = getTentacleSlotUsage(embryoNode, () => 1);
+  assert.equal(slotUsage.maxTentacleSlots, 2, 'TentacleWars click and preview helpers should use the grade-owned slot cap');
+  assert.equal(slotUsage.hasFreeSlot, true, 'TentacleWars Embryo should still allow the second outgoing tentacle');
 
-  assert.match(nodeRendererSource, /const maxT = n\.maxSlots;/, 'TentacleWars node slot dots should render from the mode-aware slot getter');
-  assert.match(nodeRendererSource, /const mx = n\.maxSlots;/, 'TentacleWars out-count badge should render from the mode-aware slot getter');
+  const fullSlotUsage = getTentacleSlotUsage(embryoNode, () => 2);
+  assert.equal(fullSlotUsage.hasFreeSlot, false, 'TentacleWars Embryo should block a third outgoing tentacle');
+
+  const solarNode = new GameNode(1, 0, 0, 160, 1);
+  solarNode.maxE = 200;
+  solarNode.simulationMode = 'tentaclewars';
+  solarNode.syncLevelFromEnergy();
+  assert.equal(solarNode.maxSlots, 3, 'TentacleWars Solar nodes should still expose three outgoing tentacles');
+
+  assert.match(nodeRendererSource, /function drawPersistentSlotMarkers\(/, 'Node rendering should keep a dedicated persistent slot-marker renderer');
+  assert.match(nodeRendererSource, /const totalSlots = node\.maxSlots;/, 'persistent slot markers should render from the mode-aware slot getter');
+  assert.match(nodeRendererSource, /const usedSlots = Math\.max\(0, Math\.min\(totalSlots, node\.outCount\)\);/, 'persistent slot markers should fill against live outgoing tentacle occupancy');
+  assert.match(nodeRendererSource, /drawPersistentSlotMarkers\(ctx, n, r, col\);/, 'both NodeWARS and TentacleWars should use the below-node markers for slot occupancy');
+  assert.match(nodeRendererSource, /function drawNodeWarsLevelBadge\(/, 'NodeWARS should keep a separate level badge once the below-node channel is reused for slots');
+  assert.match(nodeRendererSource, /if \(!isTentacleWarsNode\) \{\s*drawNodeWarsLevelBadge\(ctx, n, r, col, lvl\);\s*\}/s, 'NodeWARS should move level readability to a dedicated above-node badge');
+  assert.match(nodeRendererSource, /if \(!isTentacleWarsNode && n\.owner !== 0 && n\.outCount > 0\)/, 'the old out-count badge should remain secondary telemetry for NodeWARS only');
   assert.match(uiRendererSource, /const totalSlots = n\.maxSlots;/, 'TentacleWars info panels should render slot totals from the mode-aware slot getter');
 }
 
@@ -1158,6 +1182,7 @@ async function testTentacleWarsTouchDragConnectUsesCanonicalPath() {
 
 async function testTentacleWarsRuntimeMathIntegration() {
   const { computeNodeDisplayRegenRate, computeNodeTentacleFeedRate } = await load('src/systems/EnergyBudget.js');
+  const { TW_BALANCE } = await load('src/tentaclewars/TwBalance.js');
   const { computeTentacleBuildCost } = await load('src/input/TentacleCommands.js');
   const { computeTentacleWarsNeutralCaptureCost } = await load('src/tentaclewars/TwCaptureRules.js');
   const tentSource = await fs.readFile(path.join(ROOT, 'src/entities/Tent.js'), 'utf8');
@@ -1179,12 +1204,14 @@ async function testTentacleWarsRuntimeMathIntegration() {
   };
   const twTarget = { x: 100, y: 0 };
 
+  assert.equal(TW_BALANCE.PASSIVE_REGEN_FRACTION, 0.25, 'TentacleWars passive regen should use the faster under-attack drain fraction');
+  assert.equal(TW_BALANCE.TW_SELF_REGEN_FRACTION, 0.20, 'TentacleWars attacker self-regen reserve should stay explicit in balance');
   assert.equal(computeNodeDisplayRegenRate(twNode), 1.0, 'TentacleWars regen display should resolve from packet grade rates');
-  assert.equal(computeNodeTentacleFeedRate(twNode), 0.5, 'TentacleWars base lane throughput should stay separate from packetized overflow credit');
+  assert.equal(computeNodeTentacleFeedRate(twNode), 0.4, 'TentacleWars base lane throughput should reserve a self-regen share while staying separate from packetized overflow credit');
   assert.equal(computeTentacleWarsNeutralCaptureCost(40), 16, 'TentacleWars sandbox neutrals should derive their capture threshold from displayed energy');
 
   const twBuildCost = computeTentacleBuildCost(twNode, twTarget, 99);
-  assert.equal(twBuildCost.baseBuildCost, 3, 'TentacleWars player build cost should stay linear with distance');
+  assert.equal(twBuildCost.baseBuildCost, 20, 'TentacleWars player build cost should stay linear with distance');
   assert.equal(twBuildCost.rangeSurcharge, 0, 'TentacleWars player build cost should ignore NodeWARS range surcharge');
 
   assert.match(tentSource, /sourceNode\.simulationMode === 'tentaclewars'/, 'Tent should branch build cost and bandwidth on the source simulation mode');
@@ -1192,8 +1219,232 @@ async function testTentacleWarsRuntimeMathIntegration() {
   assert.match(tentSource, /resolveTentacleWarsHostileCapture\(/, 'TentacleWars hostile takeovers should resolve through the dedicated reset-plus-carryover helper');
   assert.match(tentSource, /resolveTentacleWarsNeutralCapture\(/, 'TentacleWars neutral takeovers should resolve through the dedicated acquisition helper');
   assert.match(physicsSource, /n\.twOverflowBudget = captureTentacleWarsOverflowBudget\(n\)/, 'Physics should carry prior-frame overflow budget for TentacleWars nodes');
-  assert.match(gameSource, /computeTentacleWarsNeutralCaptureCost\(this\.nodes\[i\]\.energy\)/, 'TentacleWars sandbox should set neutral capture thresholds from displayed neutral energy on load');
-  assert.match(gameSource, /this\.nodes\[i\]\.simulationMode = this\.twMode\.isSandboxConfig\(cfg\) \? 'tentaclewars' : 'nodewars'/, 'Game should mark sandbox nodes with TentacleWars simulation mode before syncing levels');
+  assert.match(gameSource, /computeTentacleWarsNeutralCaptureCost\(this\.nodes\[i\]\.energy\)/, 'TentacleWars mode should set neutral capture thresholds from displayed neutral energy on load');
+  assert.match(gameSource, /this\.nodes\[i\]\.simulationMode = this\.twMode\.isTentacleWarsConfig\(cfg\) \? 'tentaclewars' : 'nodewars'/, 'Game should mark TW nodes with TentacleWars simulation mode before syncing levels');
+}
+
+async function testTentacleWarsEqualGradeCombatRespectsActiveAttackState() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { Physics } = await load('src/systems/Physics.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+
+  async function runTentacleWarsMiniSim({
+    sourceEnergy,
+    targetEnergy,
+    sourceOwner = 1,
+    targetOwner = 2,
+    includeReverseLane = false,
+    totalSteps,
+    stepSeconds,
+    maxE = 30,
+  }) {
+    const sourceNode = new GameNode(0, 0, 0, sourceEnergy, sourceOwner);
+    const targetNode = new GameNode(1, 100, 0, targetEnergy, targetOwner);
+    sourceNode.simulationMode = 'tentaclewars';
+    targetNode.simulationMode = 'tentaclewars';
+    sourceNode.maxE = maxE;
+    targetNode.maxE = maxE;
+    sourceNode.syncLevelFromEnergy();
+    targetNode.syncLevelFromEnergy();
+
+    const forwardTentacle = new Tent(sourceNode, targetNode, 0);
+    forwardTentacle.state = TentState.ACTIVE;
+    forwardTentacle.reachT = 1;
+
+    const tents = [forwardTentacle];
+    let reverseTentacle = null;
+    if (includeReverseLane) {
+      reverseTentacle = new Tent(targetNode, sourceNode, 0);
+      reverseTentacle.state = TentState.ACTIVE;
+      reverseTentacle.reachT = 1;
+      tents.push(reverseTentacle);
+    }
+
+    const game = {
+      time: 0,
+      nodes: [sourceNode, targetNode],
+      tents,
+    };
+    forwardTentacle.game = game;
+    if (reverseTentacle) reverseTentacle.game = game;
+
+    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex += 1) {
+      game.time += stepSeconds;
+      Physics.updateOutCounts(game);
+      sourceNode.update(stepSeconds, false);
+      targetNode.update(stepSeconds, false);
+      forwardTentacle.update(stepSeconds);
+      if (reverseTentacle) reverseTentacle.update(stepSeconds);
+    }
+
+    return { sourceNode, targetNode };
+  }
+
+  const stepSeconds = 0.25;
+  const fiveSecondSteps = 20;
+
+  const uncontested = await runTentacleWarsMiniSim({
+    sourceEnergy: 10,
+    targetEnergy: 5,
+    totalSteps: fiveSecondSteps,
+    stepSeconds,
+  });
+
+  assert.ok(
+    uncontested.sourceNode.energy > 10,
+    'TentacleWars uncontested attacker should grow instead of freezing during a live hostile lane',
+  );
+  assert.ok(
+    uncontested.sourceNode.energy < 15,
+    'TentacleWars attacker should not grow faster than the grade-0 regen budget allows over five seconds',
+  );
+
+  let captureTimeSeconds = null;
+  {
+    const sourceNode = new GameNode(2, 0, 0, 10, 1);
+    const targetNode = new GameNode(3, 100, 0, 5, 2);
+    sourceNode.simulationMode = 'tentaclewars';
+    targetNode.simulationMode = 'tentaclewars';
+    sourceNode.maxE = 30;
+    targetNode.maxE = 30;
+    sourceNode.syncLevelFromEnergy();
+    targetNode.syncLevelFromEnergy();
+
+    const tentacle = new Tent(sourceNode, targetNode, 0);
+    tentacle.state = TentState.ACTIVE;
+    tentacle.reachT = 1;
+
+    const game = {
+      time: 0,
+      nodes: [sourceNode, targetNode],
+      tents: [tentacle],
+    };
+    tentacle.game = game;
+
+    const timeoutSteps = Math.round(20 / stepSeconds);
+    for (let stepIndex = 0; stepIndex < timeoutSteps; stepIndex += 1) {
+      game.time += stepSeconds;
+      Physics.updateOutCounts(game);
+      sourceNode.update(stepSeconds, false);
+      targetNode.update(stepSeconds, false);
+      tentacle.update(stepSeconds);
+      if (targetNode.owner === 1 || targetNode.energy <= 0) {
+        captureTimeSeconds = (stepIndex + 1) * stepSeconds;
+        break;
+      }
+    }
+  }
+
+  assert.ok(captureTimeSeconds !== null, 'TentacleWars grade-0 defender should be captured within the timeout window');
+  assert.ok(captureTimeSeconds >= 6 && captureTimeSeconds <= 15, 'TentacleWars grade-0 defender should fall in a reasonable 6..15 second window');
+
+  const clash = await runTentacleWarsMiniSim({
+    sourceEnergy: 20,
+    targetEnergy: 20,
+    includeReverseLane: true,
+    totalSteps: fiveSecondSteps,
+    stepSeconds,
+  });
+  assert.ok(clash.sourceNode.energy < 20, 'TentacleWars mutual clash should deplete the attacker nucleus');
+  assert.ok(clash.targetNode.energy < 20, 'TentacleWars mutual clash should also deplete the defender nucleus');
+
+  const attackerGrowthRate = (uncontested.sourceNode.energy - 10) / 5;
+  const defenderDrainRate = (5 - (captureTimeSeconds === null ? 5 : 0)) / Math.max(captureTimeSeconds || 5, 0.001);
+  assert.ok(
+    defenderDrainRate > attackerGrowthRate,
+    'TentacleWars capture should converge faster than the uncontested attacker self-grows',
+  );
+}
+
+async function testTentacleWarsCampaignLoaderWiresAuthoredLevels() {
+  const {
+    TW_CAMPAIGN_FIXTURE_LEVELS,
+  } = await load('src/tentaclewars/TwCampaignFixtures.js');
+  const {
+    buildTentacleWarsCampaignConfig,
+  } = await load('src/tentaclewars/TwCampaignLoader.js');
+  const {
+    canCreateTentacleConnection,
+  } = await load('src/input/TentacleCommands.js');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const loaderSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwCampaignLoader.js'), 'utf8');
+  const obstacleRuntimeSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwObstacleRuntime.js'), 'utf8');
+
+  const worldOneObstacleLevel = TW_CAMPAIGN_FIXTURE_LEVELS.find(level => level.id === 'W1-05');
+  const config = buildTentacleWarsCampaignConfig(worldOneObstacleLevel, 1000, 800);
+  assert.equal(config.isTentacleWarsCampaign, true, 'authored TW levels should build into campaign configs');
+  assert.equal(config.isTentacleWarsSandbox, false, 'authored TW levels should stay distinct from the sandbox');
+  assert.equal(config.fixedLayout.twObstacles.length, 2, 'phase-one authored TW levels should preserve static obstacle shells');
+  assert.match(loaderSource, /buildTentacleWarsCampaignConfig\(levelData, width, height\)/, 'TW campaign loader should expose a canonical authored-level config builder');
+  assert.match(obstacleRuntimeSource, /unsupported shape kind/, 'TW obstacle runtime should reject unsupported authoring shapes');
+  assert.match(gameSource, /loadTentacleWarsCampaignLevel\(levelData\)/, 'Game should expose a loader entry for authored TW campaign levels');
+
+  const runtimeNodes = config.fixedLayout.nodes.map((node, index) => ({
+    ...node,
+    id: index,
+    simulationMode: 'tentaclewars',
+    maxSlots: 2,
+  }));
+  const sourceNode = runtimeNodes[2];
+  const targetNode = runtimeNodes[3];
+  assert.equal(
+    canCreateTentacleConnection(sourceNode, targetNode, config.fixedLayout.twObstacles),
+    false,
+    'phase-one TW authored obstacles should block direct lane creation canonically',
+  );
+}
+
+async function testTentacleWarsCapsuleObstacleBlocksCrossingLane() {
+  const { findBlockingTentacleWarsObstacle } = await load('src/tentaclewars/TwObstacleRuntime.js');
+  const obstacle = {
+    id: 'capsule-blocker',
+    kind: 'capsule',
+    ax: 500,
+    ay: 100,
+    bx: 500,
+    by: 500,
+    r: 30,
+  };
+  const sourceNode = { x: 100, y: 300 };
+  const targetNode = { x: 900, y: 300 };
+  const blockingObstacle = findBlockingTentacleWarsObstacle([obstacle], sourceNode, targetNode);
+  assert.equal(blockingObstacle, obstacle, 'crossing a capsule obstacle should return the blocker');
+}
+
+async function testTentacleWarsCapsuleObstacleIgnoresNonCrossingLane() {
+  const { findBlockingTentacleWarsObstacle } = await load('src/tentaclewars/TwObstacleRuntime.js');
+  const obstacle = {
+    id: 'capsule-blocker',
+    kind: 'capsule',
+    ax: 500,
+    ay: 100,
+    bx: 500,
+    by: 500,
+    r: 30,
+  };
+  const sourceNode = { x: 100, y: 100 };
+  const targetNode = { x: 400, y: 100 };
+  const blockingObstacle = findBlockingTentacleWarsObstacle([obstacle], sourceNode, targetNode);
+  assert.equal(blockingObstacle, null, 'non-crossing lanes should ignore capsule blockers');
+}
+
+async function testTentacleWarsControlledScenarioPresetsStayWired() {
+  const presetSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwScenarioPresets.js'), 'utf8');
+  const sandboxConfigSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwSandboxConfig.js'), 'utf8');
+  const previewSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwCampaignPreview.js'), 'utf8');
+  const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
+  const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
+
+  assert.match(presetSource, /'grade-showcase'/, 'TentacleWars should expose a deterministic grade-showcase preset');
+  assert.match(presetSource, /'slice-lab'/, 'TentacleWars should expose a deterministic slice-lab preset');
+  assert.match(presetSource, /'clash-lab'/, 'TentacleWars should expose a deterministic clash-lab preset');
+  assert.match(presetSource, /'density-lab'/, 'TentacleWars should expose a deterministic density-lab preset');
+  assert.match(sandboxConfigSource, /resolveTentacleWarsScenarioPresetId/, 'TentacleWars sandbox config should resolve scenario presets from the runtime URL');
+  assert.match(previewSource, /tw-autostart/, 'TentacleWars preview tooling should preserve autostart query handling');
+  assert.match(gameSource, /const fixedLayout = cfg\.fixedLayout \|\|/, 'Game should accept a mode-owned fixed layout override before campaign fixed layouts');
+  assert.match(gameSource, /_seedTentacleWarsPresetTents\(fixedLayout\.tents\)/, 'TentacleWars preset layouts should be able to seed deterministic tentacles');
+  assert.match(mainSource, /window\.__NODEWARS_DEBUG__ =/, 'browser visual tooling should expose a small runtime debug bridge');
 }
 
 async function testTentacleWarsCutRetractionPresentationStaysProgressive() {
@@ -1628,6 +1879,87 @@ async function testTentacleWarsClashStaysPinnedAtMidpoint() {
   assert.equal(rightTent.clashT, 0.5, 'TentacleWars clashes should keep both mirrored lanes locked to the same midpoint');
   assert.equal(leftTent.clashVisualT, 0.5, 'TentacleWars clashes should pin the visual front to the midpoint');
   assert.equal(rightTent.clashVisualT, 0.5, 'TentacleWars clashes should keep the mirrored visual front pinned to the midpoint');
+}
+
+async function testTentacleWarsClashApproachActuallyAdvances() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+
+  const leftNode = new GameNode(0, 0, 0, 120, 1);
+  const rightNode = new GameNode(1, 200, 0, 120, 2);
+  leftNode.simulationMode = 'tentaclewars';
+  rightNode.simulationMode = 'tentaclewars';
+  leftNode.maxE = 200;
+  rightNode.maxE = 200;
+
+  const leftTent = new Tent(leftNode, rightNode, 20);
+  const rightTent = new Tent(rightNode, leftNode, 20);
+  leftTent.state = TentState.ACTIVE;
+  rightTent.state = TentState.ACTIVE;
+  leftTent.reachT = 1;
+  rightTent.reachT = 1;
+  leftTent.clashPartner = rightTent;
+  rightTent.clashPartner = leftTent;
+  leftTent.clashT = 0.2;
+  rightTent.clashT = 0.8;
+  leftTent.clashVisualT = 0.2;
+  rightTent.clashVisualT = 0.8;
+  leftTent.clashApproachActive = true;
+  rightTent.clashApproachActive = true;
+  leftTent.game = { time: 0 };
+  rightTent.game = leftTent.game;
+
+  leftTent.update(0.1);
+
+  assert.ok(leftTent.clashVisualT > 0.2, 'TentacleWars clash approach should move the left visual front toward the midpoint');
+  assert.ok(rightTent.clashVisualT < 0.8, 'TentacleWars clash approach should move the right visual front toward the midpoint');
+  assert.ok(leftTent.clashVisualT < 0.5, 'TentacleWars clash approach should not jump straight to midpoint on the first tick');
+  assert.ok(rightTent.clashVisualT > 0.5, 'TentacleWars clash approach should preserve mirrored travel on the first tick');
+}
+
+async function testTentacleWarsClashPreviewMatchesClickResolution() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+  const { buildPlayerTentaclePreview } = await load('src/input/BuildPreview.js');
+  const { resolvePlayerClickIntent } = await load('src/input/PlayerClickResolution.js');
+
+  const playerNode = new GameNode(0, 0, 0, 11, 1);
+  const enemyNode = new GameNode(1, 100, 0, 20, 2);
+  playerNode.simulationMode = 'tentaclewars';
+  enemyNode.simulationMode = 'tentaclewars';
+  playerNode.maxE = 200;
+  enemyNode.maxE = 200;
+
+  const hostileTent = new Tent(enemyNode, playerNode, 20);
+  hostileTent.state = TentState.ACTIVE;
+  hostileTent.reachT = 1;
+  hostileTent.pipeAge = hostileTent.travelDuration;
+
+  const tents = [hostileTent];
+  const preview = buildPlayerTentaclePreview({
+    selectedNode: playerNode,
+    hoveredNode: enemyNode,
+    tents,
+    liveOut: () => 0,
+    distanceCostMultiplier: 0.01,
+    obstacles: [],
+  });
+  const clickIntent = resolvePlayerClickIntent({
+    selectedNode: playerNode,
+    hitNode: enemyNode,
+    tents,
+    liveOut: () => 0,
+    distanceCostMultiplier: 0.01,
+    obstacles: [],
+    playerOwner: 1,
+  });
+
+  assert.equal(preview.type, 'build_new_tentacle', 'TentacleWars clash preview should stay on the build-new-tentacle path');
+  assert.equal(preview.isClashRoute, true, 'TentacleWars clash preview should recognize the reverse hostile lane');
+  assert.equal(preview.canAffordBuild, true, 'TentacleWars clash preview should treat the half-cost route as affordable');
+  assert.equal(clickIntent.type, 'build_tentacle', 'TentacleWars click resolution should agree with clash preview affordability');
 }
 
 async function testPurpleAiDifferentiationAndFrameDrivenCoreVisuals() {
@@ -2090,6 +2422,8 @@ async function main() {
     ['Frenzy requires the same continuous slice gesture', testFrenzyRequiresSameContinuousSliceGesture],
     ['Fresh clashes use an approach visual front instead of popping to mid-lane', testFreshClashUsesApproachVisualFront],
     ['TentacleWars clashes stay pinned at the lane midpoint', testTentacleWarsClashStaysPinnedAtMidpoint],
+    ['TentacleWars clash approach actually advances before midpoint lock', testTentacleWarsClashApproachActuallyAdvances],
+    ['TentacleWars clash preview affordability matches click resolution', testTentacleWarsClashPreviewMatchesClickResolution],
     ['Purple AI differentiation and frame-driven core visuals stay present', testPurpleAiDifferentiationAndFrameDrivenCoreVisuals],
     ['AI tactical state and slice pressure stay active', testAiTacticalStateAndSlicePressureStayActive],
     ['Tutorial steps stay rigid and gated', testTutorialStepsStayRigidAndGated],
@@ -2119,6 +2453,11 @@ async function main() {
     ['TentacleWars sandbox disables frenzy and auto-retract', testTentacleWarsSandboxDisablesFrenzyAndAutoRetract],
     ['TentacleWars AI phase one stays isolated and hostile by default', testTentacleWarsAiPhaseOneBoundary],
     ['TentacleWars runtime math stays wired into sandbox entities', testTentacleWarsRuntimeMathIntegration],
+    ['TentacleWars equal-grade combat respects active attack state', testTentacleWarsEqualGradeCombatRespectsActiveAttackState],
+    ['TentacleWars campaign loader wires authored levels into the runtime shell', testTentacleWarsCampaignLoaderWiresAuthoredLevels],
+    ['TentacleWars capsule obstacle blocks a crossing tentacle lane', testTentacleWarsCapsuleObstacleBlocksCrossingLane],
+    ['TentacleWars capsule obstacle does not block a non-crossing lane', testTentacleWarsCapsuleObstacleIgnoresNonCrossingLane],
+    ['TentacleWars controlled scenario presets stay wired', testTentacleWarsControlledScenarioPresetsStayWired],
     ['TentacleWars cut retraction presentation stays progressive', testTentacleWarsCutRetractionPresentationStaysProgressive],
     ['TentacleWars cut retraction does not explode target flash', testTentacleWarsCutRetractionDoesNotExplodeTargetFlash],
     ['Range preview stays viewport clamped', testRangePreviewStaysViewportClamped],

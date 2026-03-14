@@ -26,6 +26,7 @@ import { Music }        from '../audio/Music.js';
 import { DOM_IDS }      from '../ui/DomIds.js';
 import { findNodeAtWorldPoint } from '../input/NodeHitTesting.js';
 import {
+  canCreateTentacleConnection,
   findOpposingActiveTentacle,
 } from '../input/TentacleCommands.js';
 import { resolvePinnedHoverState, resolvePlayerClickIntent } from '../input/PlayerClickResolution.js';
@@ -46,6 +47,8 @@ import {
 import { bindGameInputEvents } from '../input/GameInputBinding.js';
 import { getFixedCampaignLayout } from '../levels/FixedCampaignLayouts.js';
 import { areHostileOwners } from '../systems/OwnerTeams.js';
+import { buildTentacleWarsCampaignConfig } from '../tentaclewars/TwCampaignLoader.js';
+import { getTentacleWarsCampaignLevelById } from '../tentaclewars/TwCampaignFixtures.js';
 import { TwModeRuntime } from '../tentaclewars/TwModeRuntime.js';
 import { TwAI } from '../tentaclewars/TwAI.js';
 import { computeTentacleWarsNeutralCaptureCost } from '../tentaclewars/TwCaptureRules.js';
@@ -81,6 +84,7 @@ export class Game {
     this.tents      = [];
     this.hazards      = [];
     this.pulsars      = [];
+    this.twObstacles  = [];
     this.orbPool      = new OrbPool(150);
     this.freeOrbPool  = new FreeOrbPool(30);
     this.visualEvents = [];
@@ -295,6 +299,13 @@ export class Game {
     });
   }
 
+  /* Authored TentacleWars phases reuse the shared loader shell with TW config. */
+  loadTentacleWarsCampaignLevel(levelData) {
+    this._loadConfiguredLevel(buildTentacleWarsCampaignConfig(levelData, this.W, this.H), {
+      persistCurrentLevel: false,
+    });
+  }
+
   /*
    * Level loading rebuilds the entire live runtime for the phase: nodes,
    * world features, AI controllers, tutorial state, and music context.
@@ -310,6 +321,7 @@ export class Game {
     }
 
     this.nodes = []; this.tents = [];
+    this.twObstacles = [];
     this.sel   = null; this.done = false; this.paused = false; this.scoreTime = 0;
     this.camX  = 0; this.camY = 0; this.fogDirty = true; this.fogRevealTimer = 0;
     this._fogTimer = 0; this.freeOrbPool = new FreeOrbPool(30);
@@ -325,9 +337,11 @@ export class Game {
     const { W, H } = this;
     const N = cfg.nodes, MR = 118, mg = 82;
 
-    const fixedLayout = Number.isInteger(cfg.id)
-      ? getFixedCampaignLayout(cfg.id, W, H)
-      : null;
+    const fixedLayout = cfg.fixedLayout || (
+      Number.isInteger(cfg.id)
+        ? getFixedCampaignLayout(cfg.id, W, H)
+        : null
+    );
 
     if (fixedLayout) {
       populateFixedNodes(this, fixedLayout);
@@ -349,17 +363,21 @@ export class Game {
     /* The sandbox reuses GameNode/Tent, but it must still flip those entities
        into TentacleWars math before the first simulation frame begins. */
     for (let i = 0; i < this.nodes.length; i++) {
-      this.nodes[i].simulationMode = this.twMode.isSandboxConfig(cfg) ? 'tentaclewars' : 'nodewars';
+      this.nodes[i].simulationMode = this.twMode.isTentacleWarsConfig(cfg) ? 'tentaclewars' : 'nodewars';
       this.nodes[i].maxE = nodeEnergyCap;
-      if (this.twMode.isSandboxConfig(cfg) && this.nodes[i].owner === 0 && !this.nodes[i].isRelay) {
+      if (this.twMode.isTentacleWarsConfig(cfg) && this.nodes[i].owner === 0 && !this.nodes[i].isRelay) {
         this.nodes[i].captureThreshold = computeTentacleWarsNeutralCaptureCost(this.nodes[i].energy);
       }
       this.nodes[i].syncLevelFromEnergy?.();
     }
 
+    if (this.twMode.isSandboxConfig(cfg) && fixedLayout?.tents?.length) {
+      this._seedTentacleWarsPresetTents(fixedLayout.tents);
+    }
+
     /* TentacleWars keeps its first AI pass isolated so the NodeWARS enemy
        remains stable while the fidelity mode learns packet/overflow pressure. */
-    if (this.twMode.isSandboxConfig(cfg)) {
+    if (this.twMode.isTentacleWarsConfig(cfg)) {
       this.ai = new TwAI(this, cfg, 2);
       this.ai3 = cfg.purpleEnemyCount > 0 ? new TwAI(this, cfg, 3) : null;
     } else {
@@ -370,12 +388,55 @@ export class Game {
 
     if (this.twMode.isSandboxConfig(cfg)) {
       this.twMode.onSandboxLoaded(cfg);
+    } else if (this.twMode.isTentacleWarsConfig(cfg)) {
+      this.twMode.playTentacleWarsMusic(cfg);
     } else {
       this.playCurrentModeMusic();
     }
 
     this.hud.setLevel(cfg);
     this.hud.update(this);
+  }
+
+  /*
+   * TentacleWars visual presets can seed live lanes so clash, overlap, and
+   * slice states can be reviewed deterministically without waiting for the AI.
+   */
+  _seedTentacleWarsPresetTents(seedTentacles) {
+    const clashGroups = new Map();
+
+    seedTentacles.forEach(seedTentacle => {
+      const sourceNode = this.nodes[seedTentacle.source];
+      const targetNode = this.nodes[seedTentacle.target];
+      if (!sourceNode || !targetNode) return;
+
+      const tentacle = new Tent(sourceNode, targetNode, seedTentacle.paidCost || undefined);
+      tentacle.game = this;
+      tentacle.state = TentState.ACTIVE;
+      tentacle.reachT = seedTentacle.reachT ?? 1;
+      tentacle.paidCost = seedTentacle.paidCost ?? tentacle.buildCost;
+      tentacle.energyInPipe = seedTentacle.energyInPipe ?? 0;
+      tentacle.packetAccumulatorUnits = 0;
+      tentacle.pipeAge = tentacle.travelDuration;
+      tentacle.reversed = !!seedTentacle.reversed;
+      this.tents.push(tentacle);
+
+      if (seedTentacle.clashKey) {
+        const group = clashGroups.get(seedTentacle.clashKey) || [];
+        group.push(tentacle);
+        clashGroups.set(seedTentacle.clashKey, group);
+      }
+    });
+
+    clashGroups.forEach(group => {
+      if (group.length !== 2) return;
+      group[0].clashPartner = group[1];
+      group[1].clashPartner = group[0];
+      group[0].clashT = 0.5;
+      group[1].clashT = 0.5;
+      group[0].clashVisualT = 0.5;
+      group[1].clashVisualT = 0.5;
+    });
   }
 
   _loadTutLayout(cfg, W, H) {
@@ -437,12 +498,19 @@ export class Game {
   }
 
   /*
-   * The live product still defaults to NodeWARS. TentacleWars enters through a
-   * dedicated runtime boundary so the new mode can evolve independently.
+   * The live product still defaults to NodeWARS. TentacleWars campaign start
+   * should load the current authored phase first and only fall back to the
+   * sandbox when no authored level is available for the saved campaign cursor.
    */
   enterSelectedMode() {
     showScr(null);
     if (STATE.getGameMode() === 'tentaclewars') {
+      const currentTentacleWarsLevelId = STATE.getTentacleWarsCurrentLevel();
+      const levelData = getTentacleWarsCampaignLevelById(currentTentacleWarsLevelId);
+      if (levelData) {
+        this.loadTentacleWarsCampaignLevel(levelData);
+        return;
+      }
       this.twMode.enterSandboxPrototype();
       return;
     }
@@ -454,8 +522,8 @@ export class Game {
    * soundtrack without forking the global music system.
    */
   playCurrentModeMusic() {
-    if (this.twMode.isSandboxConfig(this.cfg)) {
-      this.twMode.playSandboxMusic(this.cfg);
+    if (this.twMode.isTentacleWarsConfig(this.cfg)) {
+      this.twMode.playTentacleWarsMusic(this.cfg);
       return;
     }
     Music.playLevelTheme(this.cfg);
@@ -558,10 +626,10 @@ export class Game {
 
     this.resolveClashes();
 
-    const isTentacleWarsSandbox = this.twMode.isSandboxActive();
+    const isTentacleWarsMode = this.twMode.isTentacleWarsActive();
 
     /* Frenzy countdown */
-    if (!isTentacleWarsSandbox && this.frenzyTimer > 0) {
+    if (!isTentacleWarsMode && this.frenzyTimer > 0) {
       const prev = this.frenzyTimer;
       this.frenzyTimer = Math.max(0, this.frenzyTimer - dt);
       if (prev > 0 && this.frenzyTimer === 0) {
@@ -573,7 +641,7 @@ export class Game {
     if (this.aiDefensive > 0) this.aiDefensive = Math.max(0, this.aiDefensive - dt);
 
     /* Node updates */
-    const frenzyActive = !isTentacleWarsSandbox && this.frenzyTimer > 0;
+    const frenzyActive = !isTentacleWarsMode && this.frenzyTimer > 0;
     for (let _i = 0; _i < this.nodes.length; _i++) this.nodes[_i].update(dt, frenzyActive);
 
     /* World-layer systems stay outside the core simulation bookkeeping. */
@@ -658,6 +726,15 @@ export class Game {
     const p  = real.filter(n => n.owner === 1).length;
     const e2 = real.filter(n => n.owner === 2).length;
     const e3 = real.filter(n => n.owner === 3).length;
+    if (this.twMode.isCampaignActive()) {
+      if (e2 === 0 && e3 === 0) {
+        this.twMode.finishCampaignLevel(true);
+      } else if (p === 0) {
+        this.twMode.finishCampaignLevel(false);
+      }
+      return;
+    }
+
     if (e2 === 0 && e3 === 0) {
       this.done = true;
       this.phaseOutcome = 'win';
@@ -684,7 +761,7 @@ export class Game {
   }
 
   _updateGameplayHints() {
-    if (!this.cfg || this.cfg.isTutorial || this.cfg.isTentacleWarsSandbox || this.done) return;
+    if (!this.cfg || this.cfg.isTutorial || this.twMode.isTentacleWarsActive() || this.done) return;
     if (this.scoreTime < this._nextGameplayHintAt) return;
 
     const playerNodes = this.nodes.filter(node => node.owner === 1 && !node.isRelay);
@@ -841,6 +918,7 @@ export class Game {
       tents: this.tents,
       liveOut: node => this._utils.liveOut(node),
       distanceCostMultiplier: this.cfg.distanceCostMultiplier,
+      obstacles: this.twObstacles,
     });
 
     if (this.cfg?.isTutorial && !this.tut.allowsClickIntent(clickIntent)) return;
@@ -906,6 +984,10 @@ export class Game {
           )
         );
         return;
+      case 'blocked_by_obstacle':
+        clickIntent.hitNode.rFlash = 1;
+        showToast(T('obstacleBlocked'));
+        return;
       case 'build_tentacle':
         this._createPlayerTentacle(clickIntent.sourceNode, clickIntent.targetNode, clickIntent.buildCost.totalBuildCost);
         if (this.cfg?.isTutorial) this.tut.onClickIntentApplied(clickIntent);
@@ -918,6 +1000,8 @@ export class Game {
   }
 
   _createPlayerTentacle(sourceNode, targetNode, totalBuildCost) {
+    if (!canCreateTentacleConnection(sourceNode, targetNode, this.twObstacles)) return;
+
     const newTentacle = new Tent(sourceNode, targetNode, totalBuildCost);
     newTentacle.game  = this;
 
@@ -970,7 +1054,7 @@ export class Game {
   }
 
   _recordPlayerFrenzyCut(sliceCut) {
-    if (this.twMode.isSandboxActive()) return;
+    if (this.twMode.isTentacleWarsActive()) return;
 
     const sliceState = {
       sliceGestureCutTentacles: this._sliceGestureCutTentacles,
@@ -1006,6 +1090,7 @@ export class Game {
         tents: this.tents,
         liveOut: node => this._utils.liveOut(node),
         distanceCostMultiplier: this.cfg.distanceCostMultiplier,
+        obstacles: this.twObstacles,
       });
       el.style.left = (this.mx + 18) + 'px';
       el.style.top  = (this.my + 58) + 'px';
@@ -1019,6 +1104,7 @@ export class Game {
           'BUILD:' + previewModel.roundedBuildCost +
           ' RNG:' + previewModel.roundedRangeSurcharge +
           ' TOT:' + previewModel.roundedTotalBuildCost +
+          (previewModel.isBlockedByObstacle ? '  BLOCKED' : '') +
           '  ' + (previewModel.canAffordBuild ? '✓' : '✗ ' + (previewModel.roundedTotalBuildCost - previewModel.availableEnergy)) +
           '  SLT:' + previewModel.activeOutgoingTentacles + '/' + previewModel.maxTentacleSlots;
         el.style.color       = previewModel.canBuildTentacle ? '#00e5ff' : '#ff3d5a';
@@ -1123,6 +1209,7 @@ export class Game {
       tents: this.tents,
       liveOut: node => this._utils.liveOut(node),
       distanceCostMultiplier: this.cfg.distanceCostMultiplier,
+      obstacles: this.twObstacles,
     });
     if (this.cfg?.isTutorial && !this.tut.allowsClickIntent(clickIntent)) return false;
     this._applyPlayerClickIntent(clickIntent);

@@ -9,6 +9,7 @@ import { NodeType, GAMEPLAY_RULES } from '../config/gameConfig.js';
 import { computeNodeRadius, computeStableNodeLevel } from '../math/simulationMath.js';
 import { bus } from '../core/EventBus.js';
 import { computeNodeDisplayRegenRate } from '../systems/EnergyBudget.js';
+import { TW_BALANCE } from '../tentaclewars/TwBalance.js';
 import {
   computeTentacleWarsGradeFromEnergy,
   getTentacleWarsMaxTentacleSlots,
@@ -77,7 +78,7 @@ export class GameNode {
   get isRelay() { return this.type === NodeType.RELAY; }
   get maxSlots(){
     return this.simulationMode === 'tentaclewars'
-      ? getTentacleWarsMaxTentacleSlots()
+      ? getTentacleWarsMaxTentacleSlots(this.level)
       : PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[this.level];
   }
 
@@ -107,7 +108,11 @@ export class GameNode {
        grow slowly, or drain depending on outgoing commitment and clash pressure. */
     if (this.owner !== 0) {
       if (this.energy < this.maxE) {
-        this.energy = Math.min(this.maxE, this.energy + computeNodeDisplayRegenRate(this, frenzyActive) * dt);
+        let regenRate = computeNodeDisplayRegenRate(this, frenzyActive);
+        if (this.simulationMode === 'tentaclewars' && this.underAttack > 0.05) {
+          regenRate *= TW_BALANCE.PASSIVE_REGEN_FRACTION;
+        }
+        this.energy = Math.min(this.maxE, this.energy + regenRate * dt);
       }
     }
 

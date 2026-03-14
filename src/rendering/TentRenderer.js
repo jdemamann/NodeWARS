@@ -206,6 +206,109 @@ function colorWithAlpha(hexColor, alpha) {
   return `rgba(${red},${green},${blue},${alpha})`;
 }
 
+/* Approximate bezier length for glyph spacing without introducing render-only physics. */
+function estimateBezierLength(sx, sy, cpx, cpy, ex, ey, t0, t1, samples = 18) {
+  let total = 0;
+  let previous = computeBezierPoint(t0, sx, sy, cpx, cpy, ex, ey);
+  for (let sampleIndex = 1; sampleIndex <= samples; sampleIndex += 1) {
+    const t = t0 + (t1 - t0) * (sampleIndex / samples);
+    const point = computeBezierPoint(t, sx, sy, cpx, cpy, ex, ey);
+    total += Math.hypot(point.x - previous.x, point.y - previous.y);
+    previous = point;
+  }
+  return total;
+}
+
+/* Sample a truthful subset of real packets when the queue gets too dense to render all at once. */
+function sampleTentacleWarsPacketProgresses(packetTravelQueue, travelDuration, maxVisiblePackets) {
+  const safeDuration = Math.max(0.0001, travelDuration || 1);
+  const progresses = (packetTravelQueue || [])
+    .map(remainingTime => 1 - remainingTime / safeDuration)
+    .filter(progress => Number.isFinite(progress))
+    .map(progress => Math.max(0, Math.min(1, progress)))
+    .sort((left, right) => left - right);
+
+  if (progresses.length <= maxVisiblePackets) return progresses;
+
+  const sampled = [];
+  const lastIndex = progresses.length - 1;
+  for (let visibleIndex = 0; visibleIndex < maxVisiblePackets; visibleIndex += 1) {
+    const sourceIndex = Math.round((visibleIndex / Math.max(1, maxVisiblePackets - 1)) * lastIndex);
+    sampled.push(progresses[sourceIndex]);
+  }
+  return sampled;
+}
+
+/* Draw the original-style TentacleWars lane body as a thin line plus repeated chain glyphs. */
+function drawTentacleWarsChain(ctx, {
+  esx,
+  esy,
+  etx,
+  ety,
+  controlPoint,
+  laneStart,
+  laneEnd,
+  color,
+  flowRatio,
+  level,
+  highGraphics,
+}) {
+  if (laneEnd - laneStart < 0.02) return;
+
+  ctx.save();
+  ctx.beginPath();
+  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
+  ctx.strokeStyle = colorWithAlpha('#06111f', 0.58);
+  ctx.lineWidth = 2.2 + flowRatio * 0.6;
+  ctx.stroke();
+  ctx.beginPath();
+  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
+  ctx.strokeStyle = colorWithAlpha(color, 0.82);
+  ctx.lineWidth = 0.75 + level * 0.02;
+  sg(ctx, color, highGraphics ? 4 : 0);
+  ctx.stroke();
+  ctx.restore();
+
+  const laneLength = estimateBezierLength(esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
+  const glyphSpacing = 8.5;
+  const glyphCount = Math.max(2, Math.floor(laneLength / glyphSpacing));
+
+  for (let glyphIndex = 0; glyphIndex <= glyphCount; glyphIndex += 1) {
+    const laneT = laneStart + (laneEnd - laneStart) * (glyphIndex / glyphCount);
+    const glyphPoint = computeBezierPoint(laneT, esx, esy, controlPoint.x, controlPoint.y, etx, ety);
+    const behindPoint = computeBezierPoint(Math.max(0, laneT - 0.008), esx, esy, controlPoint.x, controlPoint.y, etx, ety);
+    const aheadPoint = computeBezierPoint(Math.min(1, laneT + 0.008), esx, esy, controlPoint.x, controlPoint.y, etx, ety);
+    const tangentX = aheadPoint.x - behindPoint.x;
+    const tangentY = aheadPoint.y - behindPoint.y;
+    const tangentLength = Math.hypot(tangentX, tangentY) || 1;
+    const normalX = -tangentY / tangentLength;
+    const normalY = tangentX / tangentLength;
+    const armHalf = 4.2 + flowRatio * 1.1;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(glyphPoint.x - normalX * armHalf, glyphPoint.y - normalY * armHalf);
+    ctx.lineTo(glyphPoint.x + normalX * armHalf, glyphPoint.y + normalY * armHalf);
+    ctx.strokeStyle = colorWithAlpha(color, 0.84);
+    ctx.lineWidth = 1.2;
+    sg(ctx, color, highGraphics ? 6 : 0);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(glyphPoint.x, glyphPoint.y, 1.5 + flowRatio * 0.18, 0, Math.PI * 2);
+    ctx.fillStyle = colorWithAlpha(color, 0.94);
+    ctx.fill();
+
+    if (highGraphics) {
+      ctx.beginPath();
+      ctx.arc(glyphPoint.x, glyphPoint.y, 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = colorWithAlpha('#ffffff', 0.55);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
 /* Draw the split TentacleWars cut retraction so both halves snap back visibly. */
 function drawTentacleWarsCutRetraction(ctx, tentacle, {
   esx,
@@ -280,31 +383,30 @@ function drawTentacleWarsCutRetraction(ctx, tentacle, {
   });
 }
 
-/* Overlay moving packet beads so TentacleWars lanes stay readable under overlap. */
-function drawTentacleWarsPacketMarkers(ctx, {
+/* Draw truthful energy packets from the live packet queue so the TW lane is audit-friendly. */
+function drawTentacleWarsEnergyPackets(ctx, {
   esx,
   esy,
   etx,
   ety,
   controlPoint,
-  color,
-  flowRatio,
-  renderNow,
+  packetTravelQueue,
+  travelDuration,
   laneStart,
   laneEnd,
   highGraphics,
 }) {
   if (laneEnd - laneStart < 0.08) return;
 
-  const packetCount = highGraphics ? 4 : 3;
-  const drift = (renderNow * 0.00042 * (0.7 + flowRatio * 0.9)) % 1;
-  for (let packetIndex = 0; packetIndex < packetCount; packetIndex += 1) {
-    const phase = (drift + packetIndex / packetCount) % 1;
-    const laneT = laneStart + (laneEnd - laneStart) * phase;
+  const packetProgresses = sampleTentacleWarsPacketProgresses(packetTravelQueue, travelDuration, 12);
+  for (const progress of packetProgresses) {
+    if (progress < laneStart || progress > laneEnd) continue;
+    const laneT = laneStart + (laneEnd - laneStart) * ((progress - laneStart) / Math.max(0.0001, laneEnd - laneStart));
     const packetPoint = computeBezierPoint(laneT, esx, esy, controlPoint.x, controlPoint.y, etx, ety);
-    const packetRadius = highGraphics ? 3.1 + flowRatio * 1.3 : 2.5 + flowRatio * 0.9;
+    const packetRadius = highGraphics ? 6.0 : 4.8;
     const tangentAhead = computeBezierPoint(Math.min(1, laneT + 0.01), esx, esy, controlPoint.x, controlPoint.y, etx, ety);
     const packetAngle = Math.atan2(tangentAhead.y - packetPoint.y, tangentAhead.x - packetPoint.x);
+    const packetColor = '#f5c800';
 
     ctx.save();
     ctx.translate(packetPoint.x, packetPoint.y);
@@ -315,103 +417,19 @@ function drawTentacleWarsPacketMarkers(ctx, {
     ctx.fill();
     ctx.beginPath();
     ctx.ellipse(-packetRadius * 0.4, 0, packetRadius * 2, packetRadius * 1.25, 0, 0, Math.PI * 2);
-    ctx.fillStyle = colorWithAlpha(color, 0.18 + flowRatio * 0.08);
+    ctx.fillStyle = colorWithAlpha(packetColor, 0.30);
     ctx.fill();
     ctx.beginPath();
     ctx.ellipse(0, 0, packetRadius * 1.15, packetRadius * 0.82, 0, 0, Math.PI * 2);
-    ctx.fillStyle = colorWithAlpha(color, 0.92);
-    sg(ctx, color, highGraphics ? 9 : 5);
+    ctx.fillStyle = colorWithAlpha(packetColor, 0.95);
+    sg(ctx, packetColor, highGraphics ? 14 : 7);
     ctx.fill();
     ctx.beginPath();
     ctx.arc(packetRadius * 0.32, 0, Math.max(0.8, packetRadius * 0.34), 0, Math.PI * 2);
-    ctx.fillStyle = colorWithAlpha('#ffffff', 0.28);
+    ctx.fillStyle = colorWithAlpha('#fff5a8', 0.42);
     ctx.fill();
     ctx.restore();
   }
-}
-
-/* Give TentacleWars lanes a faint peristaltic halo so they read as tissue rather than UI wires. */
-function drawTentacleWarsMembranePulse(ctx, {
-  esx,
-  esy,
-  etx,
-  ety,
-  controlPoint,
-  color,
-  renderNow,
-  laneStart,
-  laneEnd,
-  flowRatio,
-}) {
-  if (laneEnd - laneStart < 0.15) return;
-
-  const pulseCenter = laneStart + (laneEnd - laneStart) * ((renderNow * 0.00024 * (0.7 + flowRatio * 0.8)) % 1);
-  const pulseSpan = 0.11 + flowRatio * 0.05;
-  const pulseStart = Math.max(laneStart, pulseCenter - pulseSpan * 0.5);
-  const pulseEnd = Math.min(laneEnd, pulseCenter + pulseSpan * 0.5);
-  if (pulseEnd - pulseStart < 0.03) return;
-
-  ctx.save();
-  ctx.beginPath();
-  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, pulseStart, pulseEnd);
-  ctx.strokeStyle = colorWithAlpha(color, 0.12 + flowRatio * 0.06);
-  ctx.lineWidth = 4.5 + flowRatio * 4.2;
-  sg(ctx, color, 9 + flowRatio * 7);
-  ctx.stroke();
-  ctx.restore();
-}
-
-/* Add a soft dark contour under TentacleWars lanes so dense overlaps stay separated. */
-function drawTentacleWarsLaneContour(ctx, {
-  esx,
-  esy,
-  etx,
-  ety,
-  controlPoint,
-  laneStart,
-  laneEnd,
-  flowRatio,
-  color,
-}) {
-  if (laneEnd - laneStart < 0.04) return;
-
-  ctx.save();
-  ctx.beginPath();
-  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
-  ctx.strokeStyle = colorWithAlpha('#02060d', 0.68 + flowRatio * 0.12);
-  ctx.lineWidth = 6.6 + flowRatio * 5.2;
-  ctx.stroke();
-
-  ctx.beginPath();
-  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
-  ctx.strokeStyle = colorWithAlpha(color, 0.22 + flowRatio * 0.08);
-  ctx.lineWidth = 4.9 + flowRatio * 3.5;
-  ctx.stroke();
-  ctx.restore();
-}
-
-/* Keep a colored inner spine on TentacleWars lanes so ownership stays readable in crowded corridors. */
-function drawTentacleWarsOwnershipSpine(ctx, {
-  esx,
-  esy,
-  etx,
-  ety,
-  controlPoint,
-  laneStart,
-  laneEnd,
-  color,
-  flowRatio,
-}) {
-  if (laneEnd - laneStart < 0.05) return;
-
-  ctx.save();
-  ctx.beginPath();
-  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
-  ctx.strokeStyle = colorWithAlpha(color, 0.72 + flowRatio * 0.14);
-  ctx.lineWidth = 1.5 + flowRatio * 1.05;
-  sg(ctx, color, 7 + flowRatio * 6);
-  ctx.stroke();
-  ctx.restore();
 }
 
 export class TentRenderer {
@@ -574,8 +592,9 @@ export class TentRenderer {
       drawTargetGrip(ctx, etx, ety, col, Math.max(4, wTip * 5.4), now, highGraphics);
       drawTransferSignature(ctx, t, etx, ety, col, now, highGraphics);
     }
+    ctx.save();
     if (isTentacleWarsLane) {
-      drawTentacleWarsLaneContour(ctx, {
+      drawTentacleWarsChain(ctx, {
         esx,
         esy,
         etx,
@@ -583,12 +602,12 @@ export class TentRenderer {
         controlPoint: cp,
         laneStart: sT,
         laneEnd: visEnd,
-        flowRatio: FR,
         color: col,
+        flowRatio: FR,
+        level: lvl,
+        highGraphics,
       });
-    }
-    ctx.save();
-    if (!atk || isRev) {
+    } else if (!atk || isRev) {
       /* Friendly / reversed: dashed bezier stroke — replaces expensive segment loop */
       ctx.beginPath();
       drawBezierSegment(ctx, esx, esy, cp.x, cp.y, etx, ety, sT, visEnd);
@@ -694,38 +713,14 @@ export class TentRenderer {
     }
 
     if (isTentacleWarsLane && t.state === TentState.ACTIVE && !isClash) {
-      drawTentacleWarsOwnershipSpine(ctx, {
+      drawTentacleWarsEnergyPackets(ctx, {
         esx,
         esy,
         etx,
         ety,
         controlPoint: cp,
-        laneStart: Math.max(sT, 0.03),
-        laneEnd: Math.max(Math.max(sT, 0.03), visEnd * 0.985),
-        color: col,
-        flowRatio: FR,
-      });
-      drawTentacleWarsMembranePulse(ctx, {
-        esx,
-        esy,
-        etx,
-        ety,
-        controlPoint: cp,
-        color: col,
-        renderNow,
-        laneStart: Math.max(sT, 0.04),
-        laneEnd: Math.max(Math.max(sT, 0.04), visEnd * 0.96),
-        flowRatio: FR,
-      });
-      drawTentacleWarsPacketMarkers(ctx, {
-        esx,
-        esy,
-        etx,
-        ety,
-        controlPoint: cp,
-        color: col,
-        flowRatio: FR,
-        renderNow,
+        packetTravelQueue: t.packetTravelQueue || [],
+        travelDuration: t.travelDuration || 1,
         laneStart: Math.max(sT, 0.04),
         laneEnd: Math.max(Math.max(sT, 0.04), visEnd * 0.96),
         highGraphics,
@@ -838,6 +833,15 @@ export class TentRenderer {
         ctx.setLineDash([2, 3]);
         ctx.stroke();
         ctx.setLineDash([]);
+
+        ctx.beginPath();
+        ctx.moveTo(sp.x - 9, sp.y);
+        ctx.lineTo(sp.x + 9, sp.y);
+        ctx.moveTo(sp.x, sp.y - 9);
+        ctx.lineTo(sp.x, sp.y + 9);
+        ctx.strokeStyle = colorWithAlpha('#ffffff', 0.22 + spark * 0.12);
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
 
       /* 8 spark rays, rotating */

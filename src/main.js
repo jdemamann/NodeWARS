@@ -17,6 +17,13 @@ import {
 } from './ui/ScreenController.js';
 import { LEVELS } from './config/gameConfig.js';
 import { buildTentacleWarsDebugMetrics } from './tentaclewars/TwDebugMetrics.js';
+import {
+  applyTentacleWarsPreviewWorldJump,
+  getTentacleWarsPreviewLevelById,
+  getTentacleWarsPreviewWorldEntryLevel,
+  listTentacleWarsPreviewLevelIds,
+  parseTentacleWarsPreviewFlags,
+} from './tentaclewars/TwCampaignPreview.js';
 
 function $id(id) { return document.getElementById(id); }
 
@@ -36,6 +43,35 @@ STATE.loadSettings();
 })();
 
 let game;
+
+/* Read runtime-only TW preview flags without persisting them into normal settings. */
+function getRuntimeQueryFlags() {
+  return parseTentacleWarsPreviewFlags(window.location.search);
+}
+
+/* Loads one preview TW authored level from the fixture pack through the live runtime. */
+function loadTentacleWarsPreviewLevel(levelId) {
+  const levelData = getTentacleWarsPreviewLevelById(levelId);
+  if (!levelData || !game) return false;
+
+  STATE.setDebugMode(true);
+  STATE.setGameMode('tentaclewars');
+  applyTentacleWarsPreviewWorldJump(levelData.world);
+  STATE.setTentacleWarsCurrentLevel(levelData.id);
+  showScr(null);
+  game.loadTentacleWarsCampaignLevel(levelData);
+  refreshSettingsUI();
+  return true;
+}
+
+/* Exposes later TW worlds for preview without mutating NodeWARS progression. */
+function jumpTentacleWarsPreviewWorld(worldId) {
+  STATE.setDebugMode(true);
+  STATE.setGameMode('tentaclewars');
+  const worldEntryLevelId = applyTentacleWarsPreviewWorldJump(worldId);
+  refreshSettingsUI();
+  return worldEntryLevelId;
+}
 
 function buildTrackNotification(trackInfo) {
   if (!trackInfo) return null;
@@ -62,6 +98,15 @@ function initGame() {
 
   try {
     game = new Game(canvas);
+    window.__NODEWARS_DEBUG__ = {
+      getGame: () => game,
+      STATE,
+      twCampaign: {
+        listFixtureLevels: () => listTentacleWarsPreviewLevelIds(),
+        loadLevelById: levelId => loadTentacleWarsPreviewLevel(levelId),
+        jumpWorld: worldId => jumpTentacleWarsPreviewWorld(worldId),
+      },
+    };
     Screens.setGame(game);
     if (typeof Music.setTrackChangeListener === 'function') {
       Music.setTrackChangeListener(trackInfo => {
@@ -99,7 +144,33 @@ function initGame() {
   const reveal = () => {
     if (boot) boot.style.display = 'none';
     fade.classList.remove('in');
-    showScr('menu');
+    const runtimeQueryFlags = getRuntimeQueryFlags();
+    if (runtimeQueryFlags.twDebug) {
+      STATE.setDebugMode(true);
+      document.documentElement.dataset.debugLogoPreview = 'on';
+    }
+    if (runtimeQueryFlags.twMode === 'tentaclewars') {
+      STATE.setGameMode('tentaclewars');
+    }
+    if (runtimeQueryFlags.twWorld && STATE.getGameMode() === 'tentaclewars') {
+      applyTentacleWarsPreviewWorldJump(runtimeQueryFlags.twWorld);
+    }
+    if (runtimeQueryFlags.twAutostart && STATE.getGameMode() === 'tentaclewars') {
+      const previewLevel = runtimeQueryFlags.twLevelId
+        ? getTentacleWarsPreviewLevelById(runtimeQueryFlags.twLevelId)
+        : getTentacleWarsPreviewWorldEntryLevel(runtimeQueryFlags.twWorld);
+
+      showScr(null);
+      if (previewLevel) {
+        applyTentacleWarsPreviewWorldJump(previewLevel.world);
+        STATE.setTentacleWarsCurrentLevel(previewLevel.id);
+        game.loadTentacleWarsCampaignLevel(previewLevel);
+      } else {
+        game.enterSelectedMode();
+      }
+    } else {
+      showScr('menu');
+    }
     _startAudio();
   };
   requestAnimationFrame(() => requestAnimationFrame(reveal));

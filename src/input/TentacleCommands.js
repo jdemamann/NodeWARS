@@ -7,6 +7,7 @@
 
 import { TentState } from '../config/gameConfig.js';
 import { computeBuildCost, computeDistance } from '../math/simulationMath.js';
+import { canCreateTentacleWarsLane, findBlockingTentacleWarsObstacle } from '../tentaclewars/TwObstacleRuntime.js';
 import { computeTentacleWarsBuildCost } from '../tentaclewars/TwTentacleEconomy.js';
 
 /*
@@ -16,7 +17,7 @@ import { computeTentacleWarsBuildCost } from '../tentaclewars/TwTentacleEconomy.
 export function computeTentacleBuildCost(sourceNode, targetNode, distanceCostMultiplier) {
   const distance = computeDistance(sourceNode.x, sourceNode.y, targetNode.x, targetNode.y);
   if (sourceNode?.simulationMode === 'tentaclewars') {
-    const linearBuildCost = computeTentacleWarsBuildCost(distance);
+    const linearBuildCost = computeTentacleWarsBuildCost(distance, undefined, sourceNode?.twCostNormalizer);
     return {
       distance,
       baseBuildCost: linearBuildCost,
@@ -34,6 +35,18 @@ export function computeTentacleBuildCost(sourceNode, targetNode, distanceCostMul
     rangeSurcharge,
     totalBuildCost: baseBuildCost + rangeSurcharge,
   };
+}
+
+/* TentacleWars authored obstacles must gate lane creation canonically. */
+export function findTentacleBuildBlocker(sourceNode, targetNode, obstacles) {
+  if (sourceNode?.simulationMode !== 'tentaclewars') return null;
+  return findBlockingTentacleWarsObstacle(obstacles, sourceNode, targetNode);
+}
+
+/* Single gate for player, AI, and preview build validation. */
+export function canCreateTentacleConnection(sourceNode, targetNode, obstacles) {
+  if (sourceNode?.simulationMode !== 'tentaclewars') return true;
+  return canCreateTentacleWarsLane(obstacles, sourceNode, targetNode);
 }
 
 export function findDirectedTentacle(tents, sourceNode, targetNode) {

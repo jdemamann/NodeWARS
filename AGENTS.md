@@ -139,6 +139,7 @@ Planning / balance:
 - `docs/project/campaign-balance-wave-b-plan.md`
 - `docs/project/linux-audio-extraction-playbook.md`
 - `docs/project/commentary-header-template.md`
+- `docs/project/lessons-codex.md`
 
 Domain agents:
 
@@ -209,6 +210,7 @@ When rebuilding a soundtrack track from an authored audio file:
 - If changing campaign progression, tutorial completion, or skip flow, keep `GameState` as the canonical source of next-level and unlock rules.
 - If changing campaign layouts, run both `smoke-checks` and `campaign-sanity`.
 - If changing world systems or simulation math, run `simulation-soak` too.
+- Before reporting a task result as validated, check that your evidence directly measures what you claim, not a proxy or a window that includes unrelated phases (build time, travel time, warm-up).
 
 ## Safe Restart Point For New Skills
 

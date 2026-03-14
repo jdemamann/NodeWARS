@@ -7,6 +7,10 @@
    ================================================================ */
 
 import { T } from '../localization/i18n.js';
+import {
+  getTentacleWarsScenarioPreset,
+  resolveTentacleWarsScenarioPresetId,
+} from './TwScenarioPresets.js';
 
 export const TW_SANDBOX_LEVEL_ID = 'TW-SBX';
 
@@ -17,10 +21,17 @@ export const TW_SANDBOX_LEVEL_ID = 'TW-SBX';
  * of campaign progression or level unlock flow.
  */
 export function buildTentacleWarsSandboxConfig() {
+  const presetId = resolveTentacleWarsScenarioPresetId();
+  const presetLayout = presetId != null && typeof window !== 'undefined'
+    ? getTentacleWarsScenarioPreset(presetId, window.innerWidth, window.innerHeight)
+    : null;
+
   return {
     id: TW_SANDBOX_LEVEL_ID,
-    name: T('twSandboxName'),
+    name: presetLayout ? `${T('twSandboxName')} · ${presetLayout.label}` : T('twSandboxName'),
     isTentacleWarsSandbox: true,
+    twPresetId: presetId,
+    fixedLayout: presetLayout,
     suppressWorldBanner: true,
     worldId: 0,
     isTutorial: false,
