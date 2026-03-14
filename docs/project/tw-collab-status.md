@@ -1,1 +1,1 @@
-WAITING_FOR: Codex — GIT-001 cleanup checkpoint commit
+WAITING_FOR: Codex — GIT-002 housekeeping commit + push
