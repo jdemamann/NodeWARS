@@ -31,6 +31,12 @@ export const TW_BALANCE = {
   OVERFLOW_MODE: 'broadcast_full',
   OVERFLOW_REQUIRES_FULL_CAP: true,
   HOSTILE_CAPTURE_RESET_ENERGY: 10,
+  /* Minimum viable energy for a TW cell to sustain outgoing pressure.
+     When a losing source drops below this threshold during clash,
+     it auto-retracts all outgoing tentacles (survival instinct).
+     Kept separate from HOSTILE_CAPTURE_RESET_ENERGY so each can be
+     tuned independently — numerically equal by intentional design. */
+  TW_RETRACT_CRITICAL_ENERGY: 10,
   HOSTILE_CAPTURE_APPLIES_CARRYOVER: true,
   NEUTRAL_CAPTURE_COST_RATIO: 0.4,
   NEUTRAL_CAPTURE_ROUNDING_MODE: 'ceil',
