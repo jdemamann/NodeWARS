@@ -6,7 +6,7 @@ Implemented the continuity/audit wave in four commits on `main`:
 1. `4f38e5d` — `docs: create RESUME.md and archive stale session files`
 2. `90c682c` — `docs: align boot chain to 4-step cold-start order`
 3. `ddea925` — `feat(audit): add doc-audit.mjs for boot-chain integrity`
-4. `f4ebf64` — `docs: close continuity references after doc audit`
+4. `748f57a` — `docs: close continuity references after doc audit`
 
 Wave B result:
 - created `docs/project/RESUME.md` as the live cold-start state file
