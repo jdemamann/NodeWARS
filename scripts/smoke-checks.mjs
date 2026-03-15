@@ -9,6 +9,122 @@ const ROOT = path.resolve(__dirname, '..');
 
 const load = rel => import(path.join(ROOT, rel));
 
+// ── TW clash test helpers ────────────────────────────────────────────────────
+
+async function makeTwFixtures({ energyA = 50, energyB = 50, maxE = 60 } = {}) {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const { Tent } = await load('src/entities/Tent.js');
+  const { TentState } = await load('src/config/gameConfig.js');
+  const { Physics } = await load('src/systems/Physics.js');
+
+  const sourceA = new GameNode(0, 0, 0, energyA, 1);
+  const sourceB = new GameNode(1, 100, 0, energyB, 2);
+  sourceA.maxE = maxE;
+  sourceB.maxE = maxE;
+  sourceA.simulationMode = 'tentaclewars';
+  sourceB.simulationMode = 'tentaclewars';
+
+  // _isCanonicalClashDriver uses this.source.id < this.target.id (original fields,
+  // NOT effectiveSourceNode.id). With sourceA.id=0 < sourceB.id=1, tentA is canonical.
+  // Neither tentacle has reversed=true in this fixture; reversed tentacles are out of scope.
+  const tentA = new Tent(sourceA, sourceB, 0);
+  const tentB = new Tent(sourceB, sourceA, 0);
+  tentA.state = TentState.ACTIVE;
+  tentB.state = TentState.ACTIVE;
+  tentA.clashPartner = tentB;
+  tentB.clashPartner = tentA;
+  tentA.clashT = 0.5;
+  tentB.clashT = 0.5;
+  tentA.reachT = 1;
+  tentB.reachT = 1;
+
+  const game = { nodes: [sourceA, sourceB], tents: [tentA, tentB], _frame: 0, fogDirty: false };
+  tentA.game = game;
+  tentB.game = game;
+
+  Physics.updateOutCounts(game);
+
+  return { sourceA, sourceB, tentA, tentB, TentState };
+}
+
+async function testTwClashDamageAppliesToLosingNode() {
+  const { sourceA, sourceB, tentA, tentB } = await makeTwFixtures({ energyA: 50, energyB: 50 });
+
+  // Give tentA an overflow boost so it wins
+  tentA.twOverflowShare = 5;
+  tentB.twOverflowShare = 0;
+
+  const energyBefore = sourceB.energy;
+
+  tentB._updateClashState(0.1); // non-canonical: Block A only
+  tentA._updateClashState(0.1); // canonical: Block A + Block B
+
+  // sourceB should have lost energy (net damage from A's advantage)
+  assert.ok(
+    sourceB.energy < energyBefore,
+    `TW clash should drain losing source: expected < ${energyBefore}, got ${sourceB.energy}`,
+  );
+}
+
+async function testTwClashThresholdTriggersRetractAndAdvance() {
+  // Sub-case A: sourceB pre-starts below TW_RETRACT_CRITICAL_ENERGY (9 < 10).
+  {
+    const { sourceA, sourceB, tentA, tentB, TentState } = await makeTwFixtures({
+      energyA: 50,
+      energyB: 9, // starts below threshold
+      maxE: 60,
+    });
+
+    tentA.twOverflowShare = 10;
+    tentB.twOverflowShare = 0;
+
+    tentB._updateClashState(0.1);
+    tentA._updateClashState(0.1);
+
+    assert.equal(tentB.state, TentState.RETRACTING,
+      '[A] losing tentacle should auto-retract when source starts below TW_RETRACT_CRITICAL_ENERGY');
+    assert.equal(tentA.state, TentState.ADVANCING,
+      '[A] winning tentacle should auto-advance after enemy retracts');
+    assert.equal(tentA.clashPartner, null, '[A] winning tentacle clash pair should be cleared');
+    assert.equal(tentB.clashPartner, null, '[A] losing tentacle clash pair should be cleared');
+  }
+
+  // Sub-case B: sourceB starts at 12, large overflow crosses threshold from above.
+  {
+    const { sourceA, sourceB, tentA, tentB, TentState } = await makeTwFixtures({
+      energyA: 50,
+      energyB: 12,
+      maxE: 60,
+    });
+
+    tentA.twOverflowShare = 50;
+    tentB.twOverflowShare = 0;
+
+    tentB._updateClashState(0.1);
+    tentA._updateClashState(0.1);
+
+    assert.ok(sourceB.energy < 10,
+      '[B] sourceB energy should be below TW_RETRACT_CRITICAL_ENERGY after large overflow damage');
+    assert.equal(tentB.state, TentState.RETRACTING,
+      '[B] losing tentacle should auto-retract when damage crosses the critical threshold');
+    assert.equal(tentA.state, TentState.ADVANCING,
+      '[B] winning tentacle should auto-advance after crossing-the-threshold retract');
+  }
+}
+
+async function testTwClashFlowRateStaysAliveOnBothSides() {
+  const { tentA, tentB } = await makeTwFixtures({ energyA: 50, energyB: 50 });
+
+  tentA.flowRate = 0;
+  tentB.flowRate = 0;
+
+  tentB._updateClashState(0.1); // Block A runs for non-canonical
+  tentA._updateClashState(0.1); // Block A + Block B for canonical
+
+  assert.ok(tentA.flowRate > 0, 'canonical tentacle flowRate should be positive during TW clash');
+  assert.ok(tentB.flowRate > 0, 'non-canonical tentacle flowRate should be positive during TW clash');
+}
+
 async function listJsFiles(dir) {
   const entries = await fs.readdir(path.join(ROOT, dir), { withFileTypes: true });
   const files = [];
@@ -2657,6 +2773,9 @@ async function main() {
     ['TentacleWars AI observability logs all candidates before pick loop', testTwAiObservabilityLogsAllCandidatesBeforePick],
     ['TentacleWars AI tactical state classifier returns valid states for all board shapes', testTwAiTacticalStateClassifier],
     ['TentacleWars AI tactical state modulates scoring by intent', testTwAiTacticalStateModulatesScoring],
+    ['TentacleWars clash damage applies to losing source node', testTwClashDamageAppliesToLosingNode],
+    ['TentacleWars clash threshold triggers auto-retract and auto-advance', testTwClashThresholdTriggersRetractAndAdvance],
+    ['TentacleWars clash flowRate stays alive on both tentacle sides', testTwClashFlowRateStaysAliveOnBothSides],
   ];
 
   let passed = 0;
