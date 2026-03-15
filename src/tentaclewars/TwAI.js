@@ -15,6 +15,7 @@ import { areHostileOwners } from '../systems/OwnerTeams.js';
 import { TW_BALANCE } from './TwBalance.js';
 import { computeTentacleWarsBuildCost } from './TwTentacleEconomy.js';
 import {
+  buildTwAiTacticalState,
   buildTentacleWarsMoveScore,
   scoreTentacleWarsSliceOpportunity,
 } from './TwAIScoring.js';
@@ -87,6 +88,7 @@ export class TwAI {
   _think() {
     const sourceNodes = this.game.nodes.filter(sourceNode => this._canUseSourceNode(sourceNode));
     if (!sourceNodes.length) return;
+    const tacticalState = buildTwAiTacticalState(this.game, this.owner);
 
     const candidateMoves = [];
     sourceNodes.forEach(sourceNode => {
@@ -115,6 +117,7 @@ export class TwAI {
           sourceNode,
           targetNode,
           totalBuildCost: buildCost,
+          tacticalState,
         });
 
         if (score <= 0) return;

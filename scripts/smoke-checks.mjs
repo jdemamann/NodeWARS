@@ -2466,6 +2466,99 @@ async function testTwAiObservabilityLogsAllCandidatesBeforePick() {
   );
 }
 
+async function testTwAiTacticalStateClassifier() {
+  const { buildTwAiTacticalState } = await load('src/tentaclewars/TwAIScoring.js');
+
+  const n = overrides => ({
+    id: Math.floor(Math.random() * 9999),
+    owner: 2,
+    energy: 50,
+    maxE: 100,
+    underAttack: 0,
+    ...overrides,
+  });
+
+  const gameExpand = {
+    nodes: [
+      n({ owner: 2, energy: 30, maxE: 100 }),
+      n({ owner: 0, energy: 20, maxE: 60 }),
+    ],
+  };
+  assert.equal(
+    buildTwAiTacticalState(gameExpand, 2),
+    'expand',
+    'No overflow-ready source should yield expand'
+  );
+
+  const gamePressure = {
+    nodes: [
+      n({ owner: 2, energy: 75, maxE: 100 }),
+      n({ owner: 1, energy: 60, maxE: 100 }),
+    ],
+  };
+  assert.equal(
+    buildTwAiTacticalState(gamePressure, 2),
+    'pressure',
+    'Overflow-ready source with no low-energy hostile should yield pressure'
+  );
+
+  const gameFinish = {
+    nodes: [
+      n({ owner: 2, energy: 95, maxE: 100 }),
+      n({ owner: 1, energy: 20, maxE: 100 }),
+    ],
+  };
+  assert.equal(
+    buildTwAiTacticalState(gameFinish, 2),
+    'finish',
+    'Overflow-ready source with a low-energy hostile should yield finish'
+  );
+
+  for (const [game, idx] of [[gameExpand, 0], [gamePressure, 1], [gameFinish, 2]]) {
+    const state = buildTwAiTacticalState(game, 2);
+    assert.ok(
+      ['expand', 'pressure', 'finish'].includes(state),
+      `buildTwAiTacticalState must return a known state (case ${idx}), got: ${String(state)}`
+    );
+  }
+}
+
+async function testTwAiTacticalStateModulatesScoring() {
+  const { buildTentacleWarsMoveScore } = await load('src/tentaclewars/TwAIScoring.js');
+
+  const mockGame = { tents: [], nodes: [] };
+  const src = { id: 1, owner: 2, energy: 90, maxE: 100, x: 0, y: 0, outCount: 0 };
+  const hostile = { id: 2, owner: 1, energy: 20, maxE: 100, x: 200, y: 0, underAttack: 0, outCount: 0, contest: {} };
+  const neutral = { id: 3, owner: 0, energy: 20, maxE: 60, x: 200, y: 0, underAttack: 0, outCount: 0, contest: {} };
+  mockGame.nodes = [src, hostile, neutral];
+
+  const scoreHostile = state => buildTentacleWarsMoveScore({
+    game: mockGame,
+    owner: 2,
+    sourceNode: src,
+    targetNode: hostile,
+    totalBuildCost: 5,
+    tacticalState: state,
+  });
+  const scoreNeutral = state => buildTentacleWarsMoveScore({
+    game: mockGame,
+    owner: 2,
+    sourceNode: src,
+    targetNode: neutral,
+    totalBuildCost: 5,
+    tacticalState: state,
+  });
+
+  assert.ok(
+    scoreNeutral('expand') > scoreNeutral('pressure'),
+    'expand should weight neutral capture higher than pressure'
+  );
+  assert.ok(
+    scoreHostile('finish') > scoreHostile('expand'),
+    'finish should weight hostile pressure higher than expand'
+  );
+}
+
 async function main() {
   const tests = [
     ['relay nodes do not create free energy', testRelayNoFreeEnergy],
@@ -2562,6 +2655,8 @@ async function main() {
     ['TentacleWars AI observability guard is explicit and correctly placed', testTwAiObservabilityGuardIsExplicit],
     ['TentacleWars AI observability does not log when sources list is empty', testTwAiObservabilityDoesNotLogWhenSourcesEmpty],
     ['TentacleWars AI observability logs all candidates before pick loop', testTwAiObservabilityLogsAllCandidatesBeforePick],
+    ['TentacleWars AI tactical state classifier returns valid states for all board shapes', testTwAiTacticalStateClassifier],
+    ['TentacleWars AI tactical state modulates scoring by intent', testTwAiTacticalStateModulatesScoring],
   ];
 
   let passed = 0;

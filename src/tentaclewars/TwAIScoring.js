@@ -11,6 +11,27 @@ import { TentState } from '../config/gameConfig.js';
 import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
 import { TW_BALANCE } from './TwBalance.js';
 
+const TACTICAL_WEIGHTS = Object.freeze({
+  expand: Object.freeze({
+    neutralCapture: 1.4,
+    overflowPressure: 0.85,
+    hostilePressure: 0.85,
+    alliedSupport: 1.0,
+  }),
+  pressure: Object.freeze({
+    neutralCapture: 0.8,
+    overflowPressure: 1.35,
+    hostilePressure: 1.25,
+    alliedSupport: 0.9,
+  }),
+  finish: Object.freeze({
+    neutralCapture: 0.4,
+    overflowPressure: 1.1,
+    hostilePressure: 1.55,
+    alliedSupport: 0.7,
+  }),
+});
+
 /*
  * Overflow pressure matters more when the source is already saturated, because
  * the prototype mode is meant to reward support triangles and full-cell spill.
@@ -89,15 +110,17 @@ export function buildTentacleWarsMoveScore({
   sourceNode,
   targetNode,
   totalBuildCost,
+  tacticalState = 'expand',
   balance = TW_BALANCE,
 }) {
+  const weights = TACTICAL_WEIGHTS[tacticalState] || TACTICAL_WEIGHTS.expand;
   const distance = computeDistance(sourceNode.x, sourceNode.y, targetNode.x, targetNode.y);
   const distanceScore = balance.AI_DISTANCE_PRESSURE_FACTOR / (distance + 60);
-  const overflowBonus = computeOverflowPressureBonus(sourceNode, balance);
+  const overflowBonus = computeOverflowPressureBonus(sourceNode, balance) * weights.overflowPressure;
   const supportTriangleBonus = computeSupportTriangleBonus(game, sourceNode, targetNode, owner, balance);
-  const hostilePressureScore = computeHostilePressureScore(targetNode, owner, balance);
-  const neutralPressureScore = computeNeutralPressureScore(game, targetNode, owner, balance);
-  const alliedSupportScore = computeAlliedSupportScore(targetNode, owner, balance);
+  const hostilePressureScore = computeHostilePressureScore(targetNode, owner, balance) * weights.hostilePressure;
+  const neutralPressureScore = computeNeutralPressureScore(game, targetNode, owner, balance) * weights.neutralCapture;
+  const alliedSupportScore = computeAlliedSupportScore(targetNode, owner, balance) * weights.alliedSupport;
   const economicPenalty = totalBuildCost * 0.22;
 
   return distanceScore + overflowBonus + supportTriangleBonus +
@@ -125,4 +148,33 @@ export function scoreTentacleWarsSliceOpportunity({
   if (sourceNode.energy >= sourceNode.maxE * 0.9) score += balance.AI_PURPLE_SLICE_OVERFLOW_SOURCE_BONUS;
   if (tentacle.state === TentState.ADVANCING) score += 8;
   return score;
+}
+
+/*
+ * Classifies the current board into a lightweight TW tactical intent.
+ * Uses local board signals so multi-faction authored maps do not depend on
+ * a single hostile-owner count that may not exist in the runtime.
+ */
+export function buildTwAiTacticalState(game, owner, balance = TW_BALANCE) {
+  const overflowThreshold = balance.AI_PRESSURE_OVERFLOW_THRESHOLD;
+  const finishFraction = balance.AI_FINISH_LOW_ENERGY_FRACTION;
+
+  let hasOverflowReadySource = false;
+  for (const node of game.nodes) {
+    if (node.owner !== owner) continue;
+    if (node.maxE > 0 && node.energy / node.maxE >= overflowThreshold) {
+      hasOverflowReadySource = true;
+      break;
+    }
+  }
+
+  if (!hasOverflowReadySource) return 'expand';
+
+  for (const node of game.nodes) {
+    if (node.owner === owner || node.owner === 0) continue;
+    if (!areHostileOwners(owner, node.owner)) continue;
+    if (node.maxE > 0 && node.energy / node.maxE < finishFraction) return 'finish';
+  }
+
+  return 'pressure';
 }
