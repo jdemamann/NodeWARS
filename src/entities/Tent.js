@@ -79,6 +79,9 @@ export class Tent {
 
     /* Visual */
     this.flowRate    = 0;
+    /* TentacleWars overflow share — pre-assigned by Physics.js each frame.
+       Zero by default; only meaningful in TW mode with a full support triangle. */
+    this.twOverflowShare = 0;
     this.cutPoint    = undefined;
     this.cutFlash    = 0;
     this.age         = 0;
