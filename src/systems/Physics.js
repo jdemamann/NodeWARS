@@ -9,7 +9,6 @@
 import { TentState } from '../config/gameConfig.js';
 import {
   captureRelayFeedBudget,
-  captureTentacleWarsOverflowBudget,
   computeNodeTentacleFeedRate,
 } from './EnergyBudget.js';
 import { distributeTentacleWarsOverflow } from '../tentaclewars/TwEnergyModel.js';
@@ -25,7 +24,12 @@ export class Physics {
       /* Relay rule: only last frame's received flow can be forwarded this frame.
          Relays are infrastructure, not generators. */
       n.relayFeedBudget = captureRelayFeedBudget(n);
-      n.twOverflowBudget = captureTentacleWarsOverflowBudget(n);
+      /* twOverflowBudget: retain last frame's value as-is — it was accumulated by
+         applyTentacleFriendlyFlow during the previous frame and already contains only
+         the true excess (energy that arrived when the node was at max).
+         captureTentacleWarsOverflowBudget is NOT called here because it returned
+         inFlow (total incoming including absorbed energy), inflating outgoing boost
+         and causing the node to drain faster than incoming support could heal it. */
       n.outCount = 0;
       n.inFlow   = 0;
     }
@@ -78,6 +82,14 @@ export class Physics {
       const idx = perNodeCounter.get(src.id) ?? 0;
       t.twOverflowShare = laneOverflowShares[idx] ?? 0;
       perNodeCounter.set(src.id, idx + 1);
+    }
+
+    /* Step 4d: zero twOverflowBudget on all TW nodes so applyTentacleFriendlyFlow
+       can re-accumulate the real overflow (true excess only, after feeding the node)
+       during this frame. Pass 4 already read and distributed the prior-frame value. */
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.simulationMode === 'tentaclewars' && !n.isRelay) n.twOverflowBudget = 0;
     }
   }
 }
