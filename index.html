@@ -20,7 +20,7 @@
 
 <!-- HUD -->
 <div id="hud">
-  <div class="hl">NODE WARS</div>
+  <div class="hl" id="hbrand">NODE WARS</div>
   <div class="hs"></div>
   <div class="hst hp"><div class="lb">YOU</div><div class="vl" id="sp">0</div></div>
   <div class="hs"></div>
@@ -66,6 +66,7 @@
     <div class="hero-logo__node hero-logo__node--b"></div>
     <div class="hero-logo__node hero-logo__node--c"></div>
   </div>
+  <img class="hero-logo-preview" src="assets/logo.png" alt="NODE WARS debug logo preview">
   <div class="mt">
     <span class="mt-top">NODE</span>
     <span class="mt-bottom">WARS</span>
@@ -73,6 +74,7 @@
   <div class="ms" id="msub">The network is alive. Energy flows. Nodes evolve.<br>Dominate the grid — or be consumed by it.</div>
   <div class="mbtns">
     <button class="btn" id="btnplay"><span data-t="startCampaign">▶ START CAMPAIGN</span></button>
+    <button class="btn" id="btntw"><span>TENTACLE WARS</span></button>
     <button class="btn sec" id="btnstory"><span data-t="theStory">◈ THE STORY</span></button>
     <button class="btn sec btn-menu-sub" id="btnsettings"><span data-t="settings">⚙ SETTINGS</span></button>
     <button class="btn sec btn-menu-sub" id="btncredits"><span data-t="credits">◈ CREDITS</span></button>
@@ -83,23 +85,6 @@
 <div class="scr off" id="sq">
   <div class="st" data-t="settings">⚙ SETTINGS</div>
   <div class="settings-body" id="settingsBody">
-    <div class="sgroup" id="worldUnlockGroup">
-      <div class="sgroup-title" data-t="setWorlds">🌍 WORLDS</div>
-      <div class="srow">
-        <div class="slabel">
-          <span class="sw2col" data-t="setW2">⊗ WORLD 2: THE VOID</span>
-          <span class="sdesc" data-t="setW2desc">Hazardous vortexes drain energy in transit</span>
-        </div>
-        <button class="stoggle" id="togW2">OFF</button>
-      </div>
-      <div class="srow">
-        <div class="slabel">
-          <span class="sw3col" data-t="setW3">⚡ WORLD 3: NEXUS PRIME</span>
-          <span class="sdesc" data-t="setW3desc">Relays boost flow · Pulsars broadcast energy</span>
-        </div>
-        <button class="stoggle" id="togW3">OFF</button>
-      </div>
-    </div>
     <div class="sgroup">
       <div class="sgroup-title" data-t="setGameplay">🎮 GAMEPLAY</div>
       <div class="srow">
@@ -190,31 +175,55 @@
         </div>
         <button class="stoggle" id="togDebug">OFF</button>
       </div>
-      <div class="srow" id="debugResetRow">
-        <div class="slabel">
-          <span class="danger-label" data-t="setReset">⚠ RESET PROGRESS</span>
-          <span class="sdesc" data-t="setResetDesc">Clears all stars and completed levels</span>
+      <div class="sgroup-subcard" id="debugSettingsGroup">
+        <div class="sgroup-subcard-title" data-t="setDeveloper">🛠 DEVELOPER</div>
+        <div class="srow" id="modeGroup">
+          <div class="slabel">
+            <span data-t="setGameMode">GAME MODE</span>
+            <span class="sdesc" data-t="setGameModeDesc">Switch between the stable live mode and the TentacleWars prototype track</span>
+          </div>
+          <button class="stoggle" id="btnModeCycle">NODEWARS</button>
         </div>
-        <button class="stoggle sdanger" id="btnResetProg">RESET</button>
-      </div>
-      <div class="srow" id="debugCopyRow">
-        <div class="slabel">
-          <span class="copy-label" data-t="setCopyDebug">COPY SNAPSHOT</span>
-          <span class="sdesc" data-t="setCopyDebugDesc">Copy runtime diagnostics to the clipboard</span>
+        <div class="srow" id="worldUnlockGroup">
+          <div class="slabel">
+            <span class="sw2col" data-t="setW2">⊗ WORLD 2: THE VOID</span>
+            <span class="sdesc" data-t="setW2desc">Hazardous vortexes drain energy in transit</span>
+          </div>
+          <button class="stoggle" id="togW2">OFF</button>
         </div>
-        <button class="stoggle" id="btnCopyDebug">COPY</button>
-      </div>
-      <div class="srow" id="debugEndingRow">
-        <div class="slabel">
-          <span class="copy-label" data-t="setViewEnding">VIEW CAMPAIGN ENDING</span>
-          <span class="sdesc" data-t="setViewEndingDesc">Preview the final epilogue screen without beating the campaign</span>
+        <div class="srow">
+          <div class="slabel">
+            <span class="sw3col" data-t="setW3">⚡ WORLD 3: NEXUS PRIME</span>
+            <span class="sdesc" data-t="setW3desc">Relays boost flow · Pulsars broadcast energy</span>
+          </div>
+          <button class="stoggle" id="togW3">OFF</button>
         </div>
-        <button class="stoggle" id="btnViewEnding" data-t="viewEnding">VIEW</button>
+        <div class="srow" id="debugResetRow">
+          <div class="slabel">
+            <span class="danger-label" data-t="setReset">⚠ RESET PROGRESS</span>
+            <span class="sdesc" data-t="setResetDesc">Clears all stars and completed levels</span>
+          </div>
+          <button class="stoggle sdanger" id="btnResetProg">RESET</button>
+        </div>
+        <div class="srow" id="debugCopyRow">
+          <div class="slabel">
+            <span class="copy-label" data-t="setCopyDebug">COPY SNAPSHOT</span>
+            <span class="sdesc" data-t="setCopyDebugDesc">Copy runtime diagnostics to the clipboard</span>
+          </div>
+          <button class="stoggle" id="btnCopyDebug">COPY</button>
+        </div>
+        <div class="srow" id="debugEndingRow">
+          <div class="slabel">
+            <span class="copy-label" data-t="setViewEnding">VIEW CAMPAIGN ENDING</span>
+            <span class="sdesc" data-t="setViewEndingDesc">Preview the final epilogue screen without beating the campaign</span>
+          </div>
+          <button class="stoggle" id="btnViewEnding" data-t="viewEnding">VIEW</button>
+        </div>
+        <div class="debug-info" id="debugInfoPanel">
+          <div class="debug-info-title">DEBUG INFO</div>
+          <div id="debugInfoText" class="debug-info-text"></div>
+        </div>
       </div>
-    </div>
-    <div class="debug-info" id="debugInfoPanel">
-      <div class="debug-info-title">DEBUG INFO</div>
-      <div id="debugInfoText" class="debug-info-text"></div>
     </div>
   </div>
   <div class="screen-actions screen-actions-top">
@@ -231,6 +240,32 @@
     <button class="btn sec sm" id="btnback">← MENU</button>
     <div id="worldDesc"></div>
   </div>
+</div>
+
+<!-- TentacleWars World Select -->
+<div class="scr off" id="stw">
+  <div class="st">TENTACLE WARS</div>
+  <div id="twWorldSummary"></div>
+  <div class="lg" id="twWorldGrid"></div>
+  <div class="screen-actions screen-actions-inline">
+    <button class="btn sec sm" id="btnTwWorldBack">← MENU</button>
+  </div>
+</div>
+
+<!-- TentacleWars Level Select -->
+<div class="scr off" id="stwl">
+  <div class="st" id="twLevelTitle">WORLD 1</div>
+  <div id="twLevelMeta"></div>
+  <div class="lg" id="twLevelGrid"></div>
+  <div class="screen-actions screen-actions-inline">
+    <button class="btn sec sm" id="btnTwLevelBack">← WORLDS</button>
+  </div>
+</div>
+
+<!-- TentacleWars Campaign Ending -->
+<div class="scr off" id="stwe">
+  <div id="twEndingContent"></div>
+  <button class="btn sm" id="btnTwEndingMenu" data-t="mainMenu">MENU PRINCIPAL</button>
 </div>
 
 <!-- Story Screen -->

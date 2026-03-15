@@ -1,0 +1,7 @@
+.venv-imagegen/
+.env.imagegen
+output/imagegen/
+tmp/imagegen/
+.playwright-cli/
+output/playwright/
+tmp/

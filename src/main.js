@@ -13,9 +13,19 @@ import { Game }     from './core/Game.js';
 import { DOM_IDS }  from './ui/DomIds.js';
 import {
   showScr, fadeGo, showToast, showNotification, buildWorldTabs, buildStory, buildCredits,
-  syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel, showCampaignEnding,
+  syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel, endTentacleWarsLevel,
+  showCampaignEnding, showTwCampaignEnding, showTwWorldSelect, showTwLevelSelect, rerenderActiveTwScreen,
 } from './ui/ScreenController.js';
 import { LEVELS } from './config/gameConfig.js';
+import { buildTentacleWarsDebugMetrics } from './tentaclewars/TwDebugMetrics.js';
+import { getTentacleWarsCampaignLevelById } from './tentaclewars/TwCampaignFixtures.js';
+import {
+  applyTentacleWarsPreviewWorldJump,
+  getTentacleWarsPreviewLevelById,
+  getTentacleWarsPreviewWorldEntryLevel,
+  listTentacleWarsPreviewLevelIds,
+  parseTentacleWarsPreviewFlags,
+} from './tentaclewars/TwCampaignPreview.js';
 
 function $id(id) { return document.getElementById(id); }
 
@@ -31,9 +41,39 @@ STATE.loadSettings();
   document.documentElement.dataset.font = id;
   document.documentElement.style.setProperty('--ui-zoom', STATE.settings.textZoom ?? 1.0);
   document.documentElement.dataset.theme = STATE.settings.theme || 'AURORA';
+  document.documentElement.dataset.debugLogoPreview = STATE.settings.debug ? 'on' : 'off';
 })();
 
 let game;
+
+/* Read runtime-only TW preview flags without persisting them into normal settings. */
+function getRuntimeQueryFlags() {
+  return parseTentacleWarsPreviewFlags(window.location.search);
+}
+
+/* Loads one preview TW authored level from the fixture pack through the live runtime. */
+function loadTentacleWarsPreviewLevel(levelId) {
+  const levelData = getTentacleWarsPreviewLevelById(levelId);
+  if (!levelData || !game) return false;
+
+  STATE.setDebugMode(true);
+  STATE.setGameMode('tentaclewars');
+  applyTentacleWarsPreviewWorldJump(levelData.world);
+  STATE.setTentacleWarsCurrentLevel(levelData.id);
+  showScr(null);
+  game.loadTentacleWarsCampaignLevel(levelData);
+  refreshSettingsUI();
+  return true;
+}
+
+/* Exposes later TW worlds for preview without mutating NodeWARS progression. */
+function jumpTentacleWarsPreviewWorld(worldId) {
+  STATE.setDebugMode(true);
+  STATE.setGameMode('tentaclewars');
+  const worldEntryLevelId = applyTentacleWarsPreviewWorldJump(worldId);
+  refreshSettingsUI();
+  return worldEntryLevelId;
+}
 
 function buildTrackNotification(trackInfo) {
   if (!trackInfo) return null;
@@ -49,6 +89,38 @@ function buildTrackNotification(trackInfo) {
   };
 }
 
+/*
+ * Resolve the active authored TW level id from the live runtime first so
+ * result and pause buttons operate on the phase the player just touched.
+ */
+function getActiveTentacleWarsLevelId() {
+  return game?.cfg?.twLevelId || game?.cfg?.id || STATE.getTentacleWarsCurrentLevel();
+}
+
+/*
+ * Keep TW world routing derived from the stable level-id namespace instead of
+ * duplicating world state in the shell.
+ */
+function getActiveTentacleWarsWorldId() {
+  const match = getActiveTentacleWarsLevelId().match(/^W(\d+)-/);
+  return match ? Number(match[1]) : STATE.getTentacleWarsActiveWorldTab();
+}
+
+/*
+ * Centralize authored TW level loading so every menu/result path updates the
+ * canonical campaign pointer before handing control back to Game.
+ */
+function loadTentacleWarsCampaignLevelById(levelId) {
+  const levelData = getTentacleWarsCampaignLevelById(levelId);
+  if (!levelData || !game) return false;
+  STATE.setGameMode('tentaclewars');
+  STATE.setTentacleWarsActiveWorldTab(levelData.world);
+  STATE.setTentacleWarsCurrentLevel(levelId);
+  showScr(null);
+  game.loadTentacleWarsCampaignLevel(levelData);
+  return true;
+}
+
 function initGame() {
   const canvas = $id(DOM_IDS.CANVAS);
   if (!canvas) { console.error('canvas element missing'); return; }
@@ -60,6 +132,15 @@ function initGame() {
 
   try {
     game = new Game(canvas);
+    window.__NODEWARS_DEBUG__ = {
+      getGame: () => game,
+      STATE,
+      twCampaign: {
+        listFixtureLevels: () => listTentacleWarsPreviewLevelIds(),
+        loadLevelById: levelId => loadTentacleWarsPreviewLevel(levelId),
+        jumpWorld: worldId => jumpTentacleWarsPreviewWorld(worldId),
+      },
+    };
     Screens.setGame(game);
     if (typeof Music.setTrackChangeListener === 'function') {
       Music.setTrackChangeListener(trackInfo => {
@@ -97,7 +178,33 @@ function initGame() {
   const reveal = () => {
     if (boot) boot.style.display = 'none';
     fade.classList.remove('in');
-    showScr('menu');
+    const runtimeQueryFlags = getRuntimeQueryFlags();
+    if (runtimeQueryFlags.twDebug) {
+      STATE.setDebugMode(true);
+      document.documentElement.dataset.debugLogoPreview = 'on';
+    }
+    if (runtimeQueryFlags.twMode === 'tentaclewars') {
+      STATE.setGameMode('tentaclewars');
+    }
+    if (runtimeQueryFlags.twWorld && STATE.getGameMode() === 'tentaclewars') {
+      applyTentacleWarsPreviewWorldJump(runtimeQueryFlags.twWorld);
+    }
+    if (runtimeQueryFlags.twAutostart && STATE.getGameMode() === 'tentaclewars') {
+      const previewLevel = runtimeQueryFlags.twLevelId
+        ? getTentacleWarsPreviewLevelById(runtimeQueryFlags.twLevelId)
+        : getTentacleWarsPreviewWorldEntryLevel(runtimeQueryFlags.twWorld);
+
+      showScr(null);
+      if (previewLevel) {
+        applyTentacleWarsPreviewWorldJump(previewLevel.world);
+        STATE.setTentacleWarsCurrentLevel(previewLevel.id);
+        game.loadTentacleWarsCampaignLevel(previewLevel);
+      } else {
+        game.enterSelectedMode();
+      }
+    } else {
+      showScr('menu');
+    }
     _startAudio();
   };
   requestAnimationFrame(() => requestAnimationFrame(reveal));
@@ -141,7 +248,16 @@ async function copyTextToClipboard(text) {
 function wireButtons() {
   /* Main menu */
   $id(DOM_IDS.BTN_PLAY)?.addEventListener('click', () => {
+    STATE.setGameMode('nodewars');
+    STATE.saveSettings();
+    refreshSettingsUI();
     fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); });
+  });
+  $id(DOM_IDS.BTN_TW_PLAY)?.addEventListener('click', () => {
+    STATE.setGameMode('tentaclewars');
+    STATE.saveSettings();
+    refreshSettingsUI();
+    fadeGo(() => showTwWorldSelect());
   });
   $id(DOM_IDS.BTN_STORY)?.addEventListener('click', () => { buildStory(); fadeGo(() => showScr('story')); });
   $id(DOM_IDS.BTN_SETTINGS)?.addEventListener('click', () => {
@@ -193,6 +309,11 @@ function wireButtons() {
     const debugPreviewGame = game || Screens._game;
     fadeGo(() => showCampaignEnding(debugPreviewGame, { debugPreview: true }));
   });
+  $id(DOM_IDS.BTN_MODE_CYCLE)?.addEventListener('click', () => {
+    STATE.setGameMode(STATE.getGameMode() === 'nodewars' ? 'tentaclewars' : 'nodewars');
+    STATE.saveSettings();
+    refreshSettingsUI();
+  });
   $id(DOM_IDS.BTN_MUSIC_PREV)?.addEventListener('click', () => {
     Music.previousTrack();
     refreshSettingsUI();
@@ -225,11 +346,39 @@ function wireButtons() {
 
   /* Level select */
   $id(DOM_IDS.BTN_BACK)?.addEventListener('click', () => { Music.playMenu(); fadeGo(() => showScr('menu')); });
+  $id(DOM_IDS.BTN_TW_WORLD_BACK)?.addEventListener('click', () => { Music.playMenu(); fadeGo(() => showScr('menu')); });
+  $id(DOM_IDS.BTN_TW_LEVEL_BACK)?.addEventListener('click', () => fadeGo(() => showTwWorldSelect()));
 
   /* Result */
-  $id(DOM_IDS.BTN_RL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
-  $id(DOM_IDS.BTN_RR)?.addEventListener('click', () => fadeGo(() => { showScr(null); game.loadLevel(STATE.curLvl); }));
+  $id(DOM_IDS.BTN_RL)?.addEventListener('click', () => fadeGo(() => {
+    if (STATE.getGameMode() === 'tentaclewars') {
+      showTwWorldSelect();
+      return;
+    }
+    syncWorldTab();
+    buildWorldTabs();
+    showScr('levels');
+  }));
+  $id(DOM_IDS.BTN_RR)?.addEventListener('click', () => fadeGo(() => {
+    if (STATE.getGameMode() === 'tentaclewars') {
+      loadTentacleWarsCampaignLevelById(getActiveTentacleWarsLevelId());
+      return;
+    }
+    showScr(null);
+    game.loadLevel(STATE.curLvl);
+  }));
   $id(DOM_IDS.BTN_RN)?.addEventListener('click', () => {
+    if (STATE.getGameMode() === 'tentaclewars') {
+      const nextLevelId = STATE.getTentacleWarsCurrentLevel();
+      fadeGo(() => {
+        if (nextLevelId === 'W4-20' && getActiveTentacleWarsLevelId() === 'W4-20') {
+          showTwCampaignEnding();
+          return;
+        }
+        loadTentacleWarsCampaignLevelById(nextLevelId);
+      });
+      return;
+    }
     const nextLevelId = STATE.getNextLevelId();
     if (nextLevelId != null) {
       STATE.setCurrentLevel(nextLevelId);
@@ -247,15 +396,46 @@ function wireButtons() {
   $id(DOM_IDS.BTN_ENDING_MENU)?.addEventListener('click', () => {
     Music.playMenu(); fadeGo(() => showScr('menu'));
   });
+  $id(DOM_IDS.BTN_TW_ENDING_MENU)?.addEventListener('click', () => {
+    STATE.setGameMode('nodewars');
+    STATE.saveSettings();
+    Music.playMenu();
+    fadeGo(() => showScr('menu'));
+  });
 
   /* Pause */
   $id(DOM_IDS.BTN_RESUME)?.addEventListener('click', () => {
     game.paused = false;
     showScr(null);
-    Music.playLevelTheme(game.cfg);
+    game.playCurrentModeMusic();
   });
-  $id(DOM_IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
-  $id(DOM_IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => { game.paused = false; showScr(null); game.loadLevel(STATE.curLvl); }));
+  $id(DOM_IDS.BTN_PRL)?.addEventListener('click', () => fadeGo(() => {
+    if (game.twMode.isSandboxActive()) {
+      Music.playMenu();
+      showScr('menu');
+      return;
+    }
+    if (game.twMode.isCampaignActive()) {
+      showTwLevelSelect(game.cfg?.twWorld || STATE.getTentacleWarsActiveWorldTab());
+      return;
+    }
+    syncWorldTab();
+    buildWorldTabs();
+    showScr('levels');
+  }));
+  $id(DOM_IDS.BTN_PRR)?.addEventListener('click', () => fadeGo(() => {
+    game.paused = false;
+    showScr(null);
+    if (game.twMode.isSandboxActive()) {
+      game.loadTentacleWarsSandbox();
+      return;
+    }
+    if (game.twMode.isCampaignActive()) {
+      loadTentacleWarsCampaignLevelById(getActiveTentacleWarsLevelId());
+      return;
+    }
+    game.loadLevel(STATE.curLvl);
+  }));
   $id(DOM_IDS.BTN_PSKIP)?.addEventListener('click', () => {
     const nextLevelId = STATE.getNextLevelId();
     if (STATE.canSkipLevel(game.cfg) && nextLevelId != null) {
@@ -279,8 +459,8 @@ function wireButtons() {
   });
 
   /* Language buttons (now in settings) */
-  $id(DOM_IDS.BTN_LANG_PT)?.addEventListener('click', () => setLang('pt'));
-  $id(DOM_IDS.BTN_LANG_EN)?.addEventListener('click', () => setLang('en'));
+  $id(DOM_IDS.BTN_LANG_PT)?.addEventListener('click', () => { setLang('pt'); rerenderActiveTwScreen(); });
+  $id(DOM_IDS.BTN_LANG_EN)?.addEventListener('click', () => { setLang('en'); rerenderActiveTwScreen(); });
 
   /* Font cycle */
   $id(DOM_IDS.BTN_FONT_CYCLE)?.addEventListener('click', () => {
@@ -360,6 +540,7 @@ function wireAudioBus() {
 function toggleSetting(key) {
   if (key === 'debug') {
     STATE.setDebugMode(!STATE.settings.debug);
+    document.documentElement.dataset.debugLogoPreview = STATE.settings.debug ? 'on' : 'off';
   } else if (key === 'w2' || key === 'w3') {
     const worldId = key === 'w2' ? 2 : 3;
     const currentEffectiveVisibility = STATE.isWorldUnlocked(worldId);
@@ -470,6 +651,7 @@ function bindMenuControlFeedback() {
 
 function buildDebugSnapshot() {
   const renderStats = game?.renderStats;
+  const twDebugMetrics = buildTentacleWarsDebugMetrics(game);
   return [
     `theme=${STATE.settings.theme}`,
     `graphics=${STATE.settings.graphicsMode}`,
@@ -492,6 +674,15 @@ function buildDebugSnapshot() {
       `render_orbs=${renderStats.orbCount}`,
       `render_free_orbs=${renderStats.freeOrbCount}`,
       `render_visual_events=${renderStats.visualEventCount}`,
+    ] : []),
+    ...(twDebugMetrics ? [
+      `tw_packet_lanes=${twDebugMetrics.packetLaneCount}`,
+      `tw_queued_packets=${twDebugMetrics.queuedPacketCount}`,
+      `tw_packet_accumulator=${twDebugMetrics.packetAccumulatorUnits.toFixed(2)}`,
+      `tw_overflow_ready_nodes=${twDebugMetrics.overflowReadyNodeCount}`,
+      `tw_contested_neutrals=${twDebugMetrics.contestedNeutralNodeCount}`,
+      `tw_capture_pressure=${twDebugMetrics.contestedCapturePressure.toFixed(2)}`,
+      `tw_leading_capture_threshold=${twDebugMetrics.leadingNeutralCaptureThreshold}`,
     ] : []),
   ].join('\n');
 }

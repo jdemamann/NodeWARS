@@ -95,6 +95,19 @@ Protects:
 - mechanic placement
 - structural support in late high-pressure phases
 
+### TentacleWars campaign loader sanity
+
+```bash
+node scripts/tw-campaign-loader-sanity.mjs
+```
+
+Protects:
+
+- authored TW level objects translating into runtime configs
+- authored obstacle shells surviving loader translation
+- obstacle-blocked lane creation in click and preview flows
+- campaign loader shape staying distinct from the sandbox shell
+
 ### Release readiness
 
 ```bash
@@ -116,6 +129,84 @@ node scripts/simulation-soak.mjs
 Protects:
 
 - long-run numerical stability
+
+### TentacleWars energy sanity
+
+```bash
+node scripts/tw-energy-sanity.mjs
+```
+
+Protects:
+
+- overflow mode
+- packet runtime
+- neutral and hostile capture helpers
+- TentacleWars refund rule
+
+### TentacleWars grade sanity
+
+```bash
+node scripts/tw-grade-sanity.mjs
+```
+
+Protects:
+
+- grade thresholds
+- grade hysteresis
+- Dominator throughput
+- TentacleWars slot cap
+
+### TentacleWars AI sanity
+
+```bash
+node scripts/tw-ai-sanity.mjs
+```
+
+Protects:
+
+- all-hostile default relation mode
+- purple slice pressure
+- canonical TentacleWars AI slice path
+
+### TentacleWars campaign sanity
+
+```bash
+node scripts/tw-campaign-sanity.mjs
+```
+
+Protects:
+
+- schema-valid authored World 1 data plus future-world TW anchor data
+- world and phase ordering for authored TW data
+- mechanic introduction ordering
+- phase-one obstacle authoring discipline
+- balance-matrix coverage for the authored World 1 pack
+- minimum loader/progression expectations before real authored worlds exist
+
+### TentacleWars balance matrix sanity
+
+```bash
+node scripts/tw-balance-matrix-sanity.mjs
+```
+
+Protects:
+
+- canonical TW spreadsheet column order
+- scaffold row presence for `W1-01`
+- CSV contract stability before real world authoring starts
+
+### TentacleWars preview/jump sanity
+
+```bash
+node scripts/tw-preview-jump-sanity.mjs
+```
+
+Protects:
+
+- debug-time TW query flag parsing
+- fixture-backed preview level lookup
+- isolated TW world-jump overrides
+- runtime debug hooks for TW authoring preview
 
 ### Full local gate
 
@@ -187,6 +278,36 @@ Run:
 Add:
 
 - `campaign-sanity` if the change affects campaign pacing
+
+### TentacleWars fidelity waves
+
+Examples:
+
+- packet runtime
+- grade thresholds
+- overflow
+- TentacleWars-specific capture
+- TentacleWars AI
+- TentacleWars input fidelity
+
+Suggested agents:
+
+- `docs/agents/gameplay-systems-agent.md`
+- `docs/agents/ai-behavior-agent.md`
+- `docs/agents/qa-checks-agent.md`
+
+Run:
+
+- `smoke-checks`
+- `tw-energy-sanity`
+- `tw-grade-sanity`
+- `tw-ai-sanity`
+- `commentary-policy` when source files were changed
+
+Add:
+
+- `input-harness` when input behavior changes
+- `simulation-soak` when simulation math or sustained runtime changes
 
 ### Campaign / tutorial / progression
 

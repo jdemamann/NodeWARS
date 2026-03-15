@@ -17,6 +17,15 @@ import {
   getContestCaptureScore,
   shouldIgnoreAlliedContestContribution,
 } from '../systems/NeutralContest.js';
+import {
+  applyTentacleWarsNeutralCaptureProgress,
+} from '../tentaclewars/TwCaptureRules.js';
+import {
+  getTentacleWarsNeutralCaptureOwner,
+  getTentacleWarsNeutralCaptureProgress,
+  getTentacleWarsNeutralCaptureScore,
+  setTentacleWarsNeutralCaptureProgress,
+} from '../tentaclewars/TwNeutralCapture.js';
 
 export function applyTentaclePayloadToTarget({
   tentacle,
@@ -29,6 +38,43 @@ export function applyTentaclePayloadToTarget({
 }) {
   // Burst and split cuts both end up here so ownership, neutral contest, and
   // direct enemy damage share the same resolution rules.
+  if (targetNode.simulationMode === 'tentaclewars') {
+    const directPayload = Math.max(0, payloadAmount);
+
+    if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
+      targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + directPayload);
+      return;
+    }
+
+    if (targetNode.owner === 0) {
+      const currentProgress = getTentacleWarsNeutralCaptureProgress(targetNode, sourceNode.owner);
+      const nextProgress = applyTentacleWarsNeutralCaptureProgress(currentProgress, directPayload);
+      setTentacleWarsNeutralCaptureProgress(targetNode, sourceNode.owner, nextProgress);
+      targetNode.cFlash = (targetNode.cFlash || 0) + contestFlash;
+      if (burstPulse > 0) targetNode.burstPulse = Math.max(targetNode.burstPulse || 0, burstPulse);
+
+      const captureScore = getTentacleWarsNeutralCaptureScore(targetNode, sourceNode.owner);
+      if (captureScore >= Math.max(1, targetNode.captureThreshold || 1)) {
+        tentacle._captureNeutralTarget(
+          targetNode,
+          getTentacleWarsNeutralCaptureOwner(targetNode, sourceNode.owner),
+          captureScore,
+        );
+      }
+      return;
+    }
+
+    targetNode.energy -= directPayload;
+    targetNode.underAttack = 1;
+    targetNode.cFlash = (targetNode.cFlash || 0) + contestFlash;
+    if (burstPulse > 0) targetNode.burstPulse = Math.max(targetNode.burstPulse || 0, burstPulse);
+
+    if (targetNode.energy <= 0) {
+      tentacle._defeatEnemyTarget(targetNode, sourceNode.owner, directPayload);
+    }
+    return;
+  }
+
   const directDamage = payloadAmount * computeAttackLevelMultiplier(sourceNode.level) * damageMultiplier;
 
   if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
@@ -70,14 +116,47 @@ export function applyTentaclePayloadToTarget({
 
 export function applyTentacleFriendlyFlow(targetNode, feedRate, relayFlowMultiplier, dt) {
   const incomingEnergy = feedRate * relayFlowMultiplier * dt;
-  if (targetNode.energy < targetNode.maxE) {
+  if (targetNode.simulationMode === 'tentaclewars') {
+    const availableRoom = Math.max(0, targetNode.maxE - targetNode.energy);
+    const absorbedEnergy = Math.min(availableRoom, incomingEnergy);
+    const overflowEnergy = Math.max(0, incomingEnergy - absorbedEnergy);
+    if (absorbedEnergy > 0) {
+      targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + absorbedEnergy);
+    }
+    if (overflowEnergy > 0) {
+      targetNode.twOverflowBudget = (targetNode.twOverflowBudget || 0) + overflowEnergy;
+    }
+  } else if (targetNode.energy < targetNode.maxE) {
     targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + incomingEnergy);
   }
-  targetNode.inFlow = (targetNode.inFlow || 0) + feedRate * relayFlowMultiplier;
+  targetNode.inFlow = (targetNode.inFlow || 0) + (
+    targetNode.simulationMode === 'tentaclewars'
+      ? incomingEnergy
+      : feedRate * relayFlowMultiplier
+  );
   return incomingEnergy;
 }
 
 export function applyTentacleNeutralCaptureFlow(tentacle, targetNode, sourceNode, feedRate, relayFlowMultiplier, dt) {
+  if (targetNode.simulationMode === 'tentaclewars') {
+    const deliveredPacketEnergy = feedRate * relayFlowMultiplier * dt;
+    const currentProgress = getTentacleWarsNeutralCaptureProgress(targetNode, sourceNode.owner);
+    const nextProgress = applyTentacleWarsNeutralCaptureProgress(currentProgress, deliveredPacketEnergy);
+    setTentacleWarsNeutralCaptureProgress(targetNode, sourceNode.owner, nextProgress);
+    targetNode.cFlash = (targetNode.cFlash || 0) + 0.35;
+
+    const captureScore = getTentacleWarsNeutralCaptureScore(targetNode, sourceNode.owner);
+    if (captureScore >= Math.max(1, targetNode.captureThreshold || 1)) {
+      tentacle._captureNeutralTarget(
+        targetNode,
+        getTentacleWarsNeutralCaptureOwner(targetNode, sourceNode.owner),
+        captureScore,
+      );
+    }
+
+    return deliveredPacketEnergy;
+  }
+
   /* Keep the same coalition rule in the sustained-flow path as in burst/split
      payload application so neutral capture behavior stays consistent. */
   if (shouldIgnoreAlliedContestContribution(targetNode, sourceNode.owner)) return 0;
@@ -103,6 +182,18 @@ export function applyTentacleNeutralCaptureFlow(tentacle, targetNode, sourceNode
 export function applyTentacleEnemyAttackFlow(tentacle, targetNode, sourceNode, feedRate, relayFlowMultiplier, dt) {
   if (!areHostileOwners(targetNode.owner, sourceNode.owner)) {
     return applyTentacleFriendlyFlow(targetNode, feedRate, relayFlowMultiplier, dt);
+  }
+
+  if (targetNode.simulationMode === 'tentaclewars') {
+    const deliveredPacketEnergy = feedRate * relayFlowMultiplier * dt;
+    targetNode.energy -= deliveredPacketEnergy;
+    targetNode.underAttack = 1;
+
+    if (targetNode.energy <= 0) {
+      tentacle._defeatEnemyTarget(targetNode, sourceNode.owner, deliveredPacketEnergy);
+    }
+
+    return deliveredPacketEnergy;
   }
 
   const damageAmount =

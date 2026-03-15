@@ -8,6 +8,22 @@ Define a simple, repeatable flow for continuing development without relying too 
 
 ## Recommended Flow
 
+### 0. Start automation watchers (if not running)
+
+```bash
+bash scripts/tw-inbox-watch.sh &
+bash scripts/tw-inbox-watch-codex.sh &
+```
+
+To check whether they are already running:
+
+```bash
+pgrep -fa tw-inbox-watch
+```
+
+These watchers are optional convenience tooling, not a protocol requirement.
+If automation fails, fall back to the manual inbox flow and continue working.
+
 ### 1. Session start
 
 Read in this order:
@@ -31,6 +47,7 @@ Choose a small wave:
 
 Also choose the most relevant domain agent before starting.
 If the task clearly matches an installed Codex skill, choose that skill before implementation.
+If the wave has more than one concrete step, start it with `update_plan` and keep that plan current during the wave.
 If the wave touches `src/*.js`, also open `docs/project/commentary-header-template.md` before editing.
 
 ### 3. Write a short spec

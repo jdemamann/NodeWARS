@@ -14,6 +14,7 @@ export function populateWorldFeatures(game, cfg, width, height) {
   // Generated phases rebuild these feature arrays from config each load.
   game.hazards = [];
   game.pulsars = [];
+  game.twObstacles = [];
   spawnHazards(game, cfg, width, height);
   spawnRelays(game, cfg, width, height);
   spawnPulsars(game, cfg, width, height);
@@ -24,11 +25,15 @@ export function applyFixedWorldFeatures(game, layout) {
   // Fixed layouts already provide fully-authored hazard and pulsar specs.
   game.hazards = (layout.hazards || []).map(hazardSpec => ({ ...hazardSpec }));
   game.pulsars = (layout.pulsars || []).map(pulsarSpec => ({ ...pulsarSpec }));
+  game.twObstacles = (layout.twObstacles || []).map(obstacleSpec => ({ ...obstacleSpec }));
 }
 
 export function populateFixedNodes(game, layout) {
   game.nodes = layout.nodes.map((nodeSpec, index) => {
     const gameNode = new GameNode(index, nodeSpec.x, nodeSpec.y, nodeSpec.energy, nodeSpec.owner, nodeSpec.type);
+    if (Number.isFinite(nodeSpec.twCostNormalizer)) {
+      gameNode.twCostNormalizer = nodeSpec.twCostNormalizer;
+    }
     if (nodeSpec.isBunker) {
       gameNode.isBunker = true;
       gameNode.captureThreshold = WORLD_RULES.BUNKER_CAPTURE_THRESHOLD;

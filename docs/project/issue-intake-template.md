@@ -24,6 +24,10 @@ What should happen instead.
 2. 
 3. 
 
+## Reproduction guardrail
+
+- If this is a bug, name the test or guardrail that should fail first and pass after the fix:
+
 ## Affected files or systems
 
 - 

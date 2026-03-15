@@ -9,8 +9,12 @@
 import { bus } from '../core/EventBus.js';
 import { isPlayerEnemyOwner } from './OwnerTeams.js';
 
-export function retractInvalidTentaclesAfterOwnershipChange(game, node, newOwner) {
+/* Retract or collapse outgoing commitments rooted at the captured node. */
+export function retractInvalidTentaclesAfterOwnershipChange(game, node, newOwner, {
+  suppressRefundOnOutgoingTentacles = false,
+} = {}) {
   if (!game) return;
+  let releasedOutgoingEnergy = 0;
 
   /* Ownership changes do not inherit the old owner's outgoing commitments.
      Any tentacle whose effective source was the captured node must collapse,
@@ -19,9 +23,19 @@ export function retractInvalidTentaclesAfterOwnershipChange(game, node, newOwner
      on the next update tick. */
   game.tents
     .filter(tent => tent.alive && tent.effectiveSourceNode === node)
-    .forEach(tent => tent.kill());
+    .forEach(tent => {
+      if (suppressRefundOnOutgoingTentacles) {
+        releasedOutgoingEnergy += tent.getCommittedPayloadForOwnershipCleanup?.() || 0;
+        tent.collapseForOwnershipLoss?.();
+        return;
+      }
+      tent.kill();
+    });
+
+  return releasedOutgoingEnergy;
 }
 
+/* Apply the capture flip and then clean up outgoing commitments from the old owner. */
 export function applyOwnershipChange({
   game,
   node,
@@ -30,6 +44,7 @@ export function applyOwnershipChange({
   previousOwner,
   wasNeutralCapture = false,
   attackerOwner = null,
+  suppressOutgoingTentacleRefunds = false,
 }) {
   node.owner = newOwner;
   node.regen = 0;
@@ -50,5 +65,7 @@ export function applyOwnershipChange({
     if (attackerOwner === 1 && isPlayerEnemyOwner(previousOwner)) bus.emit('cell:killed_enemy', node);
   }
 
-  retractInvalidTentaclesAfterOwnershipChange(game, node, newOwner);
+  retractInvalidTentaclesAfterOwnershipChange(game, node, newOwner, {
+    suppressRefundOnOutgoingTentacles: suppressOutgoingTentacleRefunds,
+  });
 }

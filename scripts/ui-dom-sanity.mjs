@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -174,16 +175,27 @@ async function setupUiDomHarness() {
   [
     DOM_IDS.SCREEN_MENU,
     DOM_IDS.SCREEN_LEVELS,
+    DOM_IDS.SCREEN_TW_WORLDS,
+    DOM_IDS.SCREEN_TW_LEVELS,
+    DOM_IDS.SCREEN_TW_ENDING,
     DOM_IDS.SCREEN_STORY,
     DOM_IDS.SCREEN_RESULT,
     DOM_IDS.SCREEN_ENDING,
     DOM_IDS.SCREEN_PAUSE,
     DOM_IDS.SCREEN_SETTINGS,
     DOM_IDS.SCREEN_CREDITS,
+    DOM_IDS.DEBUG_SETTINGS_GROUP,
+    DOM_IDS.MODE_GROUP,
     DOM_IDS.WORLD_UNLOCK_GROUP,
     DOM_IDS.WORLD_TABS,
     DOM_IDS.LGRID,
     DOM_IDS.WORLD_DESC,
+    DOM_IDS.TW_WORLD_GRID,
+    DOM_IDS.TW_WORLD_SUMMARY,
+    DOM_IDS.TW_LEVEL_GRID,
+    DOM_IDS.TW_LEVEL_TITLE,
+    DOM_IDS.TW_LEVEL_META,
+    DOM_IDS.TW_ENDING_CONTENT,
     DOM_IDS.TUTBOX,
     DOM_IDS.HSCORE,
     DOM_IDS.DC,
@@ -199,6 +211,7 @@ async function setupUiDomHarness() {
     DOM_IDS.DEBUG_INFO_PANEL,
     DOM_IDS.TOG_W2,
     DOM_IDS.TOG_W3,
+    DOM_IDS.BTN_MODE_CYCLE,
     DOM_IDS.TOG_DEBUG,
     DOM_IDS.TOG_SOUND,
     DOM_IDS.TOG_MUSIC,
@@ -219,10 +232,19 @@ async function testShowScrTogglesSingleVisibleScreen() {
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_SETTINGS).classList.contains('off'), false, 'settings screen should become visible');
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_MENU).classList.contains('off'), true, 'menu screen should be hidden when another screen is shown');
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_LEVELS).classList.contains('off'), true, 'level-select screen should be hidden when settings are shown');
+  assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_TW_WORLDS).classList.contains('off'), true, 'TW world-select screen should stay hidden until explicitly shown');
+  assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_TW_ENDING).classList.contains('off'), true, 'TW ending screen should stay hidden until explicitly shown');
 
   screenController.showScr('ending');
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_ENDING).classList.contains('off'), false, 'ending screen should become visible');
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_SETTINGS).classList.contains('off'), true, 'previous screen should be hidden after switching');
+}
+
+async function testDedicatedTwEndingCssDoesNotOverrideHiddenScreenState() {
+  const css = await fs.readFile(path.join(ROOT, 'styles/main.css'), 'utf8');
+
+  assert.match(css, /#stwe\s*\{[\s\S]*display:\s*flex;/, 'TW ending screen should keep its dedicated layout styling');
+  assert.match(css, /#stwe\.off\s*\{\s*display:\s*none;\s*\}/, 'TW ending screen should explicitly preserve the hidden-screen contract when it carries the off class');
 }
 
 async function testRefreshSettingsUiReflectsEffectiveState() {
@@ -240,9 +262,13 @@ async function testRefreshSettingsUiReflectsEffectiveState() {
     STATE.settings.showFps = true;
     STATE.settings.graphicsMode = 'high';
     STATE.settings.theme = 'SOLAR';
+    STATE.setGameMode('tentaclewars');
 
     screenController.refreshSettingsUI();
 
+    assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_SETTINGS_GROUP).style.display, '', 'grouped debug settings card should be visible when debug mode is enabled');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.MODE_GROUP).style.display, '', 'mode controls should be visible when debug mode is enabled');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.BTN_MODE_CYCLE).textContent, 'TENTACLEWARS', 'mode toggle should reflect the selected TentacleWars track');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).textContent, 'ON', 'world 2 toggle should reflect natural campaign unlock');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).classList.contains('on'), true, 'world 2 toggle should gain ON styling when visible');
     assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_UNLOCK_GROUP).style.display, '', 'manual world unlock controls should be visible when debug mode is enabled');
@@ -260,6 +286,8 @@ async function testRefreshSettingsUiReflectsEffectiveState() {
     STATE.setDebugMode(false);
     screenController.refreshSettingsUI();
 
+    assert.equal(fakeDocument.getElementById(DOM_IDS.DEBUG_SETTINGS_GROUP).style.display, 'none', 'grouped debug settings card should hide when debug mode is disabled');
+    assert.equal(fakeDocument.getElementById(DOM_IDS.MODE_GROUP).style.display, 'none', 'mode controls should hide when debug mode is disabled');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).textContent, 'ON', 'once debug is disabled, world 2 should reflect natural campaign unlock again');
     assert.equal(fakeDocument.getElementById(DOM_IDS.TOG_W2).classList.contains('on'), true, 'natural campaign unlock should restore the ON styling');
     assert.equal(fakeDocument.getElementById(DOM_IDS.WORLD_UNLOCK_GROUP).style.display, 'none', 'manual world unlock controls should hide when debug mode is disabled');
@@ -379,14 +407,106 @@ async function testBuildWorldTabsRespectsEffectiveVisibility() {
   }
 }
 
+async function testTentacleWarsWorldSelectBuildsFromCanonicalProgress() {
+  const { DOM_IDS, STATE, screenController, fakeDocument } = await setupUiDomHarness();
+  const originalTwCampaign = structuredClone(STATE.twCampaign);
+  const originalSettings = structuredClone(STATE.settings);
+
+  try {
+    STATE.settings.debug = false;
+    STATE.twCampaign.completed = 'W1-20';
+    STATE.twCampaign.curLvl = 'W2-01';
+    screenController.showTwWorldSelect();
+
+    assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_TW_WORLDS).classList.contains('off'), false, 'TW world-select screen should become visible');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 1|MUNDO 1/i, 'TW world-select should render World 1');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 2|MUNDO 2/i, 'TW world-select should render World 2 when unlocked');
+    assert.doesNotMatch(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 3[\s\S]*SELECT|MUNDO 3[\s\S]*SELECIONAR/i, 'locked TW worlds should not expose a selectable state');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_WORLD_SUMMARY).textContent, /W2-01/i, 'TW world summary should surface the canonical current level pointer');
+  } finally {
+    STATE.twCampaign = originalTwCampaign;
+    STATE.settings = originalSettings;
+  }
+}
+
+async function testTentacleWarsLevelSelectBuildsWorldCards() {
+  const { DOM_IDS, STATE, screenController, fakeDocument } = await setupUiDomHarness();
+  const originalTwCampaign = structuredClone(STATE.twCampaign);
+  const originalSettings = structuredClone(STATE.settings);
+
+  try {
+    STATE.settings.debug = false;
+    STATE.twCampaign.completed = 'W1-03';
+    STATE.twCampaign.curLvl = 'W1-04';
+    STATE.twCampaign.stars['W1-01'] = 3;
+    STATE.twCampaign.stars['W1-02'] = 2;
+    screenController.showTwLevelSelect(1);
+
+    assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_TW_LEVELS).classList.contains('off'), false, 'TW level-select screen should become visible');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_TITLE).textContent, /WORLD 1|MUNDO 1/i, 'TW level-select title should identify the selected world');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_GRID).innerHTML, /W1-01/i, 'TW level-select should render the first level id');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_GRID).innerHTML, /☆☆☆|★★★/, 'TW level-select should render a star strip per phase card');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_GRID).innerHTML, /ENERGY CAP|ENERGIA MÁX/i, 'TW level-select should show energy-cap metadata');
+  } finally {
+    STATE.twCampaign = originalTwCampaign;
+    STATE.settings = originalSettings;
+  }
+}
+
+async function testTentacleWarsCampaignEndingRendersDedicatedScreen() {
+  const { DOM_IDS, screenController, fakeDocument } = await setupUiDomHarness();
+
+  screenController.showTwCampaignEnding();
+  const endingMarkup = fakeDocument.getElementById(DOM_IDS.TW_ENDING_CONTENT).innerHTML;
+
+  assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_TW_ENDING).classList.contains('off'), false, 'TW campaign ending should show the dedicated ending screen');
+  assert.match(endingMarkup, /tw-ending-title/, 'TW campaign ending should inject its dedicated title wrapper');
+  assert.match(endingMarkup, /TENTACLE WARS/i, 'TW campaign ending should render its title');
+  assert.match(endingMarkup, /80/i, 'TW campaign ending should mention the completed 80-phase campaign');
+  assert.match(endingMarkup, /WORLD 1[\s\S]*WORLD 4|Mundo 1[\s\S]*Mundo 4/i, 'TW campaign ending should summarize the world span');
+}
+
+async function testTentacleWarsResultMarkupDropsNodewarsStats() {
+  const resultViewModule = await import(pathToFileURL(path.join(ROOT, 'src/ui/resultScreenView.js')).href + `?tw-result=${Date.now()}`);
+  const gameStateModule = await import(pathToFileURL(path.join(ROOT, 'src/core/GameState.js')).href + `?tw-stars=${Date.now()}`);
+  const { STATE } = gameStateModule;
+  const originalTwCampaign = structuredClone(STATE.twCampaign);
+
+  try {
+    STATE.twCampaign.stars['W1-01'] = 2;
+    const markup = resultViewModule.buildResultInfoMarkup({
+      id: 'W1-01',
+      par: 40,
+      isTentacleWarsCampaign: true,
+    }, {
+      scoreTime: 42.4,
+      wastedTents: 7,
+      frenzyCount: 3,
+    }, key => key, 80);
+
+    assert.match(markup, /W1-01/, 'TW result markup should include the phase id');
+    assert.match(markup, /STARS|ESTRELAS/i, 'TW result markup should label the star strip through i18n');
+    assert.match(markup, /★★☆|☆☆☆|★★★/, 'TW result markup should render stars with glyphs');
+    assert.match(markup, /PAR/i, 'TW result markup should include time-vs-par information');
+    assert.doesNotMatch(markup, /wasted|frenzies|hostile starts/i, 'TW result markup should not include NodeWARS-only result stats');
+  } finally {
+    STATE.twCampaign = originalTwCampaign;
+  }
+}
+
 async function main() {
   const tests = [
     ['showScr toggles a single visible screen', testShowScrTogglesSingleVisibleScreen],
+    ['dedicated TW ending CSS preserves hidden screen state', testDedicatedTwEndingCssDoesNotOverrideHiddenScreenState],
     ['refreshSettingsUI reflects effective state', testRefreshSettingsUiReflectsEffectiveState],
     ['showCampaignEnding populates and hides HUD surfaces', testShowCampaignEndingPopulatesAndHidesHudSurfaces],
     ['showNotification appends structured cards', testShowNotificationAppendsStructuredCards],
     ['showNotification dedupes and prioritizes cards', testShowNotificationDedupesAndPrioritizesCards],
     ['buildWorldTabs respects effective visibility', testBuildWorldTabsRespectsEffectiveVisibility],
+    ['TentacleWars world select builds from canonical progress', testTentacleWarsWorldSelectBuildsFromCanonicalProgress],
+    ['TentacleWars level select builds world cards', testTentacleWarsLevelSelectBuildsWorldCards],
+    ['TentacleWars campaign ending renders dedicated screen', testTentacleWarsCampaignEndingRendersDedicatedScreen],
+    ['TentacleWars result markup drops NodeWARS stats', testTentacleWarsResultMarkupDropsNodewarsStats],
   ];
 
   let passed = 0;

@@ -8,6 +8,7 @@
 export const DOM_IDS = Object.freeze({
   /* HUD */
   HUD:        'hud',
+  HBRAND:     'hbrand',
   SP:         'sp',
   SN:         'sn',
   SE:         'se',
@@ -38,6 +39,9 @@ export const DOM_IDS = Object.freeze({
   /* Screens */
   SCREEN_MENU:     'sm',
   SCREEN_LEVELS:   'sl',
+  SCREEN_TW_WORLDS:'stw',
+  SCREEN_TW_LEVELS:'stwl',
+  SCREEN_TW_ENDING:'stwe',
   SCREEN_STORY:    'ss',
   SCREEN_RESULT:   'sr',
   SCREEN_ENDING:   'sce',
@@ -47,6 +51,7 @@ export const DOM_IDS = Object.freeze({
   /* Menu screen */
   MSUB:       'msub',
   BTN_PLAY:   'btnplay',
+  BTN_TW_PLAY:'btntw',
   BTN_STORY:  'btnstory',
   BTN_SETTINGS:'btnsettings',
   BTN_LANG_PT:'btnlangpt',
@@ -58,6 +63,21 @@ export const DOM_IDS = Object.freeze({
   LGRID:      'lgrid',
   BTN_BACK:   'btnback',
   WORLD_DESC: 'worldDesc',
+
+  /* TentacleWars world select */
+  TW_WORLD_SUMMARY:'twWorldSummary',
+  TW_WORLD_GRID:   'twWorldGrid',
+  BTN_TW_WORLD_BACK:'btnTwWorldBack',
+
+  /* TentacleWars level select */
+  TW_LEVEL_TITLE: 'twLevelTitle',
+  TW_LEVEL_META:  'twLevelMeta',
+  TW_LEVEL_GRID:  'twLevelGrid',
+  BTN_TW_LEVEL_BACK:'btnTwLevelBack',
+
+  /* TentacleWars campaign ending */
+  TW_ENDING_CONTENT:'twEndingContent',
+  BTN_TW_ENDING_MENU:'btnTwEndingMenu',
 
   /* Story screen */
   STORY_WRAP:    'storywrap',
@@ -94,9 +114,12 @@ export const DOM_IDS = Object.freeze({
 
   /* Settings screen */
   SETTINGS_BODY:    'settingsBody',
+  DEBUG_SETTINGS_GROUP:'debugSettingsGroup',
   WORLD_UNLOCK_GROUP:'worldUnlockGroup',
+  MODE_GROUP:        'modeGroup',
   TOG_W2:           'togW2',
   TOG_W3:           'togW3',
+  BTN_MODE_CYCLE:   'btnModeCycle',
   TOG_DEBUG:        'togDebug',
   TOG_SOUND:        'togSound',
   TOG_MUSIC:        'togMusic',

@@ -32,6 +32,19 @@ Inside `src/entities/Tent.js`, the lifecycle is organized through these state ha
 - ownership transitions: shared ownership helper
 - energy budget usage: shared energy-budget helper
 
+## Mode-Specific Slice Notes
+
+- `NodeWARS` keeps the shared cut-zone model:
+  - near source: burst
+  - middle: split
+  - near target: refund
+- `TentacleWars` keeps the same input entry point, but not the same cut semantics
+- in `TentacleWars`, an explicit slice resolves immediately as a continuous geometric split of:
+  - construction energy invested into the lane
+  - plus current in-transit energy
+- in `TentacleWars`, that split does not enter the shared `BURSTING` state
+- programmatic retract still refunds the full invested payload in both modes
+
 ## Refund Notes
 
 - programmatic retract refunds the full invested payload to the effective source

@@ -98,7 +98,7 @@ Primary deliverables:
   - `docs/agents/meta-progression-agent.md`
   - `docs/agents/qa-checks-agent.md`
 - Priority: `high`
-- Status: `planned`
+- Status: `completed`
 
 Goal:
 
@@ -125,7 +125,7 @@ Primary deliverables:
   - `docs/agents/render-visual-language-agent.md`
   - `docs/agents/qa-checks-agent.md`
 - Priority: `high`
-- Status: `planned`
+- Status: `completed`
 
 Goal:
 
@@ -150,7 +150,7 @@ Primary deliverables:
   - `docs/agents/gameplay-systems-agent.md`
   - `docs/agents/qa-checks-agent.md`
 - Priority: `high`
-- Status: `planned`
+- Status: `completed`
 
 Goal:
 
@@ -175,7 +175,7 @@ Primary deliverables:
   - `docs/agents/gameplay-systems-agent.md`
   - `docs/agents/qa-checks-agent.md`
 - Priority: `high`
-- Status: `planned`
+- Status: `completed`
 
 Goal:
 
@@ -201,7 +201,7 @@ Primary deliverables:
   - `docs/agents/meta-progression-agent.md`
   - `docs/agents/render-visual-language-agent.md`
 - Priority: `high`
-- Status: `planned`
+- Status: `completed`
 
 Goal:
 
@@ -228,7 +228,7 @@ Primary deliverables:
   - `docs/agents/gameplay-systems-agent.md`
   - `docs/agents/qa-checks-agent.md`
 - Priority: `medium`
-- Status: `planned`
+- Status: `completed`
 
 Goal:
 
@@ -244,6 +244,990 @@ Primary deliverables:
 - red AI for TentacleWars mode
 - purple disruptive slice behavior
 - parameterized hostility mode
+
+#### TASK-TW-007 Packet-Native Lane Runtime
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `jupyter-notebook`
+  - `spreadsheet`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- replace the current partial continuous-lane bridge with real packet-native lane emission and travel in the TentacleWars sandbox
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+- `node scripts/input-harness.mjs` if input timing changes
+
+Primary deliverables:
+
+- packet-native lane accumulator runtime
+- packet travel/update rules
+- sandbox packet emission driven by TentacleWars throughput
+
+#### TASK-TW-008 TentacleWars Capture Runtime Integration
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `jupyter-notebook`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- make neutral and hostile capture resolve from live TentacleWars packet events instead of the current bridge logic
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- packet-driven neutral acquisition
+- packet-driven hostile takeover
+- live reset-plus-carryover resolution
+
+#### TASK-TW-009 TentacleWars Sandbox Playtest and Tuning Wave A
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/ai-behavior-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `jupyter-notebook`
+  - `spreadsheet`
+  - `doc`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- run the first real TentacleWars sandbox playtest wave and tune packet, overflow, capture, and AI pressure using live evidence
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+- `node scripts/ui-dom-sanity.mjs` if sandbox UI changes
+
+Primary deliverables:
+
+- first tuning log for the TentacleWars sandbox
+- packet and overflow adjustments backed by playtest notes
+- documented follow-up decisions
+
+#### TASK-TW-010 TentacleWars Lane and Packet Visual Language
+
+- Owner: `render-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/render-visual-language-agent.md`
+  - `docs/agents/ui-ux-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `screenshot`
+  - `figma`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- give the TentacleWars sandbox a packet-native lane look that clearly differs from NodeWARS without destabilizing the current render stack
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/ui-dom-sanity.mjs` if HUD or overlays change
+
+Primary deliverables:
+
+- clearer packet motion
+- stronger overflow feel
+- more readable TentacleWars lane identity
+
+#### TASK-TW-015 TentacleWars Visual Density Wave B
+
+- Owner: `render-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/render-visual-language-agent.md`
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+  - `screenshot`
+- Priority: `low`
+- Status: `completed`
+
+Goal:
+
+- run a narrower follow-up pass only for very dense late-fight overlap readability after the first full TentacleWars visual identity wave is stable
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- improved corridor separation in high-density fights
+- conflict-tested clash / slice readability under overlap
+- updated visual comparison captures
+
+#### TASK-TW-016 TentacleWars Fidelity Safety Rails
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- lock the TentacleWars sandbox away from fidelity-breaking NodeWARS world gimmicks and temporary power systems
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+- `node scripts/commentary-policy.mjs`
+
+Primary deliverables:
+
+- sandbox-only disablement of hazards, pulsars, fog, signal towers, and auto-retract
+- sandbox frenzy disablement in both bookkeeping and node regen flow
+- smoke guardrails proving those safety rails stay active
+
+#### TASK-TW-017 TentacleWars Controlled Scenario Presets
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/content-authored-levels-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- add deterministic sandbox scenario presets for slice, clash, capture, and density validation so future TentacleWars tuning is not bottlenecked by random layouts
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/campaign-sanity.mjs` if config-authoring surfaces change
+
+Primary deliverables:
+
+- preset scenario entry points for debug playtest loops
+- at least one dense-overlap repro case and one slice/clash repro case
+- documented browser workflow for using those presets
+
+#### TASK-TW-018 TentacleWars Sandbox Playtest and Tuning Wave B
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/ai-behavior-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+  - `spreadsheet`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- run the next TentacleWars tuning wave on top of controlled scenarios so slice, clash, capture timing, and overlap readability can be judged against repeatable evidence
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- scenario-based playtest notes
+- tightened tuning decisions backed by repeatable captures
+- follow-up bug list trimmed to residual polish instead of fidelity drift
+
+#### TASK-TW-019 TentacleWars HUD and Card Fidelity Contract
+
+- Owner: `ui-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+  - `screenshot`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- replace TentacleWars card and HUD leak-through from NodeWARS with a mode-owned presentation contract for grade, slots, regen, and capture semantics
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+
+Primary deliverables:
+
+- grade label rendering based on TentacleWars names and thresholds
+- slot presentation that shows the mode-appropriate available-capacity semantics
+- removal of remaining NodeWARS-only labels or level scales from TentacleWars cards
+
+#### TASK-TW-020 TentacleWars Node Grade Silhouette Pass
+
+- Owner: `render-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/render-visual-language-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+  - `screenshot`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- give each TentacleWars grade a clearer silhouette and progression read so cells feel closer to the original grade fantasy instead of a soft NodeWARS variant
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- clearer visual distinction between grade states
+- mode-specific grade presentation notes
+- browser captures for all major grade steps
+
+#### TASK-TW-021 TentacleWars Tentacle Motion and Material Pass
+
+- Owner: `render-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/render-visual-language-agent.md`
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+  - `screenshot`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- rework the visual material and motion feel of TentacleWars lanes, slice retraction, and clash so tentacles stop reading as modified NodeWARS pipes
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- cleaner living-tissue lane material
+- retraction and clash motion review against TentacleWars feel targets
+- browser captures for idle, slice, clash, and dense-overlap cases
+
+#### TASK-TW-022 TentacleWars Visual Regression Matrix
+
+- Owner: `qa-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/qa-checks-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+  - `docs/agents/ui-ux-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+  - `screenshot`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- turn the core TentacleWars visual checks into a repeatable capture matrix so future waves stop regressing cards, slots, lane feel, and overlap readability
+
+Checks:
+
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- named capture scenarios
+- expected artifacts for node grades, cards, clash, slice, and density
+- documented visual acceptance checklist
+
+#### TASK-TW-023 TentacleWars Grade Slot Table Reconciliation
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `spreadsheet`
+  - `playwright`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- reconcile the authoritative TentacleWars per-grade tentacle-cap table against the current fixed-three-slot implementation so mechanics and UI stop relying on assumptions
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/tw-grade-sanity.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/simulation-soak.mjs` if the live slot rules change
+
+Primary deliverables:
+
+- documented authoritative slot-cap table by TentacleWars grade
+- mode-owned slot-cap helper updated to that table
+- UI and AI surfaces aligned to the same authoritative slot-cap data
+
+Outcome:
+
+- authoritative slot table frozen as `Spore=1`, `Embryo=2`, `Pulsar=2`, `Gamma=2`, `Solar=3`, `Dominator=3`
+- `GameNode.maxSlots` now resolves TentacleWars slot caps from grade instead of a fixed `3`
+- UI, input, and AI surfaces now read the same grade-owned slot source through `n.maxSlots`
+
+### TENTACLEWARS CAMPAIGN TRACK
+
+#### TASK-TWL-001 TentacleWars Campaign Product Spec
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/content-authored-levels-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- freeze the product relationship between `NodeWARS campaign`, `TentacleWars sandbox`, and the future `TentacleWars campaign`
+
+Checks:
+
+- none required before implementation work starts
+
+Primary deliverables:
+
+- campaign product spec
+- mode coexistence rules
+- rollout plan by world
+
+#### TASK-TWL-002 TentacleWars Level Data Schema
+
+- Owner: `content-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/content-authored-levels-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- define the canonical `JS object` schema for TentacleWars campaign level authoring
+
+Checks:
+
+- none required before implementation work starts
+
+Primary deliverables:
+
+- canonical schema doc
+- field definitions
+- validation expectations for future sanity checks
+
+#### TASK-TWL-003 TentacleWars Progression and Score Spec
+
+- Owner: `ui-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/meta-progression-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- define the progression, result, star, and save-state rules for the separate TentacleWars campaign
+
+Checks:
+
+- none required before implementation work starts
+
+Primary deliverables:
+
+- progression spec
+- scoring/result spec
+- save namespace plan
+
+#### TASK-TWL-004 TentacleWars Obstacle Spec
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+- Priority: `medium`
+- Status: `planned`
+
+Goal:
+
+- define the first-phase amoeba blocker contract for the TentacleWars campaign
+
+Checks:
+
+- none required before implementation work starts
+
+Primary deliverables:
+
+- obstacle semantics
+- geometry contract
+- world-one integration notes
+
+#### TASK-TWL-005 TentacleWars Campaign Loader
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/meta-progression-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- add a dedicated level-loading path for TentacleWars campaign content without destabilizing NodeWARS campaign flow
+
+Checks:
+
+- `node scripts/campaign-sanity.mjs`
+- `node scripts/game-state-progression-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+
+Primary deliverables:
+
+- separate campaign loader
+- mode-aware level source routing
+- safe coexistence with NodeWARS campaign
+
+#### TASK-TWL-006 TentacleWars Campaign State Namespace
+
+- Owner: `meta-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/meta-progression-agent.md`
+  - `docs/agents/ui-ux-agent.md`
+- Priority: `high`
+- Status: `needs-validation`
+
+Goal:
+
+- isolate TentacleWars campaign save/progression from NodeWARS progression
+
+Checks:
+
+- `node scripts/game-state-progression-sanity.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- separate save namespace
+- separate progression rules
+- safe debug-world handling
+
+#### TASK-TWL-007 TentacleWars Campaign Sanity Suite
+
+- Owner: `qa-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/qa-checks-agent.md`
+  - `docs/agents/campaign-level-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- create campaign sanity coverage for the new TentacleWars campaign track
+
+Checks:
+
+- `node scripts/tw-campaign-sanity.mjs`
+
+Primary deliverables:
+
+- TentacleWars campaign sanity coverage
+- world continuity rules
+- level metadata validation
+
+#### TASK-TWL-008 TentacleWars World 1 Authoring Pack
+
+- Owner: `content-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/content-authored-levels-agent.md`
+  - `docs/agents/campaign-level-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- author the first TentacleWars world as a reconstructed onboarding world with low-cap pacing and early obstacle introduction
+
+Checks:
+
+- `node scripts/campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- World 1 authored level pack
+- world-one pacing notes
+- reconstruction references per phase
+
+Outcome:
+
+- `TWL-008` was split into:
+  - `TWL-008a` for `W1-01..W1-05` pipeline validation
+  - `TWL-008b` for `W1-06..W1-20` after the gate is proven
+
+#### TASK-TWL-009 TentacleWars World 1 Playtest and Reconstruction Review
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `medium`
+- Status: `planned`
+
+Goal:
+
+- verify World 1 readability, reconstruction fidelity, and scoring targets before moving to World 2
+
+Checks:
+
+- `node scripts/campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+- `node scripts/ui-actions-sanity.mjs` if campaign UI changes
+
+Primary deliverables:
+
+- world-one playtest notes
+- reconstruction deviations log
+- approved follow-up fixes
+
+#### TASK-TWL-010 TentacleWars World 2 Authoring Pack
+
+- Owner: `content-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/content-authored-levels-agent.md`
+  - `docs/agents/ai-behavior-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- author the second TentacleWars world, including the first purple pressure arc
+
+Checks:
+
+- `node scripts/campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+- `node scripts/tw-ai-sanity.mjs`
+
+Primary deliverables:
+
+- World 2 authored level pack
+- purple-introduction curve
+- reconstruction notes per phase
+
+#### TASK-TWL-011 TentacleWars World 2 Playtest and Reconstruction Review
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/ai-behavior-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- validate World 2 pacing, purple reveal, and mid-game reconstruction before World 3 authoring
+
+Checks:
+
+- `node scripts/tw-campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+- `node scripts/commentary-policy.mjs`
+
+Primary deliverables:
+
+- world-two playtest log
+- purple-fidelity findings
+- approved follow-up fixes
+
+#### TASK-TWL-012 TentacleWars World 3 Authoring Pack
+
+- Owner: `content-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/content-authored-levels-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- author the third TentacleWars world with advanced routing density and labyrinth identity
+
+Checks:
+
+- `node scripts/tw-campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+- `node scripts/commentary-policy.mjs`
+
+Primary deliverables:
+
+- World 3 authored level pack
+- layout-density notes
+- reconstruction notes per phase
+
+#### TASK-TWL-013 TentacleWars World 3 Playtest and Reconstruction Review
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/render-visual-language-agent.md`
+- Priority: `medium`
+- Status: `planned`
+
+Goal:
+
+- validate World 3 readability and density before the final world
+
+Checks:
+
+- `node scripts/campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- world-three playtest log
+- density-fidelity findings
+- approved follow-up fixes
+
+#### TASK-TWL-014 TentacleWars World 4 Authoring Pack
+
+- Owner: `content-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/content-authored-levels-agent.md`
+  - `docs/agents/ai-behavior-agent.md`
+- Priority: `high`
+- Status: `planned`
+
+Goal:
+
+- author the final TentacleWars world and late-game reconstruction arc
+
+Checks:
+
+- `node scripts/campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+- `node scripts/tw-ai-sanity.mjs`
+
+Primary deliverables:
+
+- World 4 authored level pack
+- late-game pacing notes
+- reconstruction notes per phase
+
+#### TASK-TWL-015 TentacleWars World 4 Playtest and Reconstruction Review
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `medium`
+- Status: `planned`
+
+Goal:
+
+- validate the final world and late-game reconstruction before release readiness
+
+Checks:
+
+- `node scripts/campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- world-four playtest log
+- final reconstruction gap list
+- release-facing follow-up decisions
+
+#### TASK-TWL-016 TentacleWars Level Preview and Jump Tools
+
+- Owner: `tooling-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- add practical debug entry points for previewing TentacleWars campaign levels during authoring
+
+Checks:
+
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+- `node scripts/tw-preview-jump-sanity.mjs`
+- `node scripts/game-state-progression-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- level jump tools
+- preview entry points
+- authoring convenience hooks
+
+#### TASK-TWL-017 TentacleWars Spreadsheet Balance Matrix
+
+- Owner: `tooling-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/campaign-level-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Priority: `low`
+- Status: `completed`
+
+Goal:
+
+- maintain a spreadsheet-friendly balance matrix for TentacleWars campaign phase authoring
+
+Checks:
+
+- `node scripts/tw-balance-matrix-sanity.mjs`
+
+Primary deliverables:
+
+- balance matrix
+- world-by-world metadata sheet
+- tuning support notes
+
+#### TASK-TWL-018 TentacleWars Phase Editor Feasibility Review
+
+- Owner: `tooling-owner`
+- Workstream: `WS-TWL TentacleWars Campaign`
+- Suggested Agents:
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/content-authored-levels-agent.md`
+- Priority: `low`
+- Status: `planned`
+
+Goal:
+
+- review whether a dedicated phase editor would actually pay off after the first authored world
+
+Checks:
+
+- none required before implementation work starts
+
+Primary deliverables:
+
+- editor feasibility review
+- recommendation to proceed or defer
+
+#### TASK-TW-011 TentacleWars Sandbox UX and Debug Tools
+
+- Owner: `ui-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/meta-progression-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `playwright`
+  - `playwright-interactive`
+  - `doc`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- add sandbox-specific HUD/debug readouts so packet, overflow, capture, and AI behavior can be tuned quickly without contaminating the stable game mode
+
+Checks:
+
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- TentacleWars sandbox debug panel
+- packet/overflow readouts
+- safer iteration flow for future tuning waves
+
+#### TASK-TW-012 Browser Visual Validation Framework
+
+- Owner: `qa-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/qa-checks-agent.md`
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/gameplay-systems-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+  - `screenshot`
+- Priority: `high`
+- Status: `completed`
+
+Goal:
+
+- add a reliable browser-driven visual test workflow so Codex can inspect live gameplay mechanics directly on the web page instead of relying only on code-level guardrails
+
+Checks:
+
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- stable local browser test entry for gameplay
+- reproducible screenshot capture for live mechanic states
+- text/debug state export aligned with visible gameplay
+- documented Codex workflow for visual validation loops
+
+#### TASK-TW-013 TentacleWars Draw-Connect Fidelity Input
+
+- Owner: `ui-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/ui-ux-agent.md`
+  - `docs/agents/gameplay-systems-agent.md`
+  - `docs/agents/qa-checks-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `playwright`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- move TentacleWars input closer to draw-to-connect as the primary fantasy while keeping the shared shell stable during phase 1
+
+Checks:
+
+- `node scripts/input-harness.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+Primary deliverables:
+
+- TentacleWars draw-connect primary path
+- click-connect compatibility fallback if still desired
+- documented mode-specific input semantics
+
+#### TASK-TW-014 TentacleWars Focused Sanity Suites
+
+- Owner: `qa-owner`
+- Workstream: `WS-TW TentacleWars Mode`
+- Suggested Agents:
+  - `docs/agents/qa-checks-agent.md`
+  - `docs/agents/gameplay-systems-agent.md`
+- Suggested Skills:
+  - `develop-web-game`
+  - `jupyter-notebook`
+- Priority: `medium`
+- Status: `completed`
+
+Goal:
+
+- add TentacleWars-focused sanity suites so fidelity work can be verified directly instead of relying only on the broad shared smoke suite
+
+Checks:
+
+- `node scripts/smoke-checks.mjs`
+- `node scripts/simulation-soak.mjs`
+
+Primary deliverables:
+
+- `tw-energy-sanity`
+- `tw-grade-sanity`
+- `tw-ai-sanity`
+- documented local check usage for TentacleWars waves
 
 ### LATER
 
@@ -1342,6 +2326,162 @@ Validation:
 Done criteria:
 
 - behavior checks exist only where they add real signal
+
+### TENTACLEWARS CAMPAIGN TRACK
+
+Full task definitions with blocking done criteria and explicit dependencies:
+`docs/project/tw-campaign-task-definitions.md`
+
+Sequence and current status: `docs/project/operational-kanban.md`
+
+#### TASK-TWL-001 TentacleWars Campaign Product Spec
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TW TentacleWars Campaign`
+- Status: `completed`
+- Output: `docs/tentaclewars/tw-campaign-product-spec.md`
+
+#### TASK-TWL-002 TentacleWars Level Data Schema
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TW TentacleWars Campaign`
+- Status: `active`
+- Depends on: TWL-001 ✓
+
+Checks:
+- schema validator importable
+- sample level passes
+- one invalid object rejected with descriptive error
+
+Output: `docs/tentaclewars/tw-level-data-schema.md` + `src/tentaclewars/TwLevelSchema.js`
+
+#### TASK-TWL-003 TentacleWars Progression and Score Spec
+
+- Owner: `meta-progression-owner`
+- Workstream: `WS-TW TentacleWars Campaign`
+- Status: `planned`
+- Depends on: TWL-001 ✓
+- Blocks: TWL-005, TWL-006
+
+Output: `docs/tentaclewars/tw-progression-score-spec.md`
+
+#### TASK-TWL-004 TentacleWars Obstacle Spec
+
+- Owner: `campaign-level-owner`
+- Workstream: `WS-TW TentacleWars Campaign`
+- Status: `planned`
+- Depends on: TWL-001 ✓
+- Must close: static-circle vs composite-blob decision before TWL-008a
+
+Output: `docs/tentaclewars/tw-obstacle-spec.md`
+
+#### TASK-TWL-005 TentacleWars Campaign Loader
+
+- Owner: `gameplay-owner`
+- Workstream: `WS-TW TentacleWars Campaign`
+- Status: `completed`
+- Depends on: TWL-002 + TWL-003
+
+Checks:
+- `node scripts/tw-campaign-loader-sanity.mjs`
+- `node scripts/tw-campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+#### TASK-TWL-006 TentacleWars Campaign State Namespace
+
+- Owner: `meta-progression-owner`
+- Workstream: `WS-TW TentacleWars Campaign`
+- Status: `completed`
+- Depends on: TWL-003
+
+Checks:
+- `node scripts/game-state-progression-sanity.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+#### TASK-TWL-007 TentacleWars Campaign Sanity Suite
+
+- Owner: `qa-owner`
+- Workstream: `WS-TW TentacleWars Campaign`
+- Status: `completed`
+- Depends on: TWL-002
+- Note: bootstraps sanity harness against fixture data; does not require authored levels
+
+Checks: `node scripts/tw-campaign-sanity.mjs`
+
+#### TASK-TWL-016 TentacleWars Level Preview and Jump Tools
+
+- Owner: `qa-owner`
+- Status: `completed`
+- Depends on: TWL-005
+
+Checks:
+- `node scripts/tw-preview-jump-sanity.mjs`
+- `node scripts/game-state-progression-sanity.mjs`
+- `node scripts/ui-actions-sanity.mjs`
+- `node scripts/ui-dom-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+#### TASK-TWL-017 TentacleWars Spreadsheet Balance Matrix
+
+- Owner: `campaign-level-owner`
+- Status: `completed`
+- Depends on: TWL-002
+- Must complete before TWL-008a
+
+Checks: `node scripts/tw-balance-matrix-sanity.mjs`
+
+#### TASK-TWL-008a TentacleWars World 1 Prototype
+
+- Owner: `campaign-level-owner`
+- Status: `completed`
+- Depends on: all Phase B done
+- Scope: W1-01..W1-05 — pipeline validation gate
+
+Checks:
+- `node scripts/tw-level-schema-sanity.mjs`
+- `node scripts/tw-campaign-sanity.mjs`
+- `node scripts/tw-campaign-loader-sanity.mjs`
+- `node scripts/tw-preview-jump-sanity.mjs`
+- `node scripts/tw-balance-matrix-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+#### TASK-TWL-008b TentacleWars World 1 Complete
+
+- Owner: `campaign-level-owner`
+- Status: `completed`
+- Depends on: TWL-008a pipeline confirmed
+- Scope: W1-06..W1-20
+
+Checks:
+- `node scripts/tw-campaign-sanity.mjs`
+- `node scripts/tw-campaign-loader-sanity.mjs`
+- `node scripts/tw-preview-jump-sanity.mjs`
+- `node scripts/tw-balance-matrix-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+
+#### TASK-TWL-009 TentacleWars World 1 Playtest and Reconstruction Review
+
+- Owner: `campaign-level-owner`
+- Status: `needs validation`
+- Depends on: TWL-008b
+
+Checks:
+- `node scripts/tw-campaign-sanity.mjs`
+- `node scripts/smoke-checks.mjs`
+- `node scripts/commentary-policy.mjs`
+
+#### TASK-TWL-010 through TASK-TWL-015
+
+Worlds 2, 3, 4 — same Authoring Pack + Playtest Review structure per world.
+Open only after the previous world's playtest review is done.
+
+#### TASK-TWL-018 TentacleWars Phase Editor Feasibility Review
+
+- Status: `planned`
+- Phase G — feasibility assessment only, not implementation commitment
+
+---
 
 ## Suggested Immediate Execution Order
 

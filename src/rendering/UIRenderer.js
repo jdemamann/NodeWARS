@@ -10,16 +10,23 @@
      • phase-outcome overlay
    ================================================================ */
 
-import { GAMEPLAY_RULES, MAX_SLOTS } from '../config/gameConfig.js';
+import { GAMEPLAY_RULES, TentState } from '../config/gameConfig.js';
+import { canCreateTentacleConnection, computeTentacleBuildCost } from '../input/TentacleCommands.js';
 import { ownerColor, ownerPanelTheme } from '../theme/ownerPalette.js';
 import { computeBuildCost, maxRange } from '../math/simulationMath.js';
 import { computeNodeDisplayRegenRate } from '../systems/EnergyBudget.js';
 import { getContestContributorOwners, getDisplayContestEntries } from '../systems/NeutralContest.js';
 import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
+import {
+  getTentacleWarsGradeDisplayName,
+  getTentacleWarsGradePresentation,
+  getTentacleWarsGradeDisplayThresholds,
+  getTentacleWarsSlotAvailability,
+} from '../tentaclewars/TwPresentationModel.js';
 import { drawRoundedRect } from './canvasPrimitives.js';
 import { getCanvasCopyFont, getCanvasDisplayFont } from '../theme/uiFonts.js';
 
-const { input: INPUT_TUNING, progression: PROGRESSION_RULES, render: RENDER_RULES } = GAMEPLAY_RULES;
+const { input: INPUT_TUNING, render: RENDER_RULES } = GAMEPLAY_RULES;
 
 function colorWithAlpha(hexColor, alpha) {
   const hex = hexColor.replace('#', '');
@@ -223,6 +230,7 @@ export class UIRenderer {
   static drawInfoPanel(ctx, game, W, H) {
     const n = game.hoverNode;
     if (!n || game.state !== 'playing') return;
+    const isTentacleWarsSandbox = game.twMode?.isTentacleWarsActive?.() || false;
 
     const t          = game.time;
     const isRelay    = n.isRelay;
@@ -244,8 +252,8 @@ export class UIRenderer {
     const pulse = 0.55 + Math.sin(t * 6) * 0.3;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(ncx, ncy, n.radius + RENDER_RULES.UI.HOVER_RING_OFFSET_PX, 0, Math.PI * 2);
-    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.globalAlpha = pulse;
+    ctx.arc(ncx, ncy, n.radius + (isTentacleWarsSandbox ? 6 : RENDER_RULES.UI.HOVER_RING_OFFSET_PX), 0, Math.PI * 2);
+    ctx.strokeStyle = col; ctx.lineWidth = isTentacleWarsSandbox ? 1.35 : 2; ctx.globalAlpha = isTentacleWarsSandbox ? pulse * 0.72 : pulse;
     ctx.setLineDash(RENDER_RULES.UI.PANEL_CONNECTOR_DASH); ctx.stroke(); ctx.setLineDash([]);
     if (game.hoverPin) {
       ctx.beginPath();
@@ -258,26 +266,34 @@ export class UIRenderer {
     const lang = game._lang || 'en';
     const LABEL = lang === 'pt' ? {
       title_neutral:'CÉLULA NEUTRA', title_enemy:'CÉLULA INIMIGA', title_player:'CÉLULA ALIADA', title_relay:'RETRANSMISSOR',
-      level:'NÍVEL', energy:'ENERGIA', regen:'REGEN', slots:'SLOTS',
-      sent:'ENVIADOS', slots_free:'LIVRES', incoming:'ATACANDO',
-      capture:'CAPTURA', contested:'DISPUTADA', contest_leader:'LÍDER', contest_target:'META', threat:'AMEAÇA A VOCÊ',
+      level:'NÍVEL', tw_grade:'FORMA', energy:'ENERGIA', regen:'REGEN', tw_flow:'FLUXO', slots:'SLOTS', tentacles:'TENTÁCULOS',
+      sent:'EM USO', slots_free:'LIVRES', slots_cap:'CAP', incoming:'ATACANDO',
+      capture:'CAPTURA', tw_capture:'AQUISIÇÃO', contested:'DISPUTADA', contest_leader:'LÍDER', contest_target:'META', threat:'AMEAÇA A VOCÊ',
       shield:'ESCUDO ATIVO', overflow:'TRANSBORDANDO', pin:'[clique p/ fixar]', relay_buffer:'BUFFER',
       flow_in:'ENTRADA', flow_out:'SAÍDA', under_attack:'SOB ATAQUE',
     } : {
       title_neutral:'NEUTRAL CELL', title_enemy:'ENEMY CELL', title_player:'FRIENDLY CELL', title_relay:'RELAY NODE',
-      level:'LEVEL', energy:'ENERGY', regen:'REGEN', slots:'SLOTS',
-      sent:'SENT', slots_free:'FREE', incoming:'ATTACKING YOU',
-      capture:'CAPTURE', contested:'CONTESTED', contest_leader:'LEADER', contest_target:'TARGET', threat:'THREAT TO YOU',
+      level:'LEVEL', tw_grade:'GRADE', energy:'ENERGY', regen:'REGEN', tw_flow:'FLOW', slots:'SLOTS', tentacles:'TENTACLES',
+      sent:'IN USE', slots_free:'FREE', slots_cap:'CAP', incoming:'ATTACKING YOU',
+      capture:'CAPTURE', tw_capture:'ACQUIRE', contested:'CONTESTED', contest_leader:'LEADER', contest_target:'TARGET', threat:'THREAT TO YOU',
       shield:'SHIELD ACTIVE', overflow:'OVERFLOWING', pin:'[click to pin]', relay_buffer:'BUFFER',
       flow_in:'FLOW IN', flow_out:'FLOW OUT', under_attack:'UNDER ATTACK',
     };
 
     const frenzyActive = game.frenzyTimer > 0 && n.owner === 1;
     const regen        = isNeutral ? 0 : +computeNodeDisplayRegenRate(n, frenzyActive).toFixed(1);
-    const totalSlots = PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL[
-      Math.min(lvl, PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL.length - 1)
-    ];
+    const totalSlots = n.maxSlots;
     const activeSent   = game._utils.liveOut(n);
+    const isTentacleWarsNode = n.simulationMode === 'tentaclewars';
+    const twSlotAvailability = isTentacleWarsNode
+      ? getTentacleWarsSlotAvailability(n, activeSent)
+      : null;
+    const twGradeThresholds = isTentacleWarsNode
+      ? getTentacleWarsGradeDisplayThresholds(lvl)
+      : null;
+    const twGradePresentation = isTentacleWarsNode
+      ? getTentacleWarsGradePresentation(lvl)
+      : null;
     const incomingAtk  = game.tents.filter(t2 =>
       t2.alive && t2.source && t2.target &&
       (t2.state === 'active' || t2.state === 'advancing') &&
@@ -302,17 +318,29 @@ export class UIRenderer {
     };
 
     const rows = [];
-    rows.push({
-      label: LABEL.level,
-      value: isRelay ? 'RELAY' : lvl + ' / ' + (PROGRESSION_RULES.MAX_TENTACLE_SLOTS_PER_LEVEL.length - 1),
-    });
+    if (isRelay) {
+      rows.push({ label: LABEL.level, value: 'RELAY' });
+    } else if (isTentacleWarsNode) {
+      rows.push({
+        label: LABEL.tw_grade,
+        value: getTentacleWarsGradeDisplayName(lvl).toUpperCase(),
+        sub: `↑${twGradeThresholds.ascendThreshold} · ↓${twGradeThresholds.descendThreshold} · ${LABEL.slots_cap} ${twGradePresentation.maxTentacleSlots}`,
+      });
+    } else {
+      rows.push({
+        label: LABEL.level,
+        value: lvl.toString(),
+      });
+    }
     rows.push({ label: LABEL.energy, value: energy + ' / ' + maxE,
                 bar: { pct: fillPct / 100, col: ownerColor(n.owner, Math.min(lvl, 4)) } });
     if (isRelay) {
       rows.push({ label: LABEL.relay_buffer, value: (n.relayFeedBudget || 0).toFixed(1) + ' e/s' });
     } else if (!isNeutral) {
-      const regenVal = '+' + regen + ' e/s';
-      rows.push({ label: LABEL.regen, value: regenVal });
+      const regenVal = isTentacleWarsNode
+        ? `${twGradePresentation.packetRatePerSecond.toFixed(1)} pkt/s`
+        : '+' + regen + ' e/s';
+      rows.push({ label: isTentacleWarsNode ? LABEL.tw_flow : LABEL.regen, value: regenVal });
       const eIn  = +(game.tents.filter(t2 =>
         t2.alive &&
         t2.state === 'active' &&
@@ -330,10 +358,21 @@ export class UIRenderer {
       if (eIn  > 0) rows.push({ label: LABEL.flow_in,  value: '+' + eIn  + ' e/s', accentCol:'#00ff9d' });
       if (eOut > 0) rows.push({ label: LABEL.flow_out, value: '-' + eOut + ' e/s', accentCol:'#ff7090' });
     }
-    rows.push({ label: LABEL.slots,
-      value: isNeutral ? '—' : activeSent + ' / ' + totalSlots,
-      sub: isNeutral ? null : (totalSlots - activeSent > 0 ? (totalSlots - activeSent) + ' ' + LABEL.slots_free : null)
-    });
+    rows.push(
+      isNeutral
+        ? { label: LABEL.slots, value: '—' }
+        : isTentacleWarsNode
+          ? {
+              label: LABEL.tentacles,
+              value: `${twSlotAvailability.availableSlots} ${LABEL.slots_free}`,
+              sub: `${twSlotAvailability.usedSlots} ${LABEL.sent} · ${LABEL.slots_cap} ${twSlotAvailability.totalSlots}`,
+            }
+          : {
+              label: LABEL.slots,
+              value: activeSent + ' / ' + totalSlots,
+              sub: totalSlots - activeSent > 0 ? (totalSlots - activeSent) + ' ' + LABEL.slots_free : null,
+            }
+    );
     if (isPlayer && incomingAtk > 0) {
       rows.push({ label: LABEL.under_attack, value: incomingAtk + '×', accent: true, accentCol: '#ff3d5a' });
     }
@@ -344,7 +383,7 @@ export class UIRenderer {
     if (isNeutral && n.contest) {
       const contestColor = leadingContest ? ownerColor(leadingContest.owner, Math.min(lvl, 4)) : '#00e5ff';
       rows.push({
-        label: LABEL.capture,
+        label: isTentacleWarsNode ? LABEL.tw_capture : LABEL.capture,
         value: contestPct + '%',
         bar: { pct: contestPct / 100, col: contestColor },
         accent: contestPct > 0,
@@ -380,7 +419,7 @@ export class UIRenderer {
       rows.push({ label: LABEL.shield, value: '◈', accent: true, accentCol: '#55faff' });
     }
 
-    const PW = RENDER_RULES.UI.PANEL_WIDTH_PX;
+    const PW = isTentacleWarsSandbox ? Math.max(180, RENDER_RULES.UI.PANEL_WIDTH_PX - 22) : RENDER_RULES.UI.PANEL_WIDTH_PX;
     const ROW = RENDER_RULES.UI.PANEL_ROW_HEIGHT_PX;
     const PAD = RENDER_RULES.UI.PANEL_PADDING_PX;
     const titleH = RENDER_RULES.UI.PANEL_TITLE_HEIGHT_PX;
@@ -391,13 +430,13 @@ export class UIRenderer {
     py = Math.max(RENDER_RULES.UI.PANEL_EDGE_MARGIN_PX, Math.min(H - PH - RENDER_RULES.UI.PANEL_EDGE_MARGIN_PX, py));
 
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 18;
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = isTentacleWarsSandbox ? 12 : 18;
     ctx.fillStyle   = colBg;
     ctx.beginPath(); drawRoundedRect(ctx, px, py, PW, PH, 7); ctx.fill();
     ctx.shadowBlur  = 0;
     ctx.strokeStyle = colBdr; ctx.lineWidth = 1.2;
     ctx.beginPath(); drawRoundedRect(ctx, px, py, PW, PH, 7); ctx.stroke();
-    ctx.fillStyle   = col; ctx.globalAlpha = 0.55;
+    ctx.fillStyle   = col; ctx.globalAlpha = isTentacleWarsSandbox ? 0.42 : 0.55;
     ctx.beginPath(); drawRoundedRect(ctx, px, py, PW, 3, { tl:7, tr:7, bl:0, br:0 }); ctx.fill();
     ctx.globalAlpha = 1;
     const title = isRelay ? LABEL.title_relay : isPlayer ? LABEL.title_player : isNeutral ? LABEL.title_neutral : LABEL.title_enemy;
@@ -409,7 +448,7 @@ export class UIRenderer {
     if (!game.hoverPin) {
       ctx.font = getCanvasCopyFont(7);
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.textAlign = 'right';
-      ctx.fillText(LABEL.pin, px + PW - PAD, py + 3 + titleH / 2);
+      if (!isTentacleWarsSandbox) ctx.fillText(LABEL.pin, px + PW - PAD, py + 3 + titleH / 2);
     } else {
       ctx.font = getCanvasCopyFont(7, 'bold');
       ctx.fillStyle = col; ctx.globalAlpha = 0.7; ctx.textAlign = 'right';
@@ -448,10 +487,12 @@ export class UIRenderer {
     /* Connector line */
     const cx2 = ncx + n.radius * (px < ncx ? -1 : 1) * 1;
     const px2  = px < ncx ? px + PW : px;
-    ctx.strokeStyle = colBdr; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.5;
-    ctx.setLineDash(RENDER_RULES.UI.PANEL_CONNECTOR_DASH);
-    ctx.beginPath(); ctx.moveTo(cx2, ncy); ctx.lineTo(px2, py + PH / 2); ctx.stroke();
-    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    if (!isTentacleWarsSandbox) {
+      ctx.strokeStyle = colBdr; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.5;
+      ctx.setLineDash(RENDER_RULES.UI.PANEL_CONNECTOR_DASH);
+      ctx.beginPath(); ctx.moveTo(cx2, ncy); ctx.lineTo(px2, py + PH / 2); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
     ctx.restore();
   }
 
@@ -523,11 +564,35 @@ export class UIRenderer {
     if (distanceToCursor < RENDER_RULES.UI.PREVIEW_MIN_DISTANCE_PX) return;
 
     const distanceCostMultiplier = game.cfg.distanceCostMultiplier;
-    const maxReach = maxRange(game.sel.energy - 1, distanceCostMultiplier);
+    const buildCost = computeTentacleBuildCost(game.sel, snappedTargetNode || { x: cmx, y: cmy }, distanceCostMultiplier);
+    const maxReach = game.sel.simulationMode === 'tentaclewars'
+      ? Math.max(0, distanceToCursor)
+      : maxRange(game.sel.energy - 1, distanceCostMultiplier);
     const reachableDistance = Math.min(distanceToCursor, maxReach);
-    const canFire  = game.sel.energy >= computeBuildCost(distanceToCursor) + distanceToCursor * distanceCostMultiplier + 1 &&
-                     game._utils.liveOut(game.sel) < MAX_SLOTS[game.sel.level] &&
-                     (!snappedTargetNode || snappedTargetNode !== game.sel);
+    const isBlockedByObstacle = !!(
+      snappedTargetNode &&
+      !canCreateTentacleConnection(game.sel, snappedTargetNode, game.twObstacles)
+    );
+    /* In TentacleWars the clash point is always at the lane midpoint, so a
+       counter-tentacle only needs to grow halfway.  Halve the required energy
+       when an active hostile tentacle already occupies the reverse route. */
+    const isTentacleWarsPreview = game.sel.simulationMode === 'tentaclewars';
+    let effectiveBuildCost = buildCost.totalBuildCost;
+    let isClashRoute = false;
+    if (isTentacleWarsPreview && snappedTargetNode) {
+      isClashRoute = game.tents.some(t =>
+        t.alive &&
+        t.state === TentState.ACTIVE &&
+        t.effectiveSourceNode === snappedTargetNode &&
+        t.effectiveTargetNode === game.sel &&
+        areHostileOwners(t.effectiveSourceNode.owner, game.sel.owner),
+      );
+      if (isClashRoute) effectiveBuildCost = buildCost.totalBuildCost * 0.5;
+    }
+    const canFire  = game.sel.energy >= effectiveBuildCost + 1 &&
+                     game._utils.liveOut(game.sel) < game.sel.maxSlots &&
+                     (!snappedTargetNode || snappedTargetNode !== game.sel) &&
+                     !isBlockedByObstacle;
     const normalizedX = deltaX / distanceToCursor;
     const normalizedY = deltaY / distanceToCursor;
     const reachX = sx + normalizedX * reachableDistance;
@@ -535,13 +600,44 @@ export class UIRenderer {
 
     ctx.save();
     if (reachableDistance > 0) {
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(reachX, reachY);
-      ctx.strokeStyle = canFire ? 'rgba(0,229,255,0.75)' : 'rgba(245,197,24,0.7)';
-      ctx.lineWidth   = 2; ctx.setLineDash(RENDER_RULES.UI.PREVIEW_REACH_DASH);
-      ctx.shadowColor = canFire ? '#00e5ff' : '#f5c518'; ctx.shadowBlur = 6; ctx.stroke();
-      ctx.beginPath(); ctx.arc(reachX, reachY, 3, 0, Math.PI * 2);
-      ctx.fillStyle   = canFire ? '#00e5ff' : '#f5c518'; ctx.globalAlpha = 0.85;
-      ctx.shadowBlur  = 10; ctx.fill();
+      /* In TentacleWars, when the player cannot yet afford the tentacle, draw a
+         two-tone path: the cyan segment shows available energy progress and the
+         yellow segment shows what still needs to accumulate.  This gives instant
+         feedback on how close the player is to being able to fire. */
+      /* Only show the two-tone bar when the reason for !canFire is specifically
+         insufficient energy — not when slots are full or the target is invalid. */
+      const hasInsufficientEnergy = game.sel.energy < effectiveBuildCost + 1;
+      const hasSlotAvailable = game._utils.liveOut(game.sel) < game.sel.maxSlots;
+      const showEnergyProgress =
+        isTentacleWarsPreview && !canFire && !isBlockedByObstacle &&
+        effectiveBuildCost > 0 && hasInsufficientEnergy && hasSlotAvailable;
+      if (showEnergyProgress) {
+        const energyFraction = Math.max(0, Math.min(1, game.sel.energy / effectiveBuildCost));
+        const splitX = sx + normalizedX * distanceToCursor * energyFraction;
+        const splitY = sy + normalizedY * distanceToCursor * energyFraction;
+        /* Cyan "have" segment */
+        if (energyFraction > 0.01) {
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(splitX, splitY);
+          ctx.strokeStyle = 'rgba(0,229,255,0.80)';
+          ctx.lineWidth = 2; ctx.setLineDash(RENDER_RULES.UI.PREVIEW_REACH_DASH);
+          ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 6; ctx.stroke();
+        }
+        /* Yellow "need" segment */
+        ctx.beginPath(); ctx.moveTo(splitX, splitY); ctx.lineTo(reachX, reachY);
+        ctx.strokeStyle = 'rgba(245,197,24,0.55)';
+        ctx.lineWidth = 1.5; ctx.shadowColor = '#f5c518'; ctx.shadowBlur = 4; ctx.stroke();
+        /* Endpoint dot in yellow */
+        ctx.beginPath(); ctx.arc(reachX, reachY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#f5c518'; ctx.globalAlpha = 0.75; ctx.shadowBlur = 8; ctx.fill();
+      } else {
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(reachX, reachY);
+        ctx.strokeStyle = canFire ? 'rgba(0,229,255,0.75)' : 'rgba(245,197,24,0.7)';
+        ctx.lineWidth   = 2; ctx.setLineDash(RENDER_RULES.UI.PREVIEW_REACH_DASH);
+        ctx.shadowColor = canFire ? '#00e5ff' : '#f5c518'; ctx.shadowBlur = 6; ctx.stroke();
+        ctx.beginPath(); ctx.arc(reachX, reachY, 3, 0, Math.PI * 2);
+        ctx.fillStyle   = canFire ? '#00e5ff' : '#f5c518'; ctx.globalAlpha = 0.85;
+        ctx.shadowBlur  = 10; ctx.fill();
+      }
     }
     if (reachableDistance < distanceToCursor) {
       ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -551,11 +647,18 @@ export class UIRenderer {
       ctx.setLineDash(RENDER_RULES.UI.PREVIEW_OVERFLOW_DASH);
       ctx.stroke();
     }
-    const buildCost = computeBuildCost(distanceToCursor) + distanceToCursor * distanceCostMultiplier;
     ctx.setLineDash([]); ctx.shadowBlur = 0; ctx.globalAlpha = 0.8;
     ctx.font = getCanvasCopyFont(8); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillStyle = canFire ? '#00e5ff' : '#ff3d5a';
-    ctx.fillText(Math.ceil(buildCost) + 'e', targetScreenX + 14, targetScreenY - 8);
+    const costLabel = isClashRoute
+      ? Math.ceil(effectiveBuildCost) + 'e ⚡'
+      : Math.ceil(effectiveBuildCost) + 'e';
+    ctx.fillText(costLabel, targetScreenX + 14, targetScreenY - 8);
+    if (isBlockedByObstacle) {
+      ctx.fillStyle = 'rgba(255,61,90,0.72)';
+      ctx.font = getCanvasCopyFont(7, 'bold');
+      ctx.fillText('BLOCKED', targetScreenX + 14, targetScreenY + 5);
+    }
     if (!canFire && distanceToCursor > maxReach + 5) {
       ctx.fillStyle = 'rgba(255,61,90,0.6)'; ctx.font = getCanvasCopyFont(7);
       ctx.fillText('-' + Math.ceil(distanceToCursor - maxReach) + 'px', targetScreenX + 14, targetScreenY + 3);

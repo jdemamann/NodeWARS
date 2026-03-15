@@ -13,7 +13,7 @@ async function read(relPath) {
 
 async function testScreenIdsStayUniqueAndPresent() {
   const html = await read('index.html');
-  const screenIds = ['sm', 'sl', 'ss', 'sr', 'sce', 'pm', 'sq', 'scredit'];
+  const screenIds = ['sm', 'sl', 'stw', 'stwl', 'stwe', 'ss', 'sr', 'sce', 'pm', 'sq', 'scredit'];
 
   for (const screenId of screenIds) {
     const matches = html.match(new RegExp(`id="${screenId}"`, 'g')) || [];
@@ -26,11 +26,12 @@ async function testCriticalMenuButtonsAreWired() {
   const html = await read('index.html');
 
   const buttonIds = [
-    'btnplay', 'btnstory', 'btnsettings', 'btncredits',
+    'btnplay', 'btntw', 'btnstory', 'btnsettings', 'btncredits',
     'btnSettingsBack', 'btncreditsback',
-    'btnback',
+    'btnback', 'btnTwWorldBack', 'btnTwLevelBack',
     'btnstoryback', 'btnstoryback2',
     'btnrl', 'btnrr', 'btnrn',
+    'btnTwEndingMenu',
     'btnEndingLevels', 'btnEndingReplay', 'btnEndingMenu',
     'btnresume', 'btnprl', 'btnprr', 'btnpskip', 'btnpmenu',
     'btnCopyDebug', 'btnViewEnding', 'btnResetProg',
@@ -42,11 +43,12 @@ async function testCriticalMenuButtonsAreWired() {
   }
 
   const wiredDomIds = [
-    'BTN_PLAY', 'BTN_STORY', 'BTN_SETTINGS', 'BTN_CREDITS',
+    'BTN_PLAY', 'BTN_TW_PLAY', 'BTN_STORY', 'BTN_SETTINGS', 'BTN_CREDITS',
     'BTN_SETTINGS_BACK', 'BTN_CREDITS_BACK',
-    'BTN_BACK',
+    'BTN_BACK', 'BTN_TW_WORLD_BACK', 'BTN_TW_LEVEL_BACK',
     'BTN_STORY_BACK', 'BTN_STORY_BACK2',
     'BTN_RL', 'BTN_RR', 'BTN_RN',
+    'BTN_TW_ENDING_MENU',
     'BTN_ENDING_LEVELS', 'BTN_ENDING_REPLAY', 'BTN_ENDING_MENU',
     'BTN_RESUME', 'BTN_PRL', 'BTN_PRR', 'BTN_PSKIP', 'BTN_PMENU',
     'BTN_COPY_DEBUG', 'BTN_VIEW_ENDING', 'BTN_RESET_PROG',
@@ -110,23 +112,59 @@ async function testSettingsControlsHaveI18nCoverage() {
   for (const key of ['setCopyDebug', 'setViewEnding', 'setReset', 'setMusicPlayer']) {
     assert.match(html, new RegExp(`data-t="${key}"`), `${key} should be rendered through i18n in index.html`);
   }
+
+  assert.match(html, /id="debugSettingsGroup"/, 'settings should expose a grouped debug settings card');
 }
 
 async function testScreenTransitionsUseNamedScreens() {
   const screenController = await read('src/ui/ScreenController.js');
   const mainSource = await read('src/main.js');
+  const gameSource = await read('src/core/Game.js');
 
-  for (const screenName of ['menu', 'levels', 'story', 'result', 'ending', 'pause', 'settings', 'credits']) {
+  for (const screenName of ['menu', 'levels', 'twWorlds', 'twLevels', 'twEnding', 'story', 'result', 'ending', 'pause', 'settings', 'credits']) {
     assert.match(screenController, new RegExp(`${screenName}:\\s+DOM_IDS\\.`), `ScreenController should map the ${screenName} screen`);
   }
 
   assert.match(mainSource, /showScr\('levels'\)/, 'main menu flow should still navigate to the level-select screen');
+  assert.match(mainSource, /showTwWorldSelect\(\)/, 'TentacleWars menu flow should open the world-select screen');
+  assert.match(mainSource, /showTwLevelSelect\(/, 'TentacleWars flow should support navigating from world select into level select');
   assert.match(mainSource, /showScr\('settings'\)/, 'settings flow should still navigate to the settings screen');
   assert.match(mainSource, /showScr\('credits'\)/, 'credits flow should still navigate to the credits screen');
   assert.match(mainSource, /BTN_CREDITS[\s\S]*Music\.playTrackById\('stella'\)/, 'credits flow should switch to Stella when the credits screen opens');
   assert.match(mainSource, /BTN_CREDITS_BACK[\s\S]*Music\.playMenu\(\)/, 'leaving credits should restore the menu theme');
   assert.match(mainSource, /showScr\('menu'\)/, 'back buttons should still navigate to the menu screen');
   assert.match(screenController, /showScr\('ending'\)/, 'campaign completion should still navigate to the dedicated ending screen');
+  assert.match(screenController, /twWorlds:\s+DOM_IDS\./, 'ScreenController should map the TentacleWars world-select screen');
+  assert.match(screenController, /twLevels:\s+DOM_IDS\./, 'ScreenController should map the TentacleWars level-select screen');
+  assert.match(screenController, /twEnding:\s+DOM_IDS\./, 'ScreenController should map the TentacleWars campaign ending screen');
+  assert.match(gameSource, /enterSelectedMode\(\)\s*\{\s*showScr\(null\);/s, 'entering the selected mode should hide menu shells before gameplay starts');
+}
+
+async function testTentacleWarsNavigationUsesCanonicalProgress() {
+  const screenController = await read('src/ui/ScreenController.js');
+  const mainSource = await read('src/main.js');
+  const resultViewSource = await read('src/ui/resultScreenView.js');
+
+  assert.match(screenController, /STATE\.isTentacleWarsWorldUnlocked\(/, 'TW world select should respect canonical world unlock helpers');
+  assert.match(screenController, /STATE\.isTentacleWarsLevelUnlocked\(/, 'TW level select should respect canonical level unlock helpers');
+  assert.match(screenController, /STATE\.getTentacleWarsStars\(/, 'TW level select should surface stored TW stars');
+  assert.match(mainSource, /STATE\.getTentacleWarsCurrentLevel\(\)/, 'TW result flow should consult the canonical current TW level pointer');
+  assert.match(mainSource, /getTentacleWarsCampaignLevelById\(/, 'TW navigation should load authored levels from the canonical fixture lookup');
+  assert.match(mainSource, /showTwCampaignEnding\(/, 'final TW phase should branch into the TW ending stub');
+  assert.match(resultViewSource, /isTentacleWarsCampaign/, 'result screen helpers should gate the TW result layout on the authored TW campaign flag');
+  assert.match(resultViewSource, /STATE\.getTentacleWarsStars\(/, 'TW result layout should read stars from canonical GameState');
+  assert.doesNotMatch(resultViewSource, /wastedTents[\s\S]*isTentacleWarsCampaign/s, 'TW result layout should not reuse NodeWARS wasted-tentacle stats');
+}
+
+async function testTwCampaignEndingScreenIsWired() {
+  const html = await read('index.html');
+  const mainSource = await read('src/main.js');
+  const screenController = await read('src/ui/ScreenController.js');
+
+  assert.match(html, /id="stwe"/, 'index.html should define the dedicated TW campaign ending screen');
+  assert.match(html, /id="btnTwEndingMenu"/, 'TW campaign ending screen should expose a main-menu button');
+  assert.match(screenController, /showTwCampaignEnding\(\)/, 'ScreenController should expose the real TW campaign ending entry point');
+  assert.match(mainSource, /BTN_TW_ENDING_MENU\)\?\.addEventListener\('click'/, 'main.js should wire the TW campaign ending main-menu button');
 }
 
 async function testClipboardAndDebugPreviewFallbacksExist() {
@@ -252,6 +290,8 @@ async function main() {
     ['tutorial and HUD controls are wired', testTutorialAndHudControlsAreWired],
     ['settings controls have i18n coverage', testSettingsControlsHaveI18nCoverage],
     ['screen transitions use named screens', testScreenTransitionsUseNamedScreens],
+    ['tentaclewars navigation uses canonical progress', testTentacleWarsNavigationUsesCanonicalProgress],
+    ['tw campaign ending screen is wired', testTwCampaignEndingScreenIsWired],
     ['clipboard and debug preview fallbacks exist', testClipboardAndDebugPreviewFallbacksExist],
     ['music notification wiring stays present', testMusicNotificationWiringStaysPresent],
     ['settings world toggles and menu feedback stay robust', testSettingsWorldTogglesAndMenuFeedbackStayRobust],

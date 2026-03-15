@@ -38,9 +38,22 @@ export function applySettingsToggleState(state) {
     themeButton.textContent = theme;
     themeButton.classList.toggle('on', theme !== 'GLACIER');
   }
+
+  const modeButton = $(DOM_IDS.BTN_MODE_CYCLE);
+  if (modeButton) {
+    const modeId = state.getGameMode?.() || 'nodewars';
+    modeButton.textContent = modeId === 'tentaclewars' ? 'TENTACLEWARS' : 'NODEWARS';
+    modeButton.classList.toggle('on', modeId === 'tentaclewars');
+  }
 }
 
 export function applyDebugSettingsVisibility(debugEnabled) {
+  // Keep all debug-only controls inside one visual block so the Settings
+  // screen clearly communicates that those actions belong to the same mode.
+  const debugSettingsGroup = $(DOM_IDS.DEBUG_SETTINGS_GROUP);
+  if (debugSettingsGroup) debugSettingsGroup.style.display = debugEnabled ? '' : 'none';
+  const modeGroup = $(DOM_IDS.MODE_GROUP);
+  if (modeGroup) modeGroup.style.display = debugEnabled ? '' : 'none';
   const worldUnlockGroup = $(DOM_IDS.WORLD_UNLOCK_GROUP);
   // Manual world unlock toggles are a debug-only escape hatch; natural campaign unlocks stay visible in the level select.
   if (worldUnlockGroup) worldUnlockGroup.style.display = debugEnabled ? '' : 'none';

@@ -25,6 +25,12 @@ export class HUD {
   }
 
   update(game) {
+    const isTentacleWarsMode = game.twMode?.isTentacleWarsActive?.() || false;
+    const brandElement = $(DOM_IDS.HBRAND);
+    if (brandElement) {
+      brandElement.textContent = isTentacleWarsMode ? T('twModeLabel') : 'NODE WARS';
+    }
+
     /* Node counts */
     const playerNodeCount = game.nodes.filter(node => node.owner === 1).length;
     const neutralNodeCount = game.nodes.filter(node => node.owner === 0).length;
@@ -63,7 +69,7 @@ export class HUD {
 
     /* Live score */
     const scoreElement = $(DOM_IDS.HSCORE);
-    if (scoreElement && game.cfg && !game.cfg.isTutorial && !game.done) {
+    if (scoreElement && game.cfg && !game.cfg.isTutorial && !game.done && !isTentacleWarsMode) {
       const score = game.calcScore();
       const starCount = game._utils.starsFor(score);
       const scoreText = ['★','☆','☆'].map((_, i) => i < starCount ? '★' : '☆').join('') + ' ' + score;
@@ -100,16 +106,21 @@ export class HUD {
     if (game.cfg) {
       const levelConfig = game.cfg;
       const worldLabel = levelConfig.worldId > 0 ? ' W' + levelConfig.worldId : '';
-      const levelText = levelConfig.isTutorial ? T('tutorial') : ('LVL ' + levelConfig.id + worldLabel);
+      const levelText = isTentacleWarsMode
+        ? (levelConfig.isTentacleWarsSandbox
+          ? (levelConfig.twPresetId ? `TW · ${levelConfig.twPresetId.toUpperCase()}` : T('twModeLabel'))
+          : `TW · ${levelConfig.twLevelId || levelConfig.id}`)
+        : levelConfig.isTutorial ? T('tutorial') : ('LVL ' + levelConfig.id + worldLabel);
       if (levelText !== this._lvl) {
         this._lvl = levelText;
         const el  = $(DOM_IDS.HLVL);
         if (el) el.textContent = levelText;
       }
-      if (levelConfig.name !== this._name) {
-        this._name = levelConfig.name;
+      const levelName = levelConfig.name;
+      if (levelName !== this._name) {
+        this._name = levelName;
         const el   = $(DOM_IDS.HLN);
-        if (el) el.textContent = levelConfig.name;
+        if (el) el.textContent = levelName;
       }
     }
   }

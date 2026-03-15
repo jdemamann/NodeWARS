@@ -1,0 +1,1222 @@
+Original prompt: faça isso. E especifique em quais fases essas musicas aparecem. No menu de notificação de cada musica, na descrição de cada musica que tá sendo tocada, coloque uma explicação curta sobre a alma da musica, não informações tenicas. Coloque sentimento.
+
+- 2026-03-14: Completed `TASK-TWL-012 TentacleWars World 3 Authoring Pack`.
+  - Added `src/tentaclewars/levels/TwWorld3.js` with authored `W3-01..W3-20` plus `TW_WORLD_3_PROTOTYPE_LEVELS`.
+  - Extended `src/tentaclewars/TwCampaignFixtures.js` to include the World 3 pack.
+  - Raised the TentacleWars schema energy-cap ceiling to `500` in `src/tentaclewars/TwLevelSchema.js` so `W3-20` can legally use `energyCap = 450`.
+  - Appended the full World 3 row set to `docs/tentaclewars/tw-balance-matrix.csv`.
+  - Updated `docs/tentaclewars/tw-level-data-schema.md` to reflect the live `1..500` cap range and `circle/capsule` obstacle family.
+  - Extended `scripts/tw-campaign-sanity.mjs` for World 3 contiguity, matrix coverage, and prototype-subset checks.
+  - Corrected authored obstacle layouts that accidentally sealed every opening lane in:
+    - `W3-01`
+    - `W3-05`
+    - `W3-07`
+    - `W3-09`
+    - `W3-11`
+    - `W3-13`
+    - `W3-15`
+    - `W3-18`
+  - Post-fix opening probe confirmed every World 3 phase now exposes at least one canonical opening move, including:
+    - `W3-16`: `p1 -> n1`, cost `6`, reserve `28`
+    - `W3-20`: `p1 -> n3`, cost `15`, reserve `145`
+  - Checks passed:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+
+- 2026-03-13: TWL-009 Phase 1 mechanical gate completed.
+  - Raised `TentacleWars` build cost slope from `0.03` to `0.20`.
+  - Changed TW passive regen reduction to apply only while `underAttack > 0.05`.
+  - Rewrote the TW equal-grade combat smoke guardrail around three states:
+    - uncontested attacker stays stable
+    - defender drains under attack after transient
+    - mutual clash drains both
+  - Updated TW campaign loader sanity to explicitly treat World 1 affordability as a Phase 2 authored rework concern under the high-cost model.
+  - Checks passed:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/tw-campaign-loader-sanity.mjs`
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+  - Focused browser pass on `W1-03` and `W1-05` showed the expected consequence of the new cost model:
+    - old authored layouts no longer allow opening lanes
+    - drag attempts leave `outCount = 0`
+    - this confirms Phase 2 must be level re-authoring, not more mechanic tweaking on old layouts
+
+- 2026-03-13: TWL-009 Phase 2 re-authored `W1-01..W1-05`.
+  - Applied the screenshot-derived World 1 authored set in `src/tentaclewars/levels/TwWorld1.js`.
+  - Updated early rows in `docs/tentaclewars/tw-balance-matrix.csv`.
+  - Aligned authored guardrails to:
+    - two blockers in `W1-05`
+    - `W1-03` introducing `pulsar-class`
+    - `W1-04` no longer carrying the first `support-loop` intro claim
+  - Checks passed:
+    - `node scripts/tw-campaign-loader-sanity.mjs`
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+  - Browser artifacts captured in `output/playwright/phase2-world1-pass/`.
+  - Automation anomalies remain on `W1-03` and `W1-05` because live autostart + early red AI responses make neutral-opening verification noisy without a more deterministic pause/start hook.
+
+- 2026-03-13: W1-02 lesson tag corrected after Claude review.
+  - Replaced `neutral-capture` with `priority-target` in the authored level, balance matrix, and campaign sanity.
+  - Revalidated with:
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+  - Closed `COLLAB-001` with the conclusion that only notification-side watcher automation is safe for now.
+
+- 2026-03-13: TWL-009b aligned `W1-06..W1-20` to the original non-monotone World 1 cap curve.
+  - Updated `energyCap`, `initialEnergy`, and `par` only; cell counts and positions stayed unchanged.
+  - Applied the corrected curve:
+    - `100, 100, 60, 150, 80, 60, 100, 150, 150, 100, 30, 70, 200, 100, 200`
+  - Re-authored `W1-16` as the explicit range-constraint phase:
+    - `energyCap = 30`
+    - player start `25`
+    - red starts `12, 12, 15`
+  - Updated `docs/tentaclewars/tw-balance-matrix.csv` to match.
+  - Checks passed:
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+
+- 2026-03-14: TWL-010a energy model fix.
+  - Added `TW_SELF_REGEN_FRACTION = 0.20`.
+  - Reduced `PASSIVE_REGEN_FRACTION` to `0.25`.
+  - TW feed rate now reserves self-regen share in `EnergyBudget.js`.
+  - TW hostile packet lanes now keep `underAttack` latched during active hostile pressure so under-attack regen suppression persists between packet impacts.
+  - Rewrote the TW energy-model smoke contract to cover:
+    - uncontested attacker growth
+    - bounded-time defender capture
+    - mutual clash draining both
+    - defender drain outrunning attacker self-growth
+  - Checks passed:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+  - Browser feel check on `W1-01` captured in `output/playwright/twl-010a/`.
+  - Note: browser feel still looks slower than target even though the synthetic guardrails now pass.
+
+- Wave started: music direction refresh for non-menu tracks.
+- Constraints:
+  - `DRIFT SIGNAL` menu theme remains untouched.
+  - Popup copy should become emotional, not technical.
+  - Need explicit documentation of which phases use each track.
+- Completed:
+  - reworked non-menu pressure and boss tracks for stronger contrast
+  - removed technical BPM/loop metadata from the music popup
+  - rewrote PT/EN track descriptions to communicate feeling instead of audio jargon
+  - documented exact phase-to-track mapping in implementation docs
+  - added a Settings soundtrack player with previous / play-pause / next controls
+  - wired settings UI refresh to the canonical Music runtime state
+
+- TentacleWars branch progress:
+  - `TASK-TW-001` through `TASK-TW-006` are now implemented
+  - sandbox runtime exists and owns its own load / end-state / pause handling
+  - TentacleWars grade table, packet core, tentacle economy, overflow, and capture rules are isolated in `src/tentaclewars/`
+  - TentacleWars now has a first dedicated AI pass:
+    - `TwAI.js`
+    - `TwAIScoring.js`
+    - mode-aware hostility through `OwnerTeams.js`
+  - all current TentacleWars work is still branch-local and not merged into `main`
+- Suggested next step:
+  - playtest the TentacleWars sandbox and decide whether the next wave should target:
+    - packet-native runtime replacement
+    - TentacleWars-specific render/lane feel
+    - authored prototype content
+
+- Wave started: `TASK-TW-007 Packet-Native Lane Runtime`.
+- Completed:
+  - added a live TentacleWars lane-runtime helper in `src/tentaclewars/TwPacketFlow.js`
+  - moved TentacleWars active lanes in `src/entities/Tent.js` from continuous delivery to discrete packet emission + in-transit queue delivery
+  - kept `NodeWARS` on the prior continuous path
+  - aligned TentacleWars friendly support bookkeeping so prior-frame `inFlow` is stored as delivered packet energy instead of continuous rate
+  - separated TentacleWars base lane throughput from overflow credit in `src/systems/EnergyBudget.js`
+  - extended smoke coverage for live lane runtime emission and delayed packet delivery
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/commentary-policy.mjs`
+  - `node scripts/input-harness.mjs`
+  - `node scripts/simulation-soak.mjs`
+- Blocker / note:
+  - attempted to follow the `develop-web-game` skill loop with `web_game_playwright_client.js`, but the local Node environment could not resolve the `playwright` package for that client
+  - fallback browser validation via the local Playwright wrapper confirmed the app boots at `http://127.0.0.1:4173/index.html` with `0` console errors, but deeper automated UI navigation was unreliable in this session
+- Suggested next step:
+  - reopen the TentacleWars sandbox in a fully working browser automation session and confirm lane feel, packet cadence, and capture pacing before starting `TASK-TW-008`
+
+- Ops wave: imagegen environment bootstrap.
+- Completed:
+  - created local imagegen virtualenv at `.venv-imagegen`
+  - installed `openai` and `pillow` into that venv
+  - added `scripts/imagegen.sh` wrapper to run the skill script through the local venv
+  - added `.env.imagegen.example` and ignored `.env.imagegen` in git
+- Validation:
+  - `./scripts/imagegen.sh --help`
+  - `./scripts/imagegen.sh generate --prompt 'test image' --dry-run --out output/imagegen/test.png`
+- Remaining requirement:
+  - real image generation still needs the user to create `.env.imagegen` locally with `OPENAI_API_KEY=...`
+
+- Wave continued: `TASK-TW-008 TentacleWars Capture Runtime Integration`.
+- Completed:
+  - TentacleWars sandbox neutrals now derive `captureThreshold` from displayed neutral energy using the dedicated acquisition-cost helper
+  - TentacleWars active-lane neutral capture now stacks directly from delivered packet events instead of the NodeWARS continuous capture bridge
+  - TentacleWars active-lane hostile takeover now resolves from delivered packet events with reset-plus-carryover starting energy
+  - the live sandbox runtime now routes TentacleWars capture resolution through `TwCaptureRules.js` during sustained packet delivery
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+
+- Bugfix:
+  - TentacleWars neutral takeover no longer starts captured cells at `1` energy when the acquisition threshold is met exactly
+  - neutral capture now preserves the neutral node's displayed energy as the base of the captured cell, with any extra pressure added as carryover
+- Suggested next step:
+  - run a deeper TentacleWars sandbox playtest pass to validate neutral flip strength, hostile carryover feel, and whether burst/split cuts also need a fully mode-specific capture path before `TASK-TW-009`
+
+- Follow-up completed:
+  - TentacleWars burst/split immediate payload resolution now also uses mode-specific capture logic in `TentCombat.js`
+  - added smoke coverage for TentacleWars neutral split-capture and hostile burst-takeover payloads
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+
+- Conformance wave continued:
+  - removed the inherited NodeWARS burst multiplier from TentacleWars cut payload resolution
+  - TentacleWars hostile takeover now includes released outgoing lane payload during ownership cleanup carryover
+  - added `src/tentaclewars/TwCutRules.js` so TentacleWars explicit cuts resolve as a continuous geometric split of committed lane payload instead of the shared NodeWARS burst/refund zones
+  - updated smoke guardrails to prove:
+    - TentacleWars source-side cuts no longer enter `BURSTING`
+    - TentacleWars near-target cuts still deliver a forward share instead of becoming full refunds
+    - hostile cut takeover uses geometric payload plus released outgoing lane carryover
+  - documented a backlog item for `TASK-TW-012 Browser Visual Validation Framework` because browser automation is still not reliable enough for direct mechanic inspection
+
+- Proposal audit wave:
+  - audited `docs/project/tentacle-wars-mode-architecture-proposal-2026-03-11.md` against the live sandbox code
+  - confirmed the major mechanical pillars are now aligned:
+    - packet-native runtime
+    - linear build cost and full refund
+    - neutral acquisition threshold
+    - hostile reset plus carryover
+    - cut payload based on build energy plus in-transit energy
+    - all-hostile TentacleWars enemy relation mode by default
+  - removed one remaining structural divergence by adding `src/tentaclewars/TwNeutralCapture.js` and routing TentacleWars neutral capture bookkeeping through a mode-owned helper instead of the shared NodeWARS neutral contest system
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+
+- Backlog alignment:
+  - marked `TASK-TW-007`, `TASK-TW-008`, and `TASK-TW-011` as completed in the project backlog
+  - promoted the next TentacleWars development frontier to:
+    - `TASK-TW-009 TentacleWars Sandbox Playtest and Tuning Wave A`
+    - `TASK-TW-010 TentacleWars Lane and Packet Visual Language`
+    - `TASK-TW-012 Browser Visual Validation Framework`
+  - created two follow-up tasks from the architecture proposal:
+    - `TASK-TW-013 TentacleWars Draw-Connect Fidelity Input`
+    - `TASK-TW-014 TentacleWars Focused Sanity Suites`
+
+- Parallel mechanics review wave:
+  - audited the live sandbox against the strict TentacleWars docs through parallel gameplay, AI, UI/input, and QA passes
+  - corrected the TentacleWars slot cap so sandbox cells now stop at `3` outgoing tentacles instead of inheriting the higher NodeWARS progression table
+  - routed shared player click/preview slot checks through `sourceNode.maxSlots` so the TentacleWars slot cap is enforced consistently in gameplay and UI
+  - made the purple TentacleWars AI slice path materially more aggressive by lowering its pipe-ratio gate, score threshold, and cooldown
+  - updated TentacleWars overflow to follow the later follow-up answer:
+    - a full cell now broadcasts the whole overflow value to each outgoing lane instead of splitting it equally
+  - added smoke guardrails proving:
+    - TentacleWars slot cap stays within the original documented range
+    - TentacleWars purple AI actively fires the canonical slice path on an obvious charged hostile lane
+- Validation:
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+
+- Fidelity completion wave:
+  - switched TentacleWars overflow from the earlier conservative split model to full broadcast per outgoing lane, following the later follow-up answer sheet
+  - added touch drag-connect support through the same canonical drag-connect path used by mouse gestures when a touch starts on a player-owned node
+  - added focused TentacleWars sanity suites:
+    - `scripts/tw-energy-sanity.mjs`
+    - `scripts/tw-grade-sanity.mjs`
+    - `scripts/tw-ai-sanity.mjs`
+  - added a local browser visual-validation workflow:
+    - `scripts/tw-visual-server.sh`
+    - `scripts/tw-visual-validation.sh`
+    - `docs/test-notes/tw-visual-validation.md`
+  - backlog alignment:
+    - marked `TASK-TW-012`, `TASK-TW-013`, and `TASK-TW-014` as completed
+- Validation:
+  - `node scripts/tw-energy-sanity.mjs`
+  - `node scripts/tw-grade-sanity.mjs`
+  - `node scripts/tw-ai-sanity.mjs`
+  - `node scripts/smoke-checks.mjs`
+  - `node scripts/input-harness.mjs`
+  - `node scripts/ui-actions-sanity.mjs`
+  - `node scripts/simulation-soak.mjs`
+  - `node scripts/commentary-policy.mjs`
+- 2026-03-12: Ran TentacleWars visual playtest Wave A through the browser loop. Captured sandbox start, passive AI pressure, forced player expansion, and forced player attack artifacts under `output/playwright/`. Notes recorded in `docs/test-notes/tw-playtest-wave-a-2026-03-12.md`. Main follow-up gaps: late-fight lane density readability, HUD mode identity still showing NODE WARS, pinned tooltip occlusion, and a still-needed dedicated slice-only visual pass.
+- 2026-03-12: Followed up the TentacleWars visual playtest with targeted HUD and lane-language validation. Confirmed in fresh browser captures that:
+  - the HUD now brands the sandbox as `TENTACLEWARS`
+  - the sandbox title now reads as a mode-specific prototype label
+  - owner-colored packet beads improve lane ownership readability under overlap
+  - reducing inherited white-heavy lane treatment makes active TentacleWars corridors less washed out
+  - remaining gap is now narrower and concentrated in very dense late-fight lane intersections rather than the general sandbox presentation
+- 2026-03-12: Completed a full TentacleWars visual identity pass and validated it in browser captures.
+  - nodes now read as softer circular cell membranes in the sandbox instead of inheriting the angular NodeWARS shell language
+  - active TentacleWars lanes now use elongated packet droplets and a faint membrane pulse so flow reads as organic rather than purely UI-driven
+  - clash visuals were tuned toward a tighter biotic compression point instead of a generic warning marker
+  - sandbox hover/info overlays were reduced in weight to preserve combat readability on mobile
+  - the earlier slice-adjacent visual bug was confirmed to come from stacked target `cFlash` during progressive TentacleWars cut payout and was fixed without changing mechanics
+  - visual validation artifacts:
+    - `output/playwright/tw-visual-identity-desktop-start.png`
+    - `output/playwright/tw-visual-identity-desktop-8s.png`
+    - `output/playwright/tw-visual-identity-mobile-start.png`
+    - `output/playwright/tw-visual-identity-mobile-8s.png`
+    - `output/playwright/mobile-bug-video-like-fixed.png`
+  - docs updated:
+    - `docs/test-notes/tw-visual-identity-pass-2026-03-12.md`
+    - `docs/project/task-backlog.md`
+    - `docs/project/operational-kanban.md`
+- 2026-03-12: Closed `TASK-TW-016 TentacleWars Fidelity Safety Rails`.
+  - sandbox `TentacleWars` now short-circuits world-layer gimmicks in `WorldSystems.update()` and keeps only camera follow active
+  - sandbox nodes no longer arm auto-retract, even when under the normal low-energy hostile-pressure threshold
+  - sandbox frenzy is now disabled in countdown, regen propagation, and player cut bookkeeping
+  - added smoke guardrails:
+    - `TentacleWars sandbox disables world-layer gimmicks`
+    - `TentacleWars sandbox disables frenzy and auto-retract`
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/simulation-soak.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-12: Closed `TASK-TW-015 TentacleWars Visual Density Wave B`.
+  - strengthened TentacleWars lane contour separation and ownership spine emphasis in `src/rendering/TentRenderer.js`
+  - added a darker packet underlay so moving payload stays readable when same-owner lanes bunch together
+  - browser captures for this wave:
+    - `output/playwright/tw-visual-density-wave-b-late.png`
+    - `output/playwright/tw-visual-density-wave-b-late-v2.png`
+    - `output/playwright/tw-visual-density-wave-b-clean.png`
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/ui-actions-sanity.mjs`
+    - `node scripts/simulation-soak.mjs`
+    - `node scripts/commentary-policy.mjs`
+- Next TentacleWars waves opened:
+  - `TASK-TW-017 TentacleWars Controlled Scenario Presets`
+  - `TASK-TW-018 TentacleWars Sandbox Playtest and Tuning Wave B`
+- 2026-03-12: Fixed a TentacleWars slot-cap UI leak after observing enemy cells reporting `3/2`.
+  - the sandbox mechanics already capped nodes through `GameNode.maxSlots` and `TwAI`, but the info panel and node badges were still reading the NodeWARS slot table directly
+  - updated `src/rendering/UIRenderer.js` and `src/rendering/NodeRenderer.js` to render slot totals from the mode-aware `n.maxSlots` getter
+  - extended `testTentacleWarsSlotCapStaysWithinOriginalRange` so future regressions catch mode-blind slot rendering
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/ui-dom-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-12: Re-reviewed the TentacleWars visual/state alignment after a card screenshot showed fidelity drift.
+  - evidence: `~/imgs/card.png`
+  - current gaps are broader than one bug:
+    - the card still shows NodeWARS-style level text (`0 / 5`) instead of a TentacleWars-owned grade presentation
+    - slot semantics in the card still show sent/total, while the desired surface should emphasize available slots for the current TentacleWars grade
+    - tentacles still read visually like a modified NodeWARS material instead of a fully settled TentacleWars presentation
+  - opened the next visual/fidelity waves:
+    - `TASK-TW-019 TentacleWars HUD and Card Fidelity Contract`
+    - `TASK-TW-023 TentacleWars Grade Slot Table Reconciliation`
+    - `TASK-TW-020 TentacleWars Node Grade Silhouette Pass`
+    - `TASK-TW-021 TentacleWars Tentacle Motion and Material Pass`
+    - `TASK-TW-022 TentacleWars Visual Regression Matrix`
+- 2026-03-12: Started `TASK-TW-019 TentacleWars HUD and Card Fidelity Contract`.
+  - added `src/tentaclewars/TwPresentationModel.js` so TentacleWars cards can render from a mode-owned presentation helper instead of leaking NodeWARS progression formatting
+  - TentacleWars info cards now show:
+    - named grade (`Spore`, `Embryo`, `Pulsar`, `Gamma`, `Solar`, `Dominator`)
+    - grade threshold band (`↑ ascend · ↓ descend`)
+    - available tentacles first, with used tentacles moved to secondary text
+  - added smoke guardrail:
+    - `TentacleWars info panel uses a mode-owned presentation contract`
+  - important remaining follow-up:
+    - local docs still do not freeze the exact per-grade slot-cap table, so I opened `TASK-TW-023 TentacleWars Grade Slot Table Reconciliation` to stop guessing if grades like `Embryo` should expose `2` instead of the current fixed `3`
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/ui-dom-sanity.mjs`
+    - `node scripts/ui-actions-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-12: Wrote a comparison report against the user-provided Android Tentacle Wars mechanic summary.
+  - file: `docs/project/tentaclewars-comparison-report-2026-03-12.md`
+  - purpose:
+    - compare the user report vs local TentacleWars docs vs current sandbox implementation
+    - identify which differences are already intentional project decisions
+    - identify which differences are still unresolved fidelity gaps
+  - key findings:
+    - strongest unresolved gaps are:
+      - grade-linked slot table
+      - economy model (`free production transfer` vs current source-spend packet budget)
+      - slice semantics (`segment burst` vs current geometric committed-payload split)
+    - current sandbox remains strongly aligned to the local project docs on:
+      - packet size `1`
+      - hostile reset `10`
+      - neutral acquisition threshold
+      - purple slice identity
+- 2026-03-12: Wrote a short decision brief to unblock the next TentacleWars implementation choice.
+  - file: `docs/project/tentaclewars-decision-brief-2026-03-12.md`
+  - the brief recommends:
+    - first deciding the authoritative slot table by grade
+    - keeping the current economy model for now
+    - keeping the current slice semantics for now
+  - intended use:
+    - review and approve before more TentacleWars mechanic changes
+- 2026-03-13: Rebuilt the TentacleWars visual-test wrapper around native Playwright instead of the unstable session-based `playwright-cli`.
+  - replaced `scripts/tw-visual-validation.sh` with a native Playwright wrapper that supports:
+    - `install`
+    - `open`
+    - `snapshot`
+    - `smoke`
+    - `close`
+    - `cleanup`
+  - added `scripts/tw-visual-playwright.mjs` for reliable `snapshot` and `smoke` flows using the installed Playwright package directly
+  - updated `docs/test-notes/tw-visual-validation.md`
+  - validated:
+    - `bash scripts/tw-visual-validation.sh install`
+    - `bash scripts/tw-visual-validation.sh snapshot`
+    - `bash scripts/tw-visual-validation.sh smoke`
+    - `bash scripts/tw-visual-validation.sh open`
+    - `bash scripts/tw-visual-validation.sh close`
+    - `node scripts/commentary-policy.mjs`
+  - artifacts:
+    - `output/playwright/tentaclewars-sandbox.png`
+    - `output/playwright/tw-visual-basic-menu.png`
+    - `output/playwright/tw-visual-basic-settings.png`
+  - environment note:
+    - no new browser-related `dmesg` errors appeared during the Chromium-based validation; the remaining `libxul.so` segfault lines are old Firefox artifacts
+- 2026-03-13: Completed `TASK-TW-023 TentacleWars Grade Slot Table Reconciliation`.
+  - froze the authoritative TentacleWars slot table as:
+    - `Spore=1`
+    - `Embryo=2`
+    - `Pulsar=2`
+    - `Gamma=2`
+    - `Solar=3`
+    - `Dominator=3`
+  - updated the grade source of truth in:
+    - `src/tentaclewars/TwBalance.js`
+    - `src/tentaclewars/TwGradeTable.js`
+    - `src/entities/GameNode.js`
+  - UI and AI alignment:
+    - TentacleWars cards continue to read `n.maxSlots`, which now resolves by TentacleWars grade
+    - AI/input legality checks inherit the same grade-owned cap via `sourceNode.maxSlots`
+  - new/updated guardrails:
+    - `scripts/tw-grade-sanity.mjs`
+    - `scripts/smoke-checks.mjs`
+  - validation:
+    - `node scripts/tw-grade-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/ui-dom-sanity.mjs`
+    - `node scripts/simulation-soak.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Closed the remaining TentacleWars visual-fidelity queue from `TASK-TW-017` through `TASK-TW-022`.
+  - completed controlled scenario presets with deterministic browser entry points:
+    - `grade-showcase`
+    - `capture-lab`
+    - `slice-lab`
+    - `clash-lab`
+    - `density-lab`
+  - added direct browser hooks for preset autostart through:
+    - `tw-debug=1`
+    - `tw-mode=tentaclewars`
+    - `tw-autostart=1`
+    - `tw-preset=<preset>`
+  - completed TentacleWars HUD/card fidelity cleanup:
+    - cards now use a mode-owned presentation model in `src/tentaclewars/TwPresentationModel.js`
+    - grade naming, thresholds, packet flow, and slot-cap semantics no longer leak NodeWARS progression labels
+  - completed the node silhouette pass:
+    - per-grade follicle, shell, and orbital treatment now scales through a TentacleWars-owned visual table in `src/rendering/NodeRenderer.js`
+  - completed the tentacle material/motion pass:
+    - active TentacleWars lanes now render peristaltic ribbing and stronger organic material treatment in `src/rendering/TentRenderer.js`
+  - completed the repeatable visual matrix:
+    - `scripts/tw-visual-matrix.sh`
+    - `docs/test-notes/tw-visual-regression-matrix-2026-03-13.md`
+  - scenario and playtest evidence:
+    - `docs/test-notes/tw-playtest-wave-b-2026-03-13.md`
+    - `output/playwright/matrix/grade-showcase-none.png`
+    - `output/playwright/matrix/grade-showcase-pin-node:5.png`
+    - `output/playwright/matrix/capture-lab-pin-node:3.png`
+    - `output/playwright/matrix/slice-lab-slice-primary.png`
+    - `output/playwright/matrix/clash-lab-none.png`
+    - `output/playwright/matrix/density-lab-none.png`
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/tw-grade-sanity.mjs`
+    - `node scripts/ui-dom-sanity.mjs`
+    - `node scripts/ui-actions-sanity.mjs`
+    - `node scripts/simulation-soak.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Moved TentacleWars level work from open discovery into formal campaign planning.
+  - created:
+    - `docs/project/tentaclewars-level-implementation-plan-2026-03-13.md`
+    - `docs/project/tentaclewars-campaign-skeleton-2026-03-13.md`
+  - closed product decisions from the user:
+    - TentacleWars will be a separate campaign track from NodeWARS
+    - NodeWARS campaign remains structurally untouched
+    - implementation should proceed one world at a time
+    - fidelity target is reconstruction, not loose reinterpretation
+    - TentacleWars will use its own scoring/result system
+    - amoeba blockers must stay in the campaign plan for the first world scope
+    - canonical level-authoring format should start as `JS objects`, with future JSON import/export optional
+  - opened the TentacleWars campaign task tree:
+    - `TASK-TWL-001` through `TASK-TWL-018`
+  - structured the campaign skeleton before formal specs:
+    - `4` worlds
+    - `20` phases per world
+    - rollout and validation one world at a time
+    - `World 1` as the first implementation milestone
+  - no gameplay or campaign implementation was performed in this wave
+- 2026-03-13: Reviewed and corrected the Claude-led TentacleWars campaign-plan reorganization.
+  - confirmed the useful changes:
+    - split `TWL-008` into `008a/008b`
+    - explicit task dependencies
+    - moved `TWL-017` before authoring
+    - centralized win-condition ownership in `TWL-001`
+  - corrected the sequencing issues:
+    - `TWL-007` now bootstraps fixture-based campaign sanity instead of requiring all authored levels before authoring starts
+    - `TWL-005` no longer depends on a later-stage full campaign sanity condition
+    - `TWL-008a` now explicitly extends `tw-campaign-sanity` from fixtures to authored World 1 prototype levels
+  - corrected the product-spec scope:
+    - menu-entry flow remains provisional
+    - World 1 hint-system stance remains a recommendation, not a closed product decision
+  - added convergence memo for cross-agent alignment:
+    - `docs/project/tw-planning-consensus-memo-2026-03-13.md`
+- 2026-03-13: Implemented `TASK-TWL-002 TentacleWars Level Data Schema`.
+  - created the canonical schema validator in:
+    - `src/tentaclewars/TwLevelSchema.js`
+  - created the schema document:
+    - `docs/tentaclewars/tw-level-data-schema.md`
+  - added schema sanity coverage:
+    - `scripts/tw-level-schema-sanity.mjs`
+  - the validator now covers the blocking fields agreed in planning:
+    - `id`
+    - `world`
+    - `phase`
+    - `energyCap`
+    - `cells`
+    - `obstacles`
+    - `winCondition`
+    - `par`
+    - `introMechanicTags`
+  - obstacle schema remains runtime-neutral on purpose:
+    - supports `circle` and `blob` descriptors
+    - does not pre-close the obstacle runtime decision owned by `TWL-004`
+- 2026-03-13: Started `TASK-TWL-003 TentacleWars Progression and Score Spec`.
+  - created:
+    - `docs/tentaclewars/tw-progression-score-spec.md`
+  - proposed progression/result decisions:
+    - dedicated `tw_campaign_` namespace
+    - separate TW progression from NodeWARS progression
+    - shared global presentation settings stay shared
+    - stars are mastery-only, not progression gates
+    - phase-1 stars use a time-band model:
+      - 1 star = clear
+      - 2 stars = `silverPar = ceil(par * 1.35)`
+      - 3 stars = `par`
+    - fail streaks are stored but do not unlock skip in phase 1
+    - debug overrides should mirror NodeWARS behavior operationally while staying isolated from NW state
+- 2026-03-13: Completed `TASK-TWL-004 TentacleWars Obstacle Spec`.
+  - created:
+    - `docs/tentaclewars/tw-obstacle-spec.md`
+  - closed the phase-1 complexity decision as `Option A`:
+    - static circles only
+    - line-of-sight blocking only
+    - no moving obstacles in Worlds 1-2
+    - no packet/drain/damage semantics
+    - no render-through behavior
+  - explicit tradeoff:
+    - this is less organic than full amoeba blobs
+    - but is the safer choice for World 1 pipeline validation and reconstruction pacing
+- 2026-03-13: Implemented `TASK-TWL-007 TentacleWars Campaign Sanity Suite`.
+  - created:
+    - `src/tentaclewars/TwCampaignFixtures.js`
+    - `scripts/tw-campaign-sanity.mjs`
+  - the new fixture pack intentionally bootstraps campaign validation before authored worlds exist:
+    - `W1-01`
+    - `W1-02`
+    - `W1-03`
+    - `W1-05`
+    - `W2-01`
+  - the sanity harness now proves:
+    - fixture levels pass the canonical TW level schema
+    - world and phase ordering remain stable across fixture levels
+    - mechanic introductions stay unique and inside the intended world bands
+    - minimum loader-facing playability expectations hold
+    - progression-facing `par` and derived `silverPar` assumptions remain coherent
+    - World 1 and World 2 obstacle authoring stays on the phase-one circle path
+  - updated:
+    - `docs/project/check-matrix.md`
+- 2026-03-13: Implemented `TASK-TWL-005 TentacleWars Campaign Loader`.
+  - created:
+    - `src/tentaclewars/TwCampaignLoader.js`
+    - `src/tentaclewars/TwObstacleRuntime.js`
+    - `scripts/tw-campaign-loader-sanity.mjs`
+  - added a new Game entry point:
+    - `loadTentacleWarsCampaignLevel(levelData)`
+  - authored TentacleWars levels can now load into the shared runtime shell with:
+    - TentacleWars simulation mode on nodes
+    - TwAI on red and purple owners
+    - static phase-one obstacle circles translated into runtime-space blocker shells
+    - obstacle-aware lane gating for player click, drag-connect release, preview, and TwAI move generation
+    - TentacleWars visual language and world-system short-circuiting active outside the sandbox too
+  - explicit safety tradeoff:
+    - authored TentacleWars campaign end-state currently uses a local placeholder pause/result flow to avoid polluting NodeWARS progression before `TWL-006`
+  - updated:
+    - `docs/project/check-matrix.md`
+- 2026-03-13: Implemented `TASK-TWL-006 TentacleWars Campaign State Namespace`.
+  - updated:
+    - `src/core/GameState.js`
+    - `src/tentaclewars/TwModeRuntime.js`
+    - `scripts/game-state-progression-sanity.mjs`
+  - TentacleWars campaign progression now persists in its own namespace:
+    - `tw_campaign_completed`
+    - `tw_campaign_curLvl`
+    - `tw_campaign_scores`
+    - `tw_campaign_stars`
+    - `tw_campaign_levelFailStreaks`
+    - `tw_campaign_activeWorldTab`
+  - added isolated helpers for:
+    - TW current level and active world tab
+    - TW world and level unlock checks
+    - TW win/loss recording
+    - TW stars and best-score lookup
+    - TW campaign progress reset
+  - `TwModeRuntime.finishCampaignLevel(...)` now records TW win/loss state without leaking into NodeWARS progression:
+    - win stores best clear time and derived stars
+    - loss increments the TW fail streak
+    - the end-state flow still stays local to the TW pause/result boundary by design
+  - checks:
+    - `node scripts/game-state-progression-sanity.mjs`
+    - `node scripts/ui-actions-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+- 2026-03-13: Implemented `TASK-TWL-017 TentacleWars Spreadsheet Balance Matrix`.
+  - created:
+    - `docs/tentaclewars/tw-balance-matrix.csv`
+    - `scripts/tw-balance-matrix-sanity.mjs`
+  - established the first spreadsheet-importable authoring scaffold with canonical phase-one columns:
+    - `id`
+    - `world`
+    - `phase`
+    - `energyCap`
+    - `par`
+    - `introMechanicTags`
+    - `obstacles`
+    - `hostileCount`
+    - `notes`
+  - explicit tradeoff:
+    - CSV is intentionally the phase-one format because it is easy to diff, import, and validate before real world authoring starts
+    - if authoring pressure later justifies richer tooling, it can still be upgraded without changing the canonical gameplay data source
+  - checks:
+    - `node scripts/tw-balance-matrix-sanity.mjs`
+- 2026-03-13: Implemented `TASK-TWL-016 TentacleWars Level Preview and Jump Tools`.
+  - created:
+    - `src/tentaclewars/TwCampaignPreview.js`
+    - `scripts/tw-preview-jump-sanity.mjs`
+  - updated:
+    - `src/main.js`
+    - `docs/project/check-matrix.md`
+  - phase-B preview tooling now exposes the minimum viable authoring entry points without inventing a full TW campaign UI:
+    - query flags:
+      - `?tw-mode=tentaclewars`
+      - `?tw-debug=1`
+      - `?tw-autostart=1`
+      - `?tw-level=W1-03`
+      - `?tw-world=2`
+    - runtime debug bridge:
+      - `window.__NODEWARS_DEBUG__.twCampaign.listFixtureLevels()`
+      - `window.__NODEWARS_DEBUG__.twCampaign.loadLevelById('W1-03')`
+      - `window.__NODEWARS_DEBUG__.twCampaign.jumpWorld(2)`
+  - explicit scope decision:
+    - no dedicated TW campaign preview screen was added in phase B
+    - preview and jump stay on debug query flags plus runtime hooks so the authoring pipeline opens without turning `TWL-016` into a UI feature wave
+  - checks:
+    - `node scripts/tw-preview-jump-sanity.mjs`
+    - `node scripts/game-state-progression-sanity.mjs`
+    - `node scripts/ui-actions-sanity.mjs`
+    - `node scripts/ui-dom-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Implemented `TASK-TWL-008a TentacleWars World 1 Prototype`.
+  - created:
+    - `src/tentaclewars/levels/TwWorld1.js`
+    - `docs/test-notes/tw-world1-prototype-gate-2026-03-13.md`
+  - updated:
+    - `src/tentaclewars/TwCampaignFixtures.js`
+    - `docs/tentaclewars/tw-balance-matrix.csv`
+    - `scripts/tw-campaign-sanity.mjs`
+    - `scripts/tw-preview-jump-sanity.mjs`
+  - authored phases:
+    - `W1-01` connect
+    - `W1-02` neutral-capture
+    - `W1-03` slice
+    - `W1-04` support-loop
+    - `W1-05` obstacle-routing
+  - structural decision:
+    - authored World 1 now lives in its own canonical level file under `src/tentaclewars/levels/`
+    - `TwCampaignFixtures.js` now mixes the authored `W1-01..W1-05` subset with a narrow `W2-01` future-world anchor so cross-world sanity keeps working before Worlds 2-4 exist
+  - pipeline results:
+    - balance matrix rows filled for `W1-01..W1-05`
+    - campaign sanity extended from bootstrap fixtures to the authored `W1-01..W1-05` subset
+    - browser visual validation captured authored `W1-03` and `W1-05`
+  - checks:
+    - `node scripts/tw-level-schema-sanity.mjs`
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/tw-campaign-loader-sanity.mjs`
+    - `node scripts/tw-preview-jump-sanity.mjs`
+    - `node scripts/tw-balance-matrix-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Implemented `TASK-TWL-008b TentacleWars World 1 Complete`.
+  - updated:
+    - `src/tentaclewars/levels/TwWorld1.js`
+    - `src/tentaclewars/TwCampaignFixtures.js`
+    - `docs/tentaclewars/tw-balance-matrix.csv`
+    - `scripts/tw-campaign-sanity.mjs`
+    - `scripts/tw-preview-jump-sanity.mjs`
+    - `docs/project/check-matrix.md`
+  - created:
+    - `docs/test-notes/tw-world1-complete-gate-2026-03-13.md`
+  - World 1 is now fully authored through `W1-20`
+  - curve shape now follows the world skeleton:
+    - `W1-06..08` repeated route decisions and retarget pressure
+    - `W1-09..12` stronger central/advanced pressure
+    - `W1-13..16` obstacle introduction and reinforcement
+    - `W1-17..19` mastery checks for cuts and support loops
+    - `W1-20` world boss closure
+  - structural decision:
+    - `TwCampaignFixtures.js` now exposes the full authored World 1 pack plus the `W2-01` anchor, so campaign sanity and preview/jump operate on authored data rather than a partial bootstrap slice
+  - visual spot checks captured:
+    - `output/playwright/tw-w1-13-authored.png`
+    - `output/playwright/tw-w1-20-authored.png`
+  - checks:
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/tw-campaign-loader-sanity.mjs`
+    - `node scripts/tw-preview-jump-sanity.mjs`
+    - `node scripts/tw-balance-matrix-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Started and documented `TASK-TWL-009 TentacleWars World 1 Playtest and Reconstruction Review`.
+  - created:
+    - `scripts/tw-world1-playtest-capture.sh`
+    - `docs/test-notes/tw-world1-playtest-review-2026-03-13.md`
+  - generated browser capture coverage for all authored World 1 phases:
+    - `output/playwright/world1-review/W1-01.png` through `W1-20.png`
+  - representative visual review covered:
+    - `W1-01`
+    - `W1-05`
+    - `W1-10`
+    - `W1-16`
+    - `W1-20`
+  - review position:
+    - World 1 is structurally ready to move forward
+    - current par ladder is coherent enough to keep
+    - main future recheck candidates are `W1-16`, `W1-17/18`, and `W1-20`
+    - the note is intentionally honest that this was a full runtime/browser inspection pass, not a literal hand-cleared run of all 20 phases
+  - checks:
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Fixed TentacleWars campaign start incorrectly entering the sandbox.
+  - cause:
+    - `Game.enterSelectedMode()` still hardcoded the TentacleWars branch to `enterSandboxPrototype()`
+  - fix:
+    - added `getTentacleWarsCampaignLevelById(...)` in `src/tentaclewars/TwCampaignFixtures.js`
+    - updated `src/core/Game.js` so TentacleWars start resolves `STATE.getTentacleWarsCurrentLevel()` and loads the authored campaign level first
+    - sandbox remains only as explicit fallback when no authored level resolves
+  - guardrail:
+    - extended `scripts/game-state-progression-sanity.mjs` with `TentacleWars start flow targets authored campaign before sandbox fallback`
+  - runtime proof:
+    - browser click test now reports:
+      - `isTentacleWarsCampaign = true`
+      - `isTentacleWarsSandbox = false`
+      - `twLevelId = W1-01`
+    - artifact:
+      - `output/playwright/tw-campaign-start-flow.png`
+  - checks:
+    - `node scripts/game-state-progression-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Fixed TentacleWars authored campaign opening lanes being unaffordable.
+  - user-facing symptom:
+    - World 1 phase 1 could not build a tentacle because authored campaign distances were being scaled into too large a runtime space for the linear TW cost-per-pixel economy
+  - root cause:
+    - `TwCampaignLoader` was mapping normalized authored coordinates directly against the runtime viewport, which made authored lane distances far larger than the campaign energies were designed for
+  - fix:
+    - authored TW campaign levels now load inside a fixed centered campaign design-space in `src/tentaclewars/TwCampaignLoader.js`
+    - authored obstacle scaling in `src/tentaclewars/TwObstacleRuntime.js` now uses that same centered viewport
+  - guardrail:
+    - extended `scripts/tw-campaign-loader-sanity.mjs` with `TentacleWars authored World 1 phases keep at least one affordable opening lane`
+  - runtime proof:
+    - browser validation for `W1-01` now reports:
+      - `roundedTotalBuildCost = 4`
+      - `availableEnergy = 6`
+      - `canBuildTentacle = true`
+    - artifacts:
+      - `output/playwright/tw-w1-01-build-affordable.png`
+  - checks:
+    - `node scripts/tw-campaign-loader-sanity.mjs`
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Corrected the persistent below-node markers in TentacleWars to represent tentacle slots instead of node level.
+  - previous issue:
+    - the dots below the node were still `level dots`, while TentacleWars should use that channel for slot occupancy
+  - fix:
+    - `NodeWARS` keeps level dots below the node
+    - `TentacleWars` now draws persistent slot markers below the node
+      - empty marker = free slot
+      - filled marker = occupied slot
+    - the old `→out/max` text badge above the node is no longer used as the primary persistent slot indicator in TentacleWars
+  - guardrail:
+    - `scripts/smoke-checks.mjs` now asserts the dedicated `drawTentacleWarsSlotMarkers(...)` path and the mode split between NodeWARS and TentacleWars
+  - visual artifact:
+    - `output/playwright/tw-scenario-grade-showcase-pin-node:5.png`
+  - checks:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Unified the below-node marker channel across both modes.
+  - `NodeWARS` now also uses the below-node markers as persistent tentacle-slot occupancy
+  - `NodeWARS` level readability moved to a compact above-node `LVL n` badge
+  - the old `→out/max` text remains only as secondary telemetry for NodeWARS when tentacles are active
+  - result:
+    - both modes now use the same persistent slot language
+    - only the level channel differs by mode
+  - checks:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Corrected the TentacleWars passive regen model to stop equal-grade authored combat from freezing.
+  - issue:
+    - `TentacleWars` was reusing the same packet-grade rate for both passive nucleus regen and outgoing tentacle source budget
+    - equal-grade combat could settle into zero-net stall in authored campaign play
+  - fix:
+    - added `TW_BALANCE.PASSIVE_REGEN_FRACTION = 2 / 3`
+    - applied that factor only in the passive regen tick inside `src/entities/GameNode.js`
+    - left `src/systems/EnergyBudget.js` source-budget and tent-feed paths unchanged
+  - guardrail:
+    - extended `scripts/smoke-checks.mjs` with `TentacleWars equal-grade combat drains slowly instead of freezing`
+  - validation surfaces shared with Claude:
+    - `bash scripts/tw-visual-validation.sh smoke`
+    - `bash scripts/tw-visual-validation.sh snapshot`
+    - `bash scripts/tw-world1-playtest-capture.sh`
+    - `output/playwright/world1-review/`
+  - checks:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/tw-campaign-loader-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-13: Began the authored World 1 rebalance pass after the TentacleWars passive-regen correction.
+  - applied clear early-phase fixes:
+    - `W1-01`: player `12`, red `5`, par `28`
+    - `W1-02`: player `8`
+    - `W1-03`: player `14/14`, red `9/9`, par `70`
+    - `W1-04`: player `10/10/6`, red `14`, par `64`
+  - added loader sanity coverage for:
+    - safe authored opening reserves in `W1-01` and `W1-02`
+    - `viable_reserve >= 4` across `W1-05..W1-10` cheapest first moves
+  - current review status:
+    - `W1-05..W1-10` show no reserve-floor red flags under the corrected economy
+    - early `World 1` now reads coherent under `PASSIVE_REGEN_FRACTION = 2 / 3`
+  - checks:
+    - `node scripts/tw-campaign-loader-sanity.mjs`
+    - `node scripts/tw-campaign-sanity.mjs`
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+  - browser/runtime evidence refreshed:
+    - reran `bash scripts/tw-world1-playtest-capture.sh`
+    - full capture set updated in `output/playwright/world1-review/`
+    - onboarding and mid-curve now include the post-rebalance states for `W1-01..W1-04`
+    - no new page/runtime errors appeared during capture beyond expected autoplay `AudioContext` warnings
+- 2026-03-14: Implemented `TASK-TWL-VIS-001` VIS-A renderer pass for TentacleWars lane fidelity.
+  - renderer changes:
+    - replaced the TW lane body in `src/rendering/TentRenderer.js` with `drawTentacleWarsChain()`
+    - removed the old TW contour/spine/ribs/membrane body path from the active render branch
+    - refactored `drawTentacleWarsPacketMarkers()` into data-driven `drawTentacleWarsEnergyPackets()`
+    - packet positions now come from `tent.packetTravelQueue` and `tent.travelDuration`
+    - packet color is fixed yellow/gold (`#f5c800`) instead of owner color
+    - packet sampling now uses real packets, capped at `12` visible before sampling
+    - updated `src/rendering/NodeRenderer.js` with a clearer TW energy display arc
+  - important note:
+    - the TW energy arc is an auditability adaptation, not confirmed literal original behavior
+  - visual validation:
+    - static captures:
+      - `output/playwright/twl-vis-a/W1-01.png`
+      - `output/playwright/twl-vis-a/W1-11.png`
+    - direct runtime lane captures:
+      - `output/playwright/twl-vis-a/W1-01-direct.png`
+      - `output/playwright/twl-vis-a/W1-11-direct.png`
+      - `output/playwright/twl-vis-a/W1-11-active-late.png`
+    - observation:
+      - the chain body is visible immediately once a lane exists
+      - yellow packets become clearly visible only after the lane exits `growing` and reaches `active`
+  - checks:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/ui-actions-sanity.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-14: Calibrated the VIS-A scale pass after Claude review.
+  - `src/rendering/TentRenderer.js`
+    - increased TW chain glyph arm size and center dot size
+    - slightly thickened the glyph stroke and increased high-graphics glow
+    - increased TW energy-packet size and outer glow for video readability
+  - validation:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+  - updated capture:
+    - `output/playwright/twl-vis-a/W1-11-active-calibrated.png`
+  - result:
+    - chain nodes now read as a visible spine instead of a dotted wire
+    - yellow packets remain truthful but are easier to read in recorded footage
+- 2026-03-14: Added `TASK-TWL-GUARD-001` guardrails and closed the remaining TW clash-approach bug.
+  - gameplay/runtime change:
+    - `src/entities/Tent.js`
+    - fixed TW clash preparation so `clashT` is not pinned to `0.5` while `clashApproachActive` is still true
+    - result: fresh TW clashes now actually animate toward midpoint instead of skipping straight there
+  - render/UI consistency:
+    - `src/rendering/UIRenderer.js` already restricts the TW energy-progress bar to true insufficient-energy cases
+    - click resolution and build preview are now covered together by a shared smoke guardrail
+  - new smoke guards in `scripts/smoke-checks.mjs`:
+    - `TentacleWars clash approach actually advances before midpoint lock`
+    - `TentacleWars clash preview affordability matches click resolution`
+  - checks:
+    - `node scripts/smoke-checks.mjs`
+    - `node scripts/commentary-policy.mjs`
+- 2026-03-14: Implemented `TASK-TWL-OBS-001` full capsule-obstacle support for TentacleWars authored campaign levels.
+  - schema/runtime:
+    - `src/tentaclewars/TwLevelSchema.js`
+      - obstacle shapes now support `circle` and `capsule`
+      - normalized circle authoring moved to `shape.cx/cy/radius`
+      - capsule authoring uses `shape.ax/ay/bx/by/radius`
+    - `src/tentaclewars/TwObstacleRuntime.js`
+      - added scaled runtime support for `capsule`
+      - added `segmentSegmentDistance(...)` blocker geometry
+      - runtime now rejects unsupported obstacle kinds with the canonical error path
+  - rendering:
+    - `src/rendering/HazardRenderer.js`
+      - split TW obstacle rendering into circle and capsule paths
+      - added static capsule fill/outline/highlight rendering
+  - authored levels:
+    - `src/tentaclewars/levels/TwWorld1.js`
+      - converted obstacle-authored World 1 levels from legacy top-level `x/y` circles to capsule shapes
+      - updated `W1-05`, `W1-13`, `W1-14`, `W1-15`, `W1-16`, and `W1-20`
+  - guardrails and sanity:
+    - `scripts/smoke-checks.mjs`
+      - updated runtime-source assertion to the new unsupported-shape contract
+      - added capsule blocker coverage:
+        - crossing lane blocks
+        - non-crossing lane does not block
+    - `scripts/tw-campaign-sanity.mjs`
+      - obstacle sanity now accepts the authored `circle/capsule` family
+      - cleaned the malformed trailing World 1 prototype check into the main run loop
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `89/89`
+    - `node scripts/tw-campaign-sanity.mjs` → `10/10`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+- 2026-03-14: Completed `TW-AUTOMATION-SYNC` protocol automation verification/documentation wave.
+  - watcher/runtime surface:
+    - `scripts/tw-inbox-watch-codex.sh`
+      - verified `--dry-run` detects a `TYPE: SPEC` write and prints the expected trigger message
+      - verified restored real SPEC traffic is also detected correctly in dry-run mode
+    - `scripts/tw-inbox-watch.sh`
+      - made protocol-v2 routing explicit for non-actionable types:
+        - `SPEC`
+        - `CONFIRM`
+        - `REJECT`
+        - `PROTOCOL_ACK`
+  - local permissions/doc updates:
+    - `.claude/settings.local.json`
+      - added watcher startup / dry-run / shutdown approval entries
+    - `docs/project/development-working-rhythm.md`
+      - added automation startup section at the top
+    - `docs/project/protocol-automation.md`
+      - added concise watcher reference, lock/log locations, and fallback flow
+  - decision note:
+    - did not recursively run a live `claude -p` Codex implementation session from inside the active Codex session
+    - treated that as an unsafe concurrent-write test and used dry-run + documentation validation instead
+  - checks:
+    - `bash scripts/tw-inbox-watch-codex.sh --dry-run`
+    - `node scripts/smoke-checks.mjs` → `90/90`
+- 2026-03-14: Diagnosed and fixed the watcher trigger failure after the first live automation ping.
+  - root cause:
+    - both watcher scripts were watching the inbox file inode directly with `inotifywait -e close_write`
+    - protocol writes commonly replace inbox files atomically via delete/recreate or move
+    - the running watcher could stay alive while silently missing new inbox writes
+  - fix:
+    - `scripts/tw-inbox-watch-codex.sh`
+    - `scripts/tw-inbox-watch.sh`
+    - both now watch the parent directory and filter for the inbox basename on:
+      - `close_write`
+      - `moved_to`
+      - `create`
+  - verification:
+    - dry-run Codex watcher detected a replacement-written SPEC after file delete/recreate
+    - Claude watcher was restarted and left ready for the next inbox write
+- 2026-03-14: Implemented `TW-VISUAL-WAVE2` TentacleWars cell fidelity pass.
+  - updated `src/rendering/NodeRenderer.js` only
+  - TentacleWars follicles are now rigid radial pins with dot-caps instead of animated wavy strands
+  - replaced TW rotating orbital indicators with static white grade dots below the energy number
+  - replaced the TW smooth energy arc with a segmented 24-slot ring while keeping the NodeWARS path unchanged
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+    - `node scripts/tw-campaign-sanity.mjs` → `10/10`
+  - browser evidence:
+    - `output/playwright/tw-visual-wave2/W1-01.png`
+    - `output/playwright/tw-visual-wave2/W1-02.png`
+    - `output/playwright/tw-visual-wave2/W1-03.png`
+    - `output/playwright/tw-visual-wave2/W1-04.png`
+    - `output/playwright/tw-visual-wave2/W1-05.png`
+    - `output/playwright/tw-visual-wave2/W1-04-active.png`
+  - honest note:
+    - the cell-fidelity changes are strongly confirmed in W1 stills
+    - the W1 active-lane spot-check confirmed the lane path itself, but packet visibility remained timing-sensitive in the captured frame, so the stronger packet-readability evidence is still the earlier `W1-11` VIS-A capture
+- 2026-03-14: Implemented `TASK-TWL-010` World 2 authoring pack plus `TW-LANE-EDGE`.
+  - created `src/tentaclewars/levels/TwWorld2.js` with authored `W2-01..W2-20`
+  - updated `src/tentaclewars/TwCampaignFixtures.js` to use the real World 2 pack instead of the old `W2-01` stub
+  - updated `docs/tentaclewars/tw-balance-matrix.csv` with rows for `W2-01..W2-20`
+  - updated `src/rendering/TentRenderer.js` so TentacleWars lane chains originate at node edges instead of node centers
+  - local consistency fix:
+    - raised the TW schema energy-cap ceiling in `src/tentaclewars/TwLevelSchema.js` from `200` to `350` because the new W2 spec requires a `350` cap boss phase
+    - strengthened `scripts/tw-campaign-sanity.mjs` to validate World 2 contiguity and balance-matrix coverage
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/tw-campaign-sanity.mjs` → `11/11`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+  - browser artifact:
+    - `output/playwright/twl-010/w1-04-lane-edge.png`
+  - honest note:
+    - the lane-edge still cleanly demonstrates that TW chains no longer overlap the energy number
+    - the captured frame happened after packets had already advanced out of the queue, so the still is for edge-offset validation, not packet-density validation
+- 2026-03-14: Ran `TASK-TWL-011` World 2 playtest/reconstruction review.
+  - captured milestone stills:
+    - `output/playwright/twl-011/W2-01.png`
+    - `output/playwright/twl-011/W2-04.png`
+    - `output/playwright/twl-011/W2-08.png`
+    - `output/playwright/twl-011/W2-12.png`
+    - `output/playwright/twl-011/W2-16.png`
+    - `output/playwright/twl-011/W2-20.png`
+  - review finding:
+    - `W2-16` was not merely hard; it was structurally unwinnable because its cheapest opening connection exceeded the player's starting energy
+  - correction applied in-wave under the playtest spec:
+    - `src/tentaclewars/levels/TwWorld2.js`
+    - moved the two player starts and the center neutral closer together
+    - raised each player start from `22` to `30`
+    - post-fix opening probe on `W2-16`:
+      - cheapest move `p1 -> n1`
+      - build cost `8`
+      - reserve `22`
+  - checks after correction:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/tw-campaign-sanity.mjs` → `11/11`
+- 2026-03-14: Resumed and completed `TASK-TWL-013 TentacleWars World 3 Playtest and Reconstruction Review`.
+  - confirmed the restarted session now has `superpowers` available and followed the manual inbox resume flow from `docs/project/RESUME-CODEX.md`
+  - captured required World 3 stills:
+    - `output/playwright/twl-013/W3-01.png`
+    - `output/playwright/twl-013/W3-05.png`
+    - `output/playwright/twl-013/W3-10.png`
+    - `output/playwright/twl-013/W3-15.png`
+    - `output/playwright/twl-013/W3-16.png`
+    - `output/playwright/twl-013/W3-20.png`
+  - playtest findings:
+    - no new sealed-path or unwinnable-opening defects found in the sampled World 3 phases
+    - `W3-01` reads clearly as the world intro corridor and communicates the split top/bottom route immediately
+    - `W3-15` is the busiest sampled single-player maze but remains structurally readable
+    - `W3-16` correctly renders the single-player, 5-obstacle low-cap constraint layout and still exposes the previously-probed affordable `p1 -> n1` opening
+    - `W3-20` correctly renders the 6-obstacle, 9-cell fortress closure and all cells remain individually readable in the still
+  - flagged for future balance review only:
+    - `W3-15` and `W3-16` are the phases most likely to merit future par/cap scrutiny during a dedicated balance pass, but nothing in this wave justified an in-wave structural correction
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/tw-campaign-sanity.mjs` → `13/13`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+- 2026-03-14: Implemented `TASK-TWL-014 TentacleWars World 4 Authoring Pack`.
+  - created `src/tentaclewars/levels/TwWorld4.js` with authored `W4-01..W4-20` plus `TW_WORLD_4_PROTOTYPE_LEVELS`
+  - updated `src/tentaclewars/TwCampaignFixtures.js` to append World 4 to the authored TentacleWars fixture campaign
+  - raised the TentacleWars schema `energyCap` ceiling from `500` to `700` in `src/tentaclewars/TwLevelSchema.js`
+  - updated `docs/tentaclewars/tw-level-data-schema.md` so the documented cap range matches the live validator
+  - appended the full World 4 row set to `docs/tentaclewars/tw-balance-matrix.csv`
+  - extended `scripts/tw-campaign-sanity.mjs` for World 4 contiguity, matrix coverage, and prototype-subset stability
+  - extended `scripts/tw-campaign-loader-sanity.mjs` so the authored loader path now guards safe opening reserves across all `W4-01..W4-20`
+  - fixed one stale loader guardrail that still expected the pre-capsule `circle` obstacle path in `W1-05`
+  - updated `docs/project/operational-kanban.md` to close `TWL-013` and `TWL-014` in the local board
+  - affordability probe result for all `W4-01..W4-20`:
+    - every phase exposes at least one non-player opening move with reserve `>= 4`
+    - notable checks:
+      - `W4-16`: cheapest move `p1 -> n1`, cost `5`, reserve `29`
+      - `W4-20`: cheapest move `p3 -> n3`, cost `7`, reserve `157`
+  - checks:
+    - `node scripts/tw-campaign-loader-sanity.mjs` → `7/7`
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/tw-campaign-sanity.mjs` → `15/15`
+    - `node scripts/tw-ai-sanity.mjs` → `2/2`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+- 2026-03-14: Completed `TASK-TWL-015 TentacleWars World 4 Playtest and Reconstruction Review`.
+  - captured required World 4 stills:
+    - `output/playwright/twl-015/W4-01.png`
+    - `output/playwright/twl-015/W4-06.png`
+    - `output/playwright/twl-015/W4-10.png`
+    - `output/playwright/twl-015/W4-16.png`
+    - `output/playwright/twl-015/W4-19.png`
+    - `output/playwright/twl-015/W4-20.png`
+  - playtest findings:
+    - no new sealed-path or unwinnable-opening defects found in the sampled World 4 phases
+    - `W4-01` successfully reads as endgame pressure from phase 1: both hostile factions and obstacle routing are immediately legible
+    - `W4-06` and `W4-10` maintain coalition readability without collapsing obstacle corridors into noise
+    - `W4-16` keeps the low-cap constraint readable and still shows the affordable `p1 -> n1` opening cleanly
+    - `W4-19` and `W4-20` preserve triple-player readability while keeping the hostile fortress identity intact
+    - `W4-20` clearly shows all 12 cells, the 7-obstacle layered fortress, and the three separated player starts
+  - flagged for future balance review only:
+    - `W4-16` should stay on the watchlist as the most timing-sensitive low-cap constraint phase
+    - `W4-19` and `W4-20` should stay on the watchlist for final cross-world par review because of their high-density endgame pacing
+  - campaign completion summary:
+    - World 1: 20 phases, cap range `30..200`, dominant mechanic `foundational routing + first obstacle/slice lessons`, open flags `none urgent`
+    - World 2: 20 phases, cap range `50..350`, dominant mechanic `red-purple coalition expansion`, open flags `late par review deferred`
+    - World 3: 20 phases, cap range `60..450`, dominant mechanic `labyrinth capsule routing`, open flags `W3-15` and `W3-16` balance watchlist
+    - World 4: 20 phases, cap range `80..600`, dominant mechanic `endgame coalition fortress pressure`, open flags `W4-16`, `W4-19`, and `W4-20` balance watchlist
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/tw-campaign-sanity.mjs` → `15/15`
+- 2026-03-14: Implemented `TASK-TWL-019 TentacleWars Navigation Integration`.
+  - added a dedicated `TENTACLE WARS` menu button plus two new shell screens:
+    - `stw` world select
+    - `stwl` level select
+  - created:
+    - `src/ui/twWorldSelectView.js`
+    - `src/ui/twLevelSelectView.js`
+  - updated:
+    - `index.html`
+    - `src/ui/DomIds.js`
+    - `src/ui/ScreenController.js`
+    - `src/main.js`
+    - `src/tentaclewars/TwModeRuntime.js`
+    - `styles/main.css`
+    - `scripts/ui-actions-sanity.mjs`
+    - `scripts/ui-dom-sanity.mjs`
+  - implementation notes:
+    - `START CAMPAIGN` now remains explicitly NodeWARS-facing
+    - the dedicated TW button now opens a separate world-select shell built from canonical TW progression helpers in `GameState`
+    - authored TW phase completion now reaches the shared result shell and loads the next authored phase via the TW current-level pointer
+    - `W4-20` now routes into a `showTwCampaignEnding()` stub that returns to the TW world-select shell
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+    - `node scripts/ui-actions-sanity.mjs` → `10/10`
+    - `node scripts/ui-dom-sanity.mjs` → `8/8`
+  - browser note:
+    - attempted a local Playwright smoke pass
+    - `npx playwright` CLI is available here, but the session did not expose an importable `playwright` package for scripted local automation
+    - this wave is therefore validated by guardrails rather than screenshot evidence
+- 2026-03-14: Implemented `TASK-TWL-020 TW Result Screen + Campaign Ending + Browser Validation`.
+  - created `src/ui/twCampaignEndingView.js`
+  - updated:
+    - `src/ui/resultScreenView.js`
+    - `src/ui/ScreenController.js`
+    - `src/ui/DomIds.js`
+    - `src/main.js`
+    - `index.html`
+    - `styles/main.css`
+    - `scripts/ui-actions-sanity.mjs`
+    - `scripts/ui-dom-sanity.mjs`
+  - behavior changes:
+    - authored TW phase results now show only TW-relevant stats:
+      - phase id
+      - stars
+      - time vs par
+    - the old `showTwCampaignEnding()` stub is now a dedicated `stwe` screen
+    - leaving the TW ending screen resets game mode back to `nodewars`
+  - browser artifacts:
+    - `output/playwright/twl-020/01-main-menu.png`
+    - `output/playwright/twl-020/02-world-select.png`
+    - `output/playwright/twl-020/03-level-select-w1.png`
+    - `output/playwright/twl-020/04-w1-01-ingame.png`
+    - `output/playwright/twl-020/05-result-screen.png`
+    - `output/playwright/twl-020/06-campaign-ending.png`
+  - browser method:
+    - after re-reading the repo docs, switched to the canonical Chromium-backed workflow instead of the older `playwright-cli` + Firefox path
+    - used the Playwright package installed under `~/.npm/_npx/.../node_modules/playwright`
+    - result and ending stills were captured by direct JS call from the live page, which the spec explicitly allowed as a fallback
+  - protocol memory lock:
+    - updated `AGENTS.md` and `docs/project/skill-usage-map.md` to explicitly prefer `bash scripts/tw-visual-validation.sh ...` and the Chromium-backed local flow for browser validation in this repo
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/ui-actions-sanity.mjs` → `11/11`
+    - `node scripts/ui-dom-sanity.mjs` → `10/10`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+- 2026-03-14: Implemented `TASK-TWL-021 TentacleWars i18n Compliance + Result/Ending Visual Polish`.
+  - updated:
+    - `index.html`
+    - `src/localization/i18n.js`
+    - `src/main.js`
+    - `src/ui/DomIds.js`
+    - `src/ui/ScreenController.js`
+    - `src/ui/resultScreenView.js`
+    - `src/ui/twCampaignEndingView.js`
+    - `src/ui/twLevelSelectView.js`
+    - `src/ui/twWorldSelectView.js`
+    - `styles/main.css`
+    - `scripts/ui-dom-sanity.mjs`
+  - behavior changes:
+    - moved the remaining TentacleWars shell copy into `i18n.js` and threaded `T()` through the dedicated world/level builders
+    - added `rerenderActiveTwScreen()` so the visible TW world select, level select, result screen, and ending screen rebuild immediately after EN/PT language swaps
+    - kept TW result rerender side-effect-safe by rebuilding from cached result state rather than replaying progression writes
+    - migrated the TW ending screen to injected HTML inside `#twEndingContent`
+    - polished the dedicated TW result and ending presentation in CSS
+  - browser artifacts:
+    - `output/playwright/twl-021/twl-021-world-pt.png`
+    - `output/playwright/twl-021/twl-021-level-pt.png`
+    - `output/playwright/twl-021/twl-021-result-pt.png`
+    - `output/playwright/twl-021/twl-021-ending-pt.png`
+  - browser method:
+    - used the canonical Chromium-backed local Playwright workflow already documented for this repo
+    - verified live PT → EN rerender directly on the visible TW shell surfaces through page-driven module calls
+    - browser output showed autoplay warnings before user gesture, but no runtime/page errors
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/ui-actions-sanity.mjs` → `11/11`
+    - `node scripts/ui-dom-sanity.mjs` → `10/10`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+- 2026-03-14: Completed `TASK-TWL-018 TentacleWars Phase Editor Feasibility Review`.
+  - no implementation started
+  - sources reviewed:
+    - `src/tentaclewars/TwLevelSchema.js`
+    - `src/tentaclewars/TwCampaignLoader.js`
+    - `src/tentaclewars/TwObstacleRuntime.js`
+    - `src/tentaclewars/TwCampaignFixtures.js`
+    - `src/tentaclewars/TwCampaignPreview.js`
+    - `src/tentaclewars/TwModeRuntime.js`
+    - `src/rendering/NodeRenderer.js`
+    - `src/rendering/TentRenderer.js`
+    - `docs/project/ai-improvement-and-debug-editor-study-2026-03-10.md`
+  - recommendation:
+    - defer building the editor for now
+  - rationale:
+    - the current TW level format is already simple, normalized, and validator-backed
+    - the 80-phase authored campaign is complete, so the highest-value TW work remains playtest-driven balance and selective structural fixes
+    - an editor becomes attractive only if future work shifts back into repeated layout creation or large-scale spatial remixing
+  - if reopened later:
+    - build a separate-page debug tool first, not an in-game overlay
+    - keep JS objects as canonical output
+    - use live `validateTentacleWarsLevelData()` checks plus normal campaign sanity after export
+- 2026-03-14: Implemented `REVIEW-TW-CLEANUP-001 Pre-Merge Cleanup Wave`.
+  - updated:
+    - `src/tentaclewars/TwBalance.js`
+    - `src/tentaclewars/TwCampaignLoader.js`
+    - `src/tentaclewars/TwSandboxConfig.js`
+    - `src/tentaclewars/TwAI.js`
+    - `src/tentaclewars/TwAIScoring.js`
+    - `src/entities/GameNode.js`
+    - `src/systems/EnergyBudget.js`
+    - `scripts/smoke-checks.mjs`
+    - `docs/project/tw-level-authoring-principles.md`
+  - behavior changes:
+    - centralized `AI_THINK_INTERVAL_SEC`, `DEFAULT_SOUNDTRACK_TRACK_ID`, and `AI_SUPPORT_PROXIMITY_PX` in `TW_BALANCE`
+    - removed the redundant outer validation in `buildTentacleWarsCampaignConfig()` while keeping the internal layout validation path canonical
+    - clarified the live split between defender-side passive regen suppression and allied-feed self-retain
+    - corrected the stale `2/3` energy-model references in the TW authoring principles doc
+  - guardrail adjustment:
+    - updated `scripts/smoke-checks.mjs` to assert the centralized default soundtrack-id path instead of the old hardcoded sandbox literal
+  - post-merge debt recorded in `docs/project/operational-kanban.md`:
+    - final-level constant for `W4-20`
+    - `twCampaignEndingView.js` translator injection consistency
+    - TW shared result DOM
+    - `TwScreenController.js` extraction
+    - shared renderer color helper cleanup
+    - preview-world-jump warning behavior
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/tw-campaign-sanity.mjs` → `15/15`
+    - `node scripts/tw-campaign-loader-sanity.mjs` → `7/7`

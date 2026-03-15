@@ -139,6 +139,7 @@ Planning / balance:
 - `docs/project/campaign-balance-wave-b-plan.md`
 - `docs/project/linux-audio-extraction-playbook.md`
 - `docs/project/commentary-header-template.md`
+- `docs/project/lessons-codex.md`
 
 Domain agents:
 
@@ -160,11 +161,31 @@ Installed Codex skills:
 
 - `develop-web-game`
 - `doc`
+- `figma`
+- `figma-implement-design`
 - `imagegen`
+- `jupyter-notebook`
+- `pdf`
 - `playwright`
 - `playwright-interactive`
 - `screenshot`
+- `sentry`
 - `spreadsheet`
+
+Priority superpowers:
+
+- `systematic-debugging`
+  - default for bugs, regressions, and unexpected runtime behavior
+- `test-driven-development`
+  - default for bugfixes and guarded gameplay changes
+- `verification-before-completion`
+  - required before claiming a wave is validated
+- `writing-plans`
+  - default for medium or large multi-step waves
+- `requesting-code-review`
+  - use before closing sensitive gameplay, campaign, or TentacleWars waves
+- `using-git-worktrees`
+  - use when isolating parallel or high-risk workstreams
 
 ## Audio Reconstruction Workflow
 
@@ -194,6 +215,15 @@ When rebuilding a soundtrack track from an authored audio file:
 - Prefer small, test-backed changes.
 - Start each meaningful wave by checking the relevant domain agent and the check matrix.
 - If the task clearly matches an installed Codex skill, use the skill before ad-hoc work.
+- For any multi-step wave, use `update_plan` at the start and keep it current as steps move from `in_progress` to `completed`.
+- All file-based collaboration protocol content (`inbox-codex.md`, `inbox-claude.md`, `tw-collab-status.md`) must stay in English.
+- Default superpowers stack:
+  - `systematic-debugging` for bugs
+  - `test-driven-development` for fixes and guarded behavior changes
+  - `writing-plans` for non-trivial waves
+  - `verification-before-completion` before claiming success
+  - `requesting-code-review` before closing sensitive waves
+- When the user reports a bug, do not start by fixing it. Start by adding or extending a test/guardrail that reproduces the bug, then fix it, then prove the fix with the passing test.
 - Keep source comments in English only.
 - If a touched `src/*.js` file still lacks a module header, add one in the same wave.
 - If a created or materially changed function in `src/*.js` lacks a short block header, add one in the same wave.
@@ -203,6 +233,9 @@ When rebuilding a soundtrack track from an authored audio file:
 - If changing campaign progression, tutorial completion, or skip flow, keep `GameState` as the canonical source of next-level and unlock rules.
 - If changing campaign layouts, run both `smoke-checks` and `campaign-sanity`.
 - If changing world systems or simulation math, run `simulation-soak` too.
+- Before reporting a task result as validated, check that your evidence directly measures what you claim, not a proxy or a window that includes unrelated phases (build time, travel time, warm-up).
+- For browser validation in this repo, prefer `bash scripts/tw-visual-validation.sh ...` and the Chromium-backed `scripts/tw-visual-playwright.mjs` flow.
+- Do not default to the older `playwright-cli` + Firefox path here; this Linux environment has a documented history of Firefox instability and the project-local Chromium workflow is the canonical browser-validation path.
 
 ## Safe Restart Point For New Skills
 
@@ -239,5 +272,6 @@ Treat changes there as gameplay-sensitive.
 1. evaluate whether `24 RELAY RACE` still needs structural support after Wave B tuning
 2. run playtest-driven tuning on the new AI tactical-state and enemy-slice wave
 3. keep expanding balance and micro-bug intake from live sessions
-4. keep the `TentacleWars` mode work isolated on its own branch and track it through `TASK-TW-001` to `TASK-TW-006`
+4. keep the `TentacleWars` mode work isolated on its own branch and use the sandbox playtest/tuning wave after `TASK-TW-006`
 5. prepare executable Linux/Android packaging only when port work becomes active
+6. after restarting with the new skills, update the skill-driven workflow and start `TASK-TW-007 Packet-Native Lane Runtime`

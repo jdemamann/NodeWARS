@@ -5,6 +5,8 @@
    presentation-focused rather than telemetry-heavy.
    ================================================================ */
 
+import { STATE } from '../core/GameState.js';
+
 export function buildMechanicSummary(levelConfig) {
   // Surface only the dominant phase mechanics so the result screen reads fast.
   return [
@@ -18,6 +20,30 @@ export function buildMechanicSummary(levelConfig) {
 }
 
 export function buildResultInfoMarkup(levelConfig, game, translate, totalLevels) {
+  if (levelConfig.isTentacleWarsCampaign) {
+    const levelId = levelConfig.twLevelId || levelConfig.id;
+    const parSeconds = levelConfig.par || 0;
+    const elapsedSeconds = Math.floor(game.scoreTime);
+    const stars = STATE.getTentacleWarsStars(levelId) || 0;
+    const gradeClass = elapsedSeconds <= parSeconds
+      ? 'result-good'
+      : elapsedSeconds <= Math.ceil(parSeconds * 1.35)
+        ? 'result-alert'
+        : 'result-bad';
+
+    return (
+      '<div class="tw-result-block">' +
+        '<div class="tw-phase-badge">' + levelId + '</div>' +
+        '<div class="tw-stars">' + translate('twStars') + ' · ' + '★'.repeat(stars) + '☆'.repeat(3 - stars) + '</div>' +
+        '<div class="tw-time-row">' +
+          '<span class="ll">' + translate('time') + '</span>' +
+          '<span class="lv"><span class="' + gradeClass + '">' + elapsedSeconds + 's</span></span>' +
+          '<span class="tw-par-note">' + translate('twParTime', parSeconds) + '</span>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   const parSeconds = levelConfig.par || 120;
   const elapsedSeconds = Math.floor(game.scoreTime);
   const isUnderPar = elapsedSeconds <= parSeconds;
