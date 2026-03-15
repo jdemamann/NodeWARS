@@ -736,6 +736,12 @@ export class TentRenderer {
     /* During clash visEnd is already capped at the clash front (line 487), so packets
        naturally stop before the collision point — the !isClash guard was wrong. */
     if (isTentacleWarsLane && t.state === TentState.ACTIVE) {
+      /* During clash, packets were emitted with travelDuration * clashT so they
+         reach the midpoint in the correct time. Pass the same halved duration to
+         the packet sampler so progress values map correctly to [0, 1]. */
+      const packetTravelDuration = (isClash && activeClashFront != null)
+        ? (t.travelDuration || 1) * activeClashFront
+        : (t.travelDuration || 1);
       drawTentacleWarsEnergyPackets(ctx, {
         esx: twEsx,
         esy: twEsy,
@@ -743,7 +749,7 @@ export class TentRenderer {
         ety: twEty,
         controlPoint: cp,
         packetTravelQueue: t.packetTravelQueue || [],
-        travelDuration: t.travelDuration || 1,
+        travelDuration: packetTravelDuration,
         laneStart: Math.max(sT, 0.04),
         laneEnd: Math.max(Math.max(sT, 0.04), visEnd * 0.96),
         highGraphics,
