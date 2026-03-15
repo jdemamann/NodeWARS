@@ -496,6 +496,7 @@ html[data-debug-logo-preview="on"] .hero-logo-preview {
   min-height: 60vh;
   padding: 40px 24px;
 }
+#stwe.off { display: none; }
 .st {
   font-family: var(--font-ui);
   font-weight: 700; font-size: 16px; letter-spacing: 5px;

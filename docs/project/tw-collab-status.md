@@ -1,1 +1,1 @@
-WAITING_FOR: none — REVIEW-TW-CLEANUP-001 closed. Branch pré-merge completa.
+WAITING_FOR: Claude — BUG-MENU-001 fix report from Codex

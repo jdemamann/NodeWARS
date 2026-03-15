@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -237,6 +238,13 @@ async function testShowScrTogglesSingleVisibleScreen() {
   screenController.showScr('ending');
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_ENDING).classList.contains('off'), false, 'ending screen should become visible');
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_SETTINGS).classList.contains('off'), true, 'previous screen should be hidden after switching');
+}
+
+async function testDedicatedTwEndingCssDoesNotOverrideHiddenScreenState() {
+  const css = await fs.readFile(path.join(ROOT, 'styles/main.css'), 'utf8');
+
+  assert.match(css, /#stwe\s*\{[\s\S]*display:\s*flex;/, 'TW ending screen should keep its dedicated layout styling');
+  assert.match(css, /#stwe\.off\s*\{\s*display:\s*none;\s*\}/, 'TW ending screen should explicitly preserve the hidden-screen contract when it carries the off class');
 }
 
 async function testRefreshSettingsUiReflectsEffectiveState() {
@@ -489,6 +497,7 @@ async function testTentacleWarsResultMarkupDropsNodewarsStats() {
 async function main() {
   const tests = [
     ['showScr toggles a single visible screen', testShowScrTogglesSingleVisibleScreen],
+    ['dedicated TW ending CSS preserves hidden screen state', testDedicatedTwEndingCssDoesNotOverrideHiddenScreenState],
     ['refreshSettingsUI reflects effective state', testRefreshSettingsUiReflectsEffectiveState],
     ['showCampaignEnding populates and hides HUD surfaces', testShowCampaignEndingPopulatesAndHidesHudSurfaces],
     ['showNotification appends structured cards', testShowNotificationAppendsStructuredCards],
