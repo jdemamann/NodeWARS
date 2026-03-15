@@ -144,6 +144,23 @@ async function testTwClashFlowRateStaysAliveOnBothSides() {
   assert.ok(tentB.flowRate > 0, 'non-canonical tentacle flowRate should be positive during TW clash');
 }
 
+async function testTwClashPacketQueueFedDuringClash() {
+  const { tentA, tentB } = await makeTwFixtures({ energyA: 50, energyB: 50 });
+  tentA.packetTravelQueue = [];
+  tentB.packetTravelQueue = [];
+
+  // Run several ticks so the accumulator has time to emit at least one packet
+  for (let i = 0; i < 10; i++) {
+    tentB._updateClashState(0.1);
+    tentA._updateClashState(0.1);
+  }
+
+  assert.ok(tentA.packetTravelQueue.length > 0,
+    'canonical tentacle packetTravelQueue should be fed during TW clash');
+  assert.ok(tentB.packetTravelQueue.length > 0,
+    'non-canonical tentacle packetTravelQueue should be fed during TW clash');
+}
+
 async function listJsFiles(dir) {
   const entries = await fs.readdir(path.join(ROOT, dir), { withFileTypes: true });
   const files = [];
@@ -2796,6 +2813,7 @@ async function main() {
     ['TentacleWars clash threshold triggers auto-retract and auto-advance', testTwClashThresholdTriggersRetractAndAdvance],
     ['TentacleWars clash damage is bidirectional (canonical driver can lose)', testTwClashBidirectionalDamage],
     ['TentacleWars clash flowRate stays alive on both tentacle sides', testTwClashFlowRateStaysAliveOnBothSides],
+    ['TentacleWars clash packet queue is fed during clash on both tentacles', testTwClashPacketQueueFedDuringClash],
   ];
 
   let passed = 0;

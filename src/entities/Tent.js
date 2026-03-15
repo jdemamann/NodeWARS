@@ -928,6 +928,21 @@ export class Tent {
       const localPressure = computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt)
         + this.twOverflowShare;
       this.flowRate = this.flowRate * 0.80 + localPressure * 0.20;
+
+      /* Feed the packet queue toward the clash point so yellow orbs animate
+         on both tentacles during clash. Packets travel only to clashT (0.5),
+         so travelDuration is halved. deliveredPacketCount is ignored — packets
+         cancel at the midpoint, they do not deliver energy to the target. */
+      const clashStep = advanceTentacleWarsLaneRuntime({
+        accumulatorUnits: this.packetAccumulatorUnits + this.twOverflowShare,
+        throughputPerSecond: computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt),
+        deltaSeconds: dt,
+        sourceAvailableEnergy: sourceNode.energy,
+        queuedPacketTravelTimes: this.packetTravelQueue,
+        travelDurationSeconds: this.travelDuration * (this.clashT ?? 0.5),
+      });
+      this.packetAccumulatorUnits = clashStep.nextAccumulatorUnits;
+      this.packetTravelQueue = clashStep.nextQueuedPacketTravelTimes;
     }
 
     /* Only the canonical tent (lower source.id) drives the shared clash front.
