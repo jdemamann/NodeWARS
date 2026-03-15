@@ -1039,9 +1039,11 @@ async function testTentacleWarsSandboxPrototypeBoundary() {
   const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
   const mainSource = await fs.readFile(path.join(ROOT, 'src/main.js'), 'utf8');
   const sandboxConfigSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwSandboxConfig.js'), 'utf8');
+  const twBalanceSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwBalance.js'), 'utf8');
 
   assert.match(sandboxConfigSource, /isTentacleWarsSandbox:\s*true/, 'TentacleWars should expose a dedicated sandbox config');
-  assert.match(sandboxConfigSource, /soundtrackTrackId:\s*'stella'/, 'TentacleWars sandbox should ship with a dedicated soundtrack id');
+  assert.match(twBalanceSource, /DEFAULT_SOUNDTRACK_TRACK_ID:\s*'stella'/, 'TentacleWars should centralize its default soundtrack id in TW_BALANCE');
+  assert.match(sandboxConfigSource, /soundtrackTrackId:\s*TW_BALANCE\.DEFAULT_SOUNDTRACK_TRACK_ID/, 'TentacleWars sandbox should use the centralized default soundtrack id');
   assert.match(gameSource, /loadTentacleWarsSandbox\(\)/, 'Game should expose a dedicated TentacleWars sandbox loader');
   assert.match(gameSource, /loadTentacleWarsCampaignLevel\(levelData\)/, 'Game should expose a TentacleWars campaign loader entry point');
   assert.match(gameSource, /_loadConfiguredLevel\(cfg, \{ persistCurrentLevel = false \} = \{\}\)/, 'Game should centralize config loading for campaign and sandbox entries');

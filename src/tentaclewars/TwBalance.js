@@ -19,7 +19,11 @@ export const TW_BALANCE = {
   GRADE_MAX_TENTACLE_SLOTS: [1, 2, 2, 2, 3, 3],
   DOMINATOR_PACKET_MULT: 2,
   PACKET_SIZE: 1,
+  // Applies only to TW cells currently under active hostile pressure.
+  // This is defender-side regen suppression, not the allied-feed self-retain rule.
   PASSIVE_REGEN_FRACTION: 0.25,
+  // Reserves part of a source cell's packet budget for self-regen while it is
+  // feeding allied lanes, so support cells do not flatten to zero throughput.
   TW_SELF_REGEN_FRACTION: 0.20,
   // TentacleWars phase 1 treats red and purple as separate hostiles by default.
   ENEMY_RELATION_MODE: 'all_hostile',
@@ -39,13 +43,16 @@ export const TW_BALANCE = {
   AI_HOSTILE_PLAYER_TARGET_BONUS: 12,
   AI_ALLIED_SUPPORT_BONUS: 26,
   AI_SUPPORT_TRIANGLE_BONUS: 18,
+  AI_SUPPORT_PROXIMITY_PX: 170,
   AI_OVERFLOW_READY_BONUS: 14,
   AI_EXISTING_PRESSURE_BONUS: 16,
   AI_DISTANCE_PRESSURE_FACTOR: 240,
+  AI_THINK_INTERVAL_SEC: 1.55,
   AI_PURPLE_ENABLES_SLICE: true,
   AI_PURPLE_SLICE_COOLDOWN_SEC: 0.8,
   AI_PURPLE_SLICE_PIPE_TARGET_RATIO: 0.35,
   AI_PURPLE_SLICE_SCORE_THRESHOLD: 24,
   AI_PURPLE_SLICE_HOSTILE_TARGET_BONUS: 18,
   AI_PURPLE_SLICE_OVERFLOW_SOURCE_BONUS: 12,
+  DEFAULT_SOUNDTRACK_TRACK_ID: 'stella',
 };

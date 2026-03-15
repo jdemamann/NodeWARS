@@ -6,6 +6,7 @@
    ================================================================ */
 
 import { NodeType } from '../config/gameConfig.js';
+import { TW_BALANCE } from './TwBalance.js';
 import { scaleTentacleWarsObstacle } from './TwObstacleRuntime.js';
 import { validateTentacleWarsLevelData } from './TwLevelSchema.js';
 
@@ -72,8 +73,8 @@ export function buildTentacleWarsCampaignLayout(levelData, width, height) {
 
 /* Builds the level-config shell that the existing Game loader can consume. */
 export function buildTentacleWarsCampaignConfig(levelData, width, height) {
+  const runtimeLayout = buildTentacleWarsCampaignLayout(levelData, width, height);
   const validatedLevel = validateTentacleWarsLevelData(levelData);
-  const runtimeLayout = buildTentacleWarsCampaignLayout(validatedLevel, width, height);
 
   const redEnemyCount = validatedLevel.cells.filter(cell => cell.owner === 'red').length;
   const purpleEnemyCount = validatedLevel.cells.filter(cell => cell.owner === 'purple').length;
@@ -106,8 +107,8 @@ export function buildTentacleWarsCampaignConfig(levelData, width, height) {
     nodeEnergyCap: validatedLevel.energyCap,
     distanceCostMultiplier: 0,
     twCostNormalizer: runtimeLayout.twCostNormalizer,
-    aiThinkIntervalSeconds: 1.55,
-    soundtrackTrackId: 'stella',
+    aiThinkIntervalSeconds: TW_BALANCE.AI_THINK_INTERVAL_SEC,
+    soundtrackTrackId: TW_BALANCE.DEFAULT_SOUNDTRACK_TRACK_ID,
     par: validatedLevel.par,
   };
 }

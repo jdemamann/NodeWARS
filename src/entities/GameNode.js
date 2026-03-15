@@ -109,6 +109,8 @@ export class GameNode {
     if (this.owner !== 0) {
       if (this.energy < this.maxE) {
         let regenRate = computeNodeDisplayRegenRate(this, frenzyActive);
+        // TW only suppresses passive regen on cells that are actively under
+        // hostile pressure; uncontested attackers keep their full grade regen.
         if (this.simulationMode === 'tentaclewars' && this.underAttack > 0.05) {
           regenRate *= TW_BALANCE.PASSIVE_REGEN_FRACTION;
         }

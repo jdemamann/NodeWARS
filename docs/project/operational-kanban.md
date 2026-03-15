@@ -17,6 +17,13 @@ Use it as the local source of truth when:
 - investigate additional tutorial playtest feedback once new sessions are recorded
 - evaluate whether `24 RELAY RACE` needs structural player opening support
 - `TASK-TWL-BALANCE-CROSS` TentacleWars Cross-World Balance Pass — review par values and energyCaps for flagged phases: W3-15, W3-16, W4-16, W4-19, W4-20. Requires real timed playtests. Not blocking integration.
+- `TASK-TW-POSTMERGE-DEBT` TentacleWars post-merge debt cluster:
+  - `W4-20` hardcoded final-level trigger should move to a TW constant
+  - `twCampaignEndingView.js` should align with sibling view builders and receive `T` as a parameter
+  - TW result path still reuses the shared NW result DOM
+  - `ScreenController.js` should eventually split TW navigation into `TwScreenController.js`
+  - `colorWithAlpha` is still duplicated across renderers
+  - `applyTentacleWarsPreviewWorldJump()` still returns `null` silently outside debug
 
 ## Planned
 
@@ -53,6 +60,11 @@ Phase G — Polish Final:
 - none
 
 ## Done Recently
+
+- `REVIEW-TW-CLEANUP-001 Pre-Merge Cleanup Wave`
+  - output: `src/tentaclewars/TwBalance.js`, `src/tentaclewars/TwCampaignLoader.js`, `src/tentaclewars/TwSandboxConfig.js`, `src/tentaclewars/TwAI.js`, `src/tentaclewars/TwAIScoring.js`, `docs/project/tw-level-authoring-principles.md`
+  - validation: `90/90 + 15/15 + 7/7 PASS`
+  - centralized TW config literals, removed loader double-validation, clarified the two TW regen fractions, and corrected stale energy-model docs before merge
 
 - `TASK-TWL-018 TentacleWars Phase Editor Feasibility Review`
   - output: research-only recommendation in `docs/project/inbox-claude.md`

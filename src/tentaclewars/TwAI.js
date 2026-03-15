@@ -29,7 +29,7 @@ export class TwAI {
     this.cfg = cfg;
     this.owner = owner;
     this._timer = 0;
-    this._interval = cfg.aiThinkIntervalSeconds || 1.55;
+    this._interval = cfg.aiThinkIntervalSeconds || TW_BALANCE.AI_THINK_INTERVAL_SEC;
     this._sliceCooldown = 0;
   }
 

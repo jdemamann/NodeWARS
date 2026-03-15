@@ -1191,3 +1191,32 @@ Original prompt: faça isso. E especifique em quais fases essas musicas aparecem
     - build a separate-page debug tool first, not an in-game overlay
     - keep JS objects as canonical output
     - use live `validateTentacleWarsLevelData()` checks plus normal campaign sanity after export
+- 2026-03-14: Implemented `REVIEW-TW-CLEANUP-001 Pre-Merge Cleanup Wave`.
+  - updated:
+    - `src/tentaclewars/TwBalance.js`
+    - `src/tentaclewars/TwCampaignLoader.js`
+    - `src/tentaclewars/TwSandboxConfig.js`
+    - `src/tentaclewars/TwAI.js`
+    - `src/tentaclewars/TwAIScoring.js`
+    - `src/entities/GameNode.js`
+    - `src/systems/EnergyBudget.js`
+    - `scripts/smoke-checks.mjs`
+    - `docs/project/tw-level-authoring-principles.md`
+  - behavior changes:
+    - centralized `AI_THINK_INTERVAL_SEC`, `DEFAULT_SOUNDTRACK_TRACK_ID`, and `AI_SUPPORT_PROXIMITY_PX` in `TW_BALANCE`
+    - removed the redundant outer validation in `buildTentacleWarsCampaignConfig()` while keeping the internal layout validation path canonical
+    - clarified the live split between defender-side passive regen suppression and allied-feed self-retain
+    - corrected the stale `2/3` energy-model references in the TW authoring principles doc
+  - guardrail adjustment:
+    - updated `scripts/smoke-checks.mjs` to assert the centralized default soundtrack-id path instead of the old hardcoded sandbox literal
+  - post-merge debt recorded in `docs/project/operational-kanban.md`:
+    - final-level constant for `W4-20`
+    - `twCampaignEndingView.js` translator injection consistency
+    - TW shared result DOM
+    - `TwScreenController.js` extraction
+    - shared renderer color helper cleanup
+    - preview-world-jump warning behavior
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/tw-campaign-sanity.mjs` → `15/15`
+    - `node scripts/tw-campaign-loader-sanity.mjs` → `7/7`

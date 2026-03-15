@@ -254,7 +254,9 @@ the wiki hints, the pattern is:
 - Hard: 80–120 sec
 - Boss/late: 120–180 sec
 
-Under PASSIVE_REGEN_FRACTION=2/3, grade-0 combat is slower (0.33/sec net drain).
+Under the live TW model, defenders under active hostile pressure regenerate at
+`PASSIVE_REGEN_FRACTION=0.25`, while uncontested attackers keep full grade regen
+and allied feeders retain `TW_SELF_REGEN_FRACTION=0.20` for self-regeneration.
 Adjust all early-W1 pars upward by ~30–50% vs pre-fraction values.
 
 ### 7.2 Level difficulty signals from wiki hints
@@ -333,7 +335,7 @@ For each new level:
 - [ ] Level is playable without the optimal mechanic (teaching, not gatekeeping)
 
 **Pacing:**
-- [ ] Par time calibrated under PASSIVE_REGEN_FRACTION=2/3
+- [ ] Par time calibrated under the live TW regen split model (`PASSIVE_REGEN_FRACTION=0.25` with `underAttack` gating plus `TW_SELF_REGEN_FRACTION=0.20`)
 - [ ] Grade-0 levels: par accounts for 0.33/sec net drain
 - [ ] Grade-1 advantage levels: par can be tighter (0.83/sec net drain)
 

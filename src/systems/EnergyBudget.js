@@ -43,6 +43,8 @@ export function computeNodeSourceBudget(node) {
 export function computeNodeTentacleFeedRate(node) {
   if (node.simulationMode === 'tentaclewars') {
     const outgoingTentacles = Math.max(1, node.outCount);
+    // TW support lanes do not spend the full packet budget outward; this
+    // retained share keeps the source cell self-regenerating while it feeds.
     const selfFraction = TW_BALANCE.TW_SELF_REGEN_FRACTION ?? 0;
     return computeNodeSourceBudget(node) * (1 - selfFraction) / outgoingTentacles;
   }

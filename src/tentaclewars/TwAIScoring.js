@@ -38,7 +38,7 @@ function computeSupportTriangleBonus(game, sourceNode, targetNode, owner, balanc
   const nearbyOwnedSupportNode = game.nodes.some(candidateNode =>
     candidateNode !== sourceNode &&
     candidateNode.owner === owner &&
-    computeDistance(candidateNode.x, candidateNode.y, targetNode.x, targetNode.y) <= 170
+    computeDistance(candidateNode.x, candidateNode.y, targetNode.x, targetNode.y) <= balance.AI_SUPPORT_PROXIMITY_PX
   );
   return nearbyOwnedSupportNode ? balance.AI_SUPPORT_TRIANGLE_BONUS * 0.5 : 0;
 }

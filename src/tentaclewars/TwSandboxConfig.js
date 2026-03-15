@@ -7,6 +7,7 @@
    ================================================================ */
 
 import { T } from '../localization/i18n.js';
+import { TW_BALANCE } from './TwBalance.js';
 import {
   getTentacleWarsScenarioPreset,
   resolveTentacleWarsScenarioPresetId,
@@ -45,8 +46,8 @@ export function buildTentacleWarsSandboxConfig() {
     neutralEnergyRange: [18, 72],
     nodeEnergyCap: 200,
     distanceCostMultiplier: 0,
-    aiThinkIntervalSeconds: 1.55,
-    soundtrackTrackId: 'stella',
+    aiThinkIntervalSeconds: TW_BALANCE.AI_THINK_INTERVAL_SEC,
+    soundtrackTrackId: TW_BALANCE.DEFAULT_SOUNDTRACK_TRACK_ID,
     par: null,
   };
 }
