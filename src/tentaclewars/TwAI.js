@@ -123,6 +123,14 @@ export class TwAI {
     });
 
     candidateMoves.sort((leftMove, rightMove) => rightMove.score - leftMove.score);
+    if (TW_BALANCE.AI_DEBUG_SCORING) {
+      const label = `[TwAI:${this.owner === 3 ? 'Purple' : 'Red'}]`;
+      console.debug(`${label} think() — sources:${sourceNodes.length} candidates:${candidateMoves.length}`);
+      for (const move of candidateMoves) {
+        console.debug(`  [move] node${move.sourceNode.id} → node${move.targetNode.id}  score=${move.score.toFixed(2)}`);
+      }
+    }
+
     const usedSourceIds = new Set();
     let movesPicked = 0;
 
@@ -131,6 +139,10 @@ export class TwAI {
       if (usedSourceIds.has(move.sourceNode.id)) continue;
       usedSourceIds.add(move.sourceNode.id);
       this._createTentacleMove(move.sourceNode, move.targetNode, move.buildCost);
+      if (TW_BALANCE.AI_DEBUG_SCORING) {
+        const label = `[TwAI:${this.owner === 3 ? 'Purple' : 'Red'}]`;
+        console.debug(`  ✓ selected: node${move.sourceNode.id} → node${move.targetNode.id}`);
+      }
       movesPicked += 1;
     }
   }
@@ -162,6 +174,12 @@ export class TwAI {
     sliceCandidates.sort((leftCandidate, rightCandidate) => rightCandidate.score - leftCandidate.score);
 
     sliceCandidates[0].tentacle.applySliceCut(0.15);
+    if (TW_BALANCE.AI_DEBUG_SCORING) {
+      const best = sliceCandidates[0];
+      console.debug(
+        `[TwAI:Purple] slice applied — src:node${best.tentacle.effectiveSourceNode?.id} → tgt:node${best.tentacle.effectiveTargetNode?.id}  score=${best.score.toFixed(2)}`
+      );
+    }
     this._sliceCooldown = TW_BALANCE.AI_PURPLE_SLICE_COOLDOWN_SEC;
   }
 }

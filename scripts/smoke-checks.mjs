@@ -2390,6 +2390,82 @@ async function testCommentaryHeadersStayModernAndEnglish() {
   }
 }
 
+async function testTwAiDebugScoringFlagIsOffByDefault() {
+  const { TW_BALANCE } = await load('src/tentaclewars/TwBalance.js');
+
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(TW_BALANCE, 'AI_DEBUG_SCORING'),
+    'TW_BALANCE must expose AI_DEBUG_SCORING'
+  );
+  assert.equal(
+    TW_BALANCE.AI_DEBUG_SCORING,
+    false,
+    'AI_DEBUG_SCORING must default to false so observability is off in production'
+  );
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(TW_BALANCE, 'AI_FINISH_LOW_ENERGY_FRACTION'),
+    'TW_BALANCE must expose AI_FINISH_LOW_ENERGY_FRACTION'
+  );
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(TW_BALANCE, 'AI_PRESSURE_OVERFLOW_THRESHOLD'),
+    'TW_BALANCE must expose AI_PRESSURE_OVERFLOW_THRESHOLD'
+  );
+}
+
+async function testTwAiObservabilityGuardIsExplicit() {
+  const twAiSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwAI.js'), 'utf8');
+
+  assert.match(
+    twAiSource,
+    /if\s*\(\s*TW_BALANCE\.AI_DEBUG_SCORING\s*\)/,
+    'TwAI must guard all debug output with an explicit if (TW_BALANCE.AI_DEBUG_SCORING) conditional'
+  );
+
+  assert.match(
+    twAiSource,
+    /applySliceCut\([^)]*\)[\s\S]{0,120}console\.debug/,
+    'TwAI purple slice debug output must appear after applySliceCut, not before'
+  );
+
+  const sliceMethodMatch = twAiSource.match(/_checkPurpleSlicePressure\(\)[\s\S]*?^  \}/m);
+  if (sliceMethodMatch) {
+    const sliceBody = sliceMethodMatch[0];
+    const debugIdx = sliceBody.indexOf('console.debug');
+    const sliceIdx = sliceBody.indexOf('applySliceCut');
+    if (debugIdx !== -1 && sliceIdx !== -1) {
+      assert.ok(
+        sliceIdx < debugIdx,
+        'console.debug in _checkPurpleSlicePressure must appear after applySliceCut'
+      );
+    }
+  }
+}
+
+async function testTwAiObservabilityDoesNotLogWhenSourcesEmpty() {
+  const twAiSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwAI.js'), 'utf8');
+
+  const thinkIdx = twAiSource.indexOf('_think()');
+  assert.ok(thinkIdx !== -1, 'TwAI must have a _think() method');
+  const thinkBody = twAiSource.slice(thinkIdx);
+  const earlyReturnIdx = thinkBody.indexOf('if (!sourceNodes.length) return');
+  const firstDebugIdx = thinkBody.indexOf('console.debug');
+  assert.ok(earlyReturnIdx !== -1, '_think() must have the sourceNodes.length early-return guard');
+  assert.ok(
+    earlyReturnIdx < firstDebugIdx || firstDebugIdx === -1,
+    'The sourceNodes.length early-return must appear before any console.debug in _think()'
+  );
+}
+
+async function testTwAiObservabilityLogsAllCandidatesBeforePick() {
+  const twAiSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwAI.js'), 'utf8');
+
+  assert.match(
+    twAiSource,
+    /candidateMoves[\s\S]{0,300}console\.debug[\s\S]{0,300}usedSourceIds/,
+    'TwAI observability must log all candidates before the pick loop begins'
+  );
+}
+
 async function main() {
   const tests = [
     ['relay nodes do not create free energy', testRelayNoFreeEnergy],
@@ -2482,6 +2558,10 @@ async function main() {
     ['TentacleWars cut retraction does not explode target flash', testTentacleWarsCutRetractionDoesNotExplodeTargetFlash],
     ['Range preview stays viewport clamped', testRangePreviewStaysViewportClamped],
     ['Commentary headers stay modern and English', testCommentaryHeadersStayModernAndEnglish],
+    ['TentacleWars AI debug scoring flag is off by default', testTwAiDebugScoringFlagIsOffByDefault],
+    ['TentacleWars AI observability guard is explicit and correctly placed', testTwAiObservabilityGuardIsExplicit],
+    ['TentacleWars AI observability does not log when sources list is empty', testTwAiObservabilityDoesNotLogWhenSourcesEmpty],
+    ['TentacleWars AI observability logs all candidates before pick loop', testTwAiObservabilityLogsAllCandidatesBeforePick],
   ];
 
   let passed = 0;

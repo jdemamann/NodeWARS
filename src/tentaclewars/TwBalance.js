@@ -54,5 +54,13 @@ export const TW_BALANCE = {
   AI_PURPLE_SLICE_SCORE_THRESHOLD: 24,
   AI_PURPLE_SLICE_HOSTILE_TARGET_BONUS: 18,
   AI_PURPLE_SLICE_OVERFLOW_SOURCE_BONUS: 12,
+  // Observability: enable in DevTools when tuning TW AI decisions.
+  // Must stay false by default so production runs do not allocate log state.
+  AI_DEBUG_SCORING: false,
+  // Tactical state thresholds used by the upcoming TW classifier.
+  // A hostile target is vulnerable below this fraction of its maxE.
+  AI_FINISH_LOW_ENERGY_FRACTION: 0.35,
+  // A source is near-overflow above this fraction of its maxE.
+  AI_PRESSURE_OVERFLOW_THRESHOLD: 0.7,
   DEFAULT_SOUNDTRACK_TRACK_ID: 'stella',
 };
