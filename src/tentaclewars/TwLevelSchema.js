@@ -154,7 +154,7 @@ export function validateTentacleWarsLevelData(levelData) {
     fail('level.id', `expected "${expectedId}" to match world/phase fields`);
   }
 
-  assertIntegerInRange(levelData.energyCap, 'level.energyCap', 1, 200);
+  assertIntegerInRange(levelData.energyCap, 'level.energyCap', 1, 700);
   assertIntegerInRange(levelData.par, 'level.par', 1, 3600);
 
   if (!Array.isArray(levelData.cells) || levelData.cells.length === 0) {

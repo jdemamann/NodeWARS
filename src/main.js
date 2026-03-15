@@ -13,10 +13,12 @@ import { Game }     from './core/Game.js';
 import { DOM_IDS }  from './ui/DomIds.js';
 import {
   showScr, fadeGo, showToast, showNotification, buildWorldTabs, buildStory, buildCredits,
-  syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel, showCampaignEnding,
+  syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel, endTentacleWarsLevel,
+  showCampaignEnding, showTwCampaignEnding, showTwWorldSelect, showTwLevelSelect,
 } from './ui/ScreenController.js';
 import { LEVELS } from './config/gameConfig.js';
 import { buildTentacleWarsDebugMetrics } from './tentaclewars/TwDebugMetrics.js';
+import { getTentacleWarsCampaignLevelById } from './tentaclewars/TwCampaignFixtures.js';
 import {
   applyTentacleWarsPreviewWorldJump,
   getTentacleWarsPreviewLevelById,
@@ -85,6 +87,38 @@ function buildTrackNotification(trackInfo) {
     durationMs: 3600,
     dedupeKey: `music:${trackInfo.id}`,
   };
+}
+
+/*
+ * Resolve the active authored TW level id from the live runtime first so
+ * result and pause buttons operate on the phase the player just touched.
+ */
+function getActiveTentacleWarsLevelId() {
+  return game?.cfg?.twLevelId || game?.cfg?.id || STATE.getTentacleWarsCurrentLevel();
+}
+
+/*
+ * Keep TW world routing derived from the stable level-id namespace instead of
+ * duplicating world state in the shell.
+ */
+function getActiveTentacleWarsWorldId() {
+  const match = getActiveTentacleWarsLevelId().match(/^W(\d+)-/);
+  return match ? Number(match[1]) : STATE.getTentacleWarsActiveWorldTab();
+}
+
+/*
+ * Centralize authored TW level loading so every menu/result path updates the
+ * canonical campaign pointer before handing control back to Game.
+ */
+function loadTentacleWarsCampaignLevelById(levelId) {
+  const levelData = getTentacleWarsCampaignLevelById(levelId);
+  if (!levelData || !game) return false;
+  STATE.setGameMode('tentaclewars');
+  STATE.setTentacleWarsActiveWorldTab(levelData.world);
+  STATE.setTentacleWarsCurrentLevel(levelId);
+  showScr(null);
+  game.loadTentacleWarsCampaignLevel(levelData);
+  return true;
 }
 
 function initGame() {
@@ -214,11 +248,16 @@ async function copyTextToClipboard(text) {
 function wireButtons() {
   /* Main menu */
   $id(DOM_IDS.BTN_PLAY)?.addEventListener('click', () => {
-    if (STATE.getGameMode() === 'tentaclewars') {
-      fadeGo(() => { game.enterSelectedMode(); });
-      return;
-    }
+    STATE.setGameMode('nodewars');
+    STATE.saveSettings();
+    refreshSettingsUI();
     fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); });
+  });
+  $id(DOM_IDS.BTN_TW_PLAY)?.addEventListener('click', () => {
+    STATE.setGameMode('tentaclewars');
+    STATE.saveSettings();
+    refreshSettingsUI();
+    fadeGo(() => showTwWorldSelect());
   });
   $id(DOM_IDS.BTN_STORY)?.addEventListener('click', () => { buildStory(); fadeGo(() => showScr('story')); });
   $id(DOM_IDS.BTN_SETTINGS)?.addEventListener('click', () => {
@@ -307,11 +346,39 @@ function wireButtons() {
 
   /* Level select */
   $id(DOM_IDS.BTN_BACK)?.addEventListener('click', () => { Music.playMenu(); fadeGo(() => showScr('menu')); });
+  $id(DOM_IDS.BTN_TW_WORLD_BACK)?.addEventListener('click', () => { Music.playMenu(); fadeGo(() => showScr('menu')); });
+  $id(DOM_IDS.BTN_TW_LEVEL_BACK)?.addEventListener('click', () => fadeGo(() => showTwWorldSelect()));
 
   /* Result */
-  $id(DOM_IDS.BTN_RL)?.addEventListener('click', () => fadeGo(() => { syncWorldTab(); buildWorldTabs(); showScr('levels'); }));
-  $id(DOM_IDS.BTN_RR)?.addEventListener('click', () => fadeGo(() => { showScr(null); game.loadLevel(STATE.curLvl); }));
+  $id(DOM_IDS.BTN_RL)?.addEventListener('click', () => fadeGo(() => {
+    if (STATE.getGameMode() === 'tentaclewars') {
+      showTwWorldSelect();
+      return;
+    }
+    syncWorldTab();
+    buildWorldTabs();
+    showScr('levels');
+  }));
+  $id(DOM_IDS.BTN_RR)?.addEventListener('click', () => fadeGo(() => {
+    if (STATE.getGameMode() === 'tentaclewars') {
+      loadTentacleWarsCampaignLevelById(getActiveTentacleWarsLevelId());
+      return;
+    }
+    showScr(null);
+    game.loadLevel(STATE.curLvl);
+  }));
   $id(DOM_IDS.BTN_RN)?.addEventListener('click', () => {
+    if (STATE.getGameMode() === 'tentaclewars') {
+      const nextLevelId = STATE.getTentacleWarsCurrentLevel();
+      fadeGo(() => {
+        if (nextLevelId === 'W4-20' && getActiveTentacleWarsLevelId() === 'W4-20') {
+          showTwCampaignEnding();
+          return;
+        }
+        loadTentacleWarsCampaignLevelById(nextLevelId);
+      });
+      return;
+    }
     const nextLevelId = STATE.getNextLevelId();
     if (nextLevelId != null) {
       STATE.setCurrentLevel(nextLevelId);
@@ -329,6 +396,12 @@ function wireButtons() {
   $id(DOM_IDS.BTN_ENDING_MENU)?.addEventListener('click', () => {
     Music.playMenu(); fadeGo(() => showScr('menu'));
   });
+  $id(DOM_IDS.BTN_TW_ENDING_MENU)?.addEventListener('click', () => {
+    STATE.setGameMode('nodewars');
+    STATE.saveSettings();
+    Music.playMenu();
+    fadeGo(() => showScr('menu'));
+  });
 
   /* Pause */
   $id(DOM_IDS.BTN_RESUME)?.addEventListener('click', () => {
@@ -342,6 +415,10 @@ function wireButtons() {
       showScr('menu');
       return;
     }
+    if (game.twMode.isCampaignActive()) {
+      showTwLevelSelect(game.cfg?.twWorld || STATE.getTentacleWarsActiveWorldTab());
+      return;
+    }
     syncWorldTab();
     buildWorldTabs();
     showScr('levels');
@@ -351,6 +428,10 @@ function wireButtons() {
     showScr(null);
     if (game.twMode.isSandboxActive()) {
       game.loadTentacleWarsSandbox();
+      return;
+    }
+    if (game.twMode.isCampaignActive()) {
+      loadTentacleWarsCampaignLevelById(getActiveTentacleWarsLevelId());
       return;
     }
     game.loadLevel(STATE.curLvl);

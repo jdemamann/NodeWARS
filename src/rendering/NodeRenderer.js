@@ -68,6 +68,68 @@ function drawNodeSurfaceShape(ctx, x, y, radius, sides, angle, forceCircle = fal
   drawNodeHull(ctx, x, y, radius, sides, angle);
 }
 
+/* Draw the rigid TentacleWars spike as a straight pin with a small dot-cap. */
+function drawTentacleWarsFollicle(ctx, startX, startY, endX, endY, tipRadius, color, lineWidth, alpha) {
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = alpha;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(endX, endY, tipRadius, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 1;
+  ctx.fill();
+}
+
+/* Render static white grade dots under the energy number for TentacleWars nodes. */
+function drawTentacleWarsGradeDots(ctx, node, radius, level) {
+  if (node.owner === 0 || level <= 0) return;
+
+  const dotCount = Math.min(4, level);
+  const dotRadius = Math.min(4, radius * 0.055);
+  const spacing = dotRadius * 2.8;
+  const totalWidth = (dotCount - 1) * spacing;
+  const dotY = node.y + radius * 0.28;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.82)';
+  for (let index = 0; index < dotCount; index += 1) {
+    const dotX = node.x - totalWidth / 2 + index * spacing;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* Draw the segmented TentacleWars energy ring without using a smooth progress arc. */
+function drawTentacleWarsSegmentedEnergyRing(ctx, x, y, radius, energyFraction, color) {
+  const totalSegments = 24;
+  const stepAngle = (Math.PI * 2) / totalSegments;
+  const segmentSpan = stepAngle * 0.72;
+  const activeSegments = energyFraction * totalSegments;
+
+  ctx.save();
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  for (let segmentIndex = 0; segmentIndex < totalSegments; segmentIndex += 1) {
+    const startAngle = -Math.PI / 2 + segmentIndex * stepAngle;
+    const endAngle = startAngle + segmentSpan;
+    const isActive = segmentIndex < activeSegments;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, startAngle, endAngle);
+    ctx.strokeStyle = isActive
+      ? colorWithAlpha(color, 0.75)
+      : colorWithAlpha(color, 0.10);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /* Use the below-node marker row as the persistent tentacle-slot indicator. */
 function drawPersistentSlotMarkers(ctx, node, radius, color) {
   if (node.owner === 0) return;
@@ -166,27 +228,43 @@ export class NodeRenderer {
       ctx.save();
       for (let i = 0; i < fc; i++) {
         const base = (i / fc) * Math.PI * 2 + ang * 0.7;
-        const wave = Math.sin(time * (isTentacleWarsNode ? 2.5 : 3.1) + i * 1.38) * (isTentacleWarsNode ? 0.16 : 0.27);
-        const bx   = n.x + r * Math.cos(base),  by = n.y + r * Math.sin(base);
-        const ex   = n.x + (r + fl) * Math.cos(base + wave), ey = n.y + (r + fl) * Math.sin(base + wave);
-        const mx2  = n.x + (r + fl * 0.5) * Math.cos(base + wave * 0.5);
-        const my2  = n.y + (r + fl * 0.5) * Math.sin(base + wave * 0.5);
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.quadraticCurveTo(mx2, my2, ex, ey);
-        ctx.strokeStyle  = col;
-        ctx.lineWidth    = isTentacleWarsNode ? 0.55 + lvl * 0.08 : 0.65 + lvl * 0.11;
-        ctx.globalAlpha  = fogAlpha * (isTentacleWarsNode ? (0.18 + lvl * 0.05) : (0.26 + lvl * 0.07));
+        const wave = isTentacleWarsNode ? 0 : Math.sin(time * 3.1 + i * 1.38) * 0.27;
+        const bx = n.x + r * Math.cos(base);
+        const by = n.y + r * Math.sin(base);
+        const ex = n.x + (r + fl) * Math.cos(base + wave);
+        const ey = n.y + (r + fl) * Math.sin(base + wave);
+
         sg(ctx, col, isTentacleWarsNode ? 2 : 3);
-        ctx.stroke();
+        if (isTentacleWarsNode) {
+          const tipRadius = Math.min(2.5, r * 0.04);
+          drawTentacleWarsFollicle(
+            ctx,
+            bx,
+            by,
+            ex,
+            ey,
+            tipRadius,
+            col,
+            0.55 + lvl * 0.08,
+            fogAlpha * (0.18 + lvl * 0.05),
+          );
+        } else {
+          const mx2 = n.x + (r + fl * 0.5) * Math.cos(base + wave * 0.5);
+          const my2 = n.y + (r + fl * 0.5) * Math.sin(base + wave * 0.5);
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.quadraticCurveTo(mx2, my2, ex, ey);
+          ctx.strokeStyle  = col;
+          ctx.lineWidth    = 0.65 + lvl * 0.11;
+          ctx.globalAlpha  = fogAlpha * (0.26 + lvl * 0.07);
+          ctx.stroke();
+        }
       }
       ctx.restore();
     }
 
     if (isTentacleWarsNode && n.owner !== 0) {
       const energyFraction = Math.max(0, Math.min(1, n.energy / Math.max(1, n.maxE)));
-      const energyArcStart = -Math.PI / 2;
-      const energyArcEnd = energyArcStart + energyFraction * Math.PI * 2;
       ctx.save();
       ctx.beginPath();
       ctx.arc(n.x, n.y, r * twVisual.shellScale, 0, Math.PI * 2);
@@ -195,41 +273,7 @@ export class NodeRenderer {
       sg(ctx, col, 10);
       ctx.stroke();
 
-      // Adaptation for auditability: this energy display is clearer than the
-      // current subtle ring, but it is not yet confirmed as literal original
-      // TentacleWars behavior.
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, r * 0.84, 0, Math.PI * 2);
-      ctx.strokeStyle = colorWithAlpha('#ffffff', 0.10);
-      ctx.lineWidth = 2.2;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, r * 0.84, energyArcStart, energyArcEnd);
-      ctx.strokeStyle = n.owner > 1
-        ? colorWithAlpha(col, 0.45 + energyFraction * 0.25)
-        : colorWithAlpha('#ffffff', 0.45 + energyFraction * 0.25);
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-      ctx.lineCap = 'butt';
-
-      for (let orbitalIndex = 0; orbitalIndex < twVisual.orbitals; orbitalIndex += 1) {
-        const orbitalAngle = ang * 0.55 + time * 0.35 + (orbitalIndex / twVisual.orbitals) * Math.PI * 2;
-        const orbitalRadius = r * twVisual.orbitalRadiusScale;
-        const orbitalDotRadius = Math.max(2, r * twVisual.orbitalDotScale);
-        const orbitalX = n.x + Math.cos(orbitalAngle) * orbitalRadius;
-        const orbitalY = n.y + Math.sin(orbitalAngle) * orbitalRadius;
-        ctx.beginPath();
-        ctx.arc(orbitalX, orbitalY, orbitalDotRadius, 0, Math.PI * 2);
-        ctx.fillStyle = colorWithAlpha('#06111f', 0.78);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(orbitalX, orbitalY, orbitalDotRadius * 0.7, 0, Math.PI * 2);
-        ctx.fillStyle = colorWithAlpha(col, 0.46 + lvl * 0.05);
-        sg(ctx, col, 6);
-        ctx.fill();
-      }
+      drawTentacleWarsSegmentedEnergyRing(ctx, n.x, n.y, r * 0.84, energyFraction, col);
       ctx.restore();
     }
 
@@ -598,7 +642,7 @@ export class NodeRenderer {
     }
 
     /* Energy arc */
-    if (n.owner !== 0) {
+    if (n.owner !== 0 && !isTentacleWarsNode) {
       const pct = n.energy / n.maxE;
       ctx.save();
       ctx.beginPath();
@@ -629,6 +673,10 @@ export class NodeRenderer {
     sg(ctx, col, 5);
     if (!n.inFog) ctx.fillText(n.dispE, n.x, n.y);
     ctx.restore();
+
+    if (isTentacleWarsNode) {
+      drawTentacleWarsGradeDots(ctx, n, r, lvl);
+    }
 
     /* Both modes now use the below-node channel for slot occupancy. */
     drawPersistentSlotMarkers(ctx, n, r, col);

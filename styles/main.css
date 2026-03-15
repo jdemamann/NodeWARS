@@ -477,7 +477,10 @@ html[data-debug-logo-preview="on"] .hero-logo-preview {
 .btn-menu-sub { margin-top: 4px; font-size: 10px; letter-spacing: 2px; }
 
 /* ── Level select ── */
-#sl {
+#sl,
+#stw,
+#stwl,
+#stwe {
   gap: 18px;
   width: 100%;
   margin: 0 auto;
@@ -540,6 +543,26 @@ html[data-debug-logo-preview="on"] .hero-logo-preview {
   text-align: center;
   padding-right: 0;
   max-width: 420px;
+}
+#twWorldSummary,
+#twLevelMeta,
+#twEndingSub,
+#twEndingMeta {
+  font: 10px/1.55 var(--font-copy);
+  color: var(--mid);
+  text-align: center;
+  max-width: 480px;
+}
+#twEndingTitle {
+  font-size: 24px;
+}
+.tw-world-card,
+.tw-level-card {
+  font: inherit;
+}
+.tw-world-card .ln,
+.tw-level-card .ln {
+  font-size: 18px;
 }
 .lb2 {
   background: var(--panel-soft); border: 1px solid var(--line);

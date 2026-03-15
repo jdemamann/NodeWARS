@@ -912,7 +912,7 @@ Primary deliverables:
   - `docs/agents/campaign-level-agent.md`
   - `docs/agents/ai-behavior-agent.md`
 - Priority: `medium`
-- Status: `planned`
+- Status: `completed`
 
 Goal:
 
@@ -920,9 +920,9 @@ Goal:
 
 Checks:
 
-- `node scripts/campaign-sanity.mjs`
+- `node scripts/tw-campaign-sanity.mjs`
 - `node scripts/smoke-checks.mjs`
-- `node scripts/tw-ai-sanity.mjs`
+- `node scripts/commentary-policy.mjs`
 
 Primary deliverables:
 
@@ -938,7 +938,7 @@ Primary deliverables:
   - `docs/agents/content-authored-levels-agent.md`
   - `docs/agents/render-visual-language-agent.md`
 - Priority: `high`
-- Status: `planned`
+- Status: `completed`
 
 Goal:
 
@@ -946,8 +946,9 @@ Goal:
 
 Checks:
 
-- `node scripts/campaign-sanity.mjs`
+- `node scripts/tw-campaign-sanity.mjs`
 - `node scripts/smoke-checks.mjs`
+- `node scripts/commentary-policy.mjs`
 
 Primary deliverables:
 

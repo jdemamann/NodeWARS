@@ -11,7 +11,7 @@ import { T } from '../localization/i18n.js';
 import { STATE } from '../core/GameState.js';
 import { Music } from '../audio/Music.js';
 import { DOM_IDS } from '../ui/DomIds.js';
-import { showNotification, showScr, showToast } from '../ui/ScreenController.js';
+import { endTentacleWarsLevel, showNotification, showScr, showToast } from '../ui/ScreenController.js';
 import { buildTentacleWarsCampaignConfig } from './TwCampaignLoader.js';
 import { buildTentacleWarsSandboxConfig } from './TwSandboxConfig.js';
 import { computeTentacleWarsSandboxOutcome } from './TwSandboxRules.js';
@@ -169,35 +169,7 @@ export class TwModeRuntime {
     this.game.done = true;
     this.game.paused = true;
     this.game.phaseOutcome = win ? 'win' : 'lose';
-    const levelId = this.game.cfg?.twLevelId || this.game.cfg?.id;
-
-    if (win) {
-      STATE.recordTentacleWarsLevelWin(levelId, this.game.scoreTime, this.game.cfg?.par);
-    } else {
-      STATE.recordTentacleWarsLevelLoss(levelId);
-    }
-
-    const pauseInfoElement = $(DOM_IDS.PINFO);
-    const resumeButton = $(DOM_IDS.BTN_RESUME);
-    const restartButton = $(DOM_IDS.BTN_PRR);
-    const phaseSelectButton = $(DOM_IDS.BTN_PRL);
-    const skipButton = $(DOM_IDS.BTN_PSKIP);
-    const mainMenuButton = $(DOM_IDS.BTN_PMENU);
-    const pauseSaveElement = $(DOM_IDS.PPSAVE);
-
-    if (pauseInfoElement) pauseInfoElement.textContent = `${this.game.cfg?.twLevelId || this.game.cfg?.id} — ${win ? T('phaseClear') : T('annihilated')}`;
-    if (resumeButton) resumeButton.style.display = 'none';
-    if (restartButton) restartButton.textContent = T('restart');
-    if (phaseSelectButton) phaseSelectButton.style.display = 'none';
-    if (skipButton) skipButton.style.display = 'none';
-    if (mainMenuButton) mainMenuButton.textContent = T('mainMenu');
-    if (pauseSaveElement) {
-      pauseSaveElement.textContent = win
-        ? `TentacleWars progress saved · next ${STATE.getTentacleWarsCurrentLevel()}`
-        : `TentacleWars fail streak ${STATE.getTentacleWarsLevelFailStreak(levelId)}x`;
-    }
-
     showToast(win ? T('phaseClear') : T('annihilated'));
-    showScr('pause');
+    endTentacleWarsLevel(win, this.game);
   }
 }

@@ -1017,6 +1017,23 @@ async function testTentacleWarsOverflowAndCaptureCore() {
   assert.equal(hostileCapture.nextEnergy, 15, 'TentacleWars hostile capture should reset to ten and then apply carryover');
 }
 
+async function testTentacleWarsOverflowBudgetAccumulatesAtCap() {
+  const { applyTentacleFriendlyFlow } = await load('src/entities/TentCombat.js');
+
+  const targetNode = {
+    simulationMode: 'tentaclewars',
+    energy: 50,
+    maxE: 50,
+    inFlow: 0,
+    twOverflowBudget: 0,
+  };
+
+  applyTentacleFriendlyFlow(targetNode, 10, 1, 0.5);
+
+  assert.equal(targetNode.energy, targetNode.maxE, 'TentacleWars friendly overflow should not push energy beyond maxE');
+  assert.ok(targetNode.twOverflowBudget > 0, 'TentacleWars full-cap friendly flow should accumulate overflow budget');
+}
+
 async function testTentacleWarsSandboxPrototypeBoundary() {
   const twModeSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwModeRuntime.js'), 'utf8');
   const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
@@ -2448,6 +2465,7 @@ async function main() {
     ['TentacleWars packet accumulator stays deterministic', testTentacleWarsPacketAccumulatorCore],
     ['TentacleWars tentacle economy stays linear and fully refundable', testTentacleWarsTentacleEconomyCore],
     ['TentacleWars overflow and capture core stays parameterized and deterministic', testTentacleWarsOverflowAndCaptureCore],
+    ['TentacleWars overflow budget accumulates when node is at energyCap', testTentacleWarsOverflowBudgetAccumulatesAtCap],
     ['TentacleWars sandbox prototype stays isolated from campaign flow', testTentacleWarsSandboxPrototypeBoundary],
     ['TentacleWars sandbox disables world-layer gimmicks', testTentacleWarsSandboxDisablesWorldLayerGimmicks],
     ['TentacleWars sandbox disables frenzy and auto-retract', testTentacleWarsSandboxDisablesFrenzyAndAutoRetract],

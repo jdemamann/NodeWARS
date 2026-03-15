@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 import { TW_CAMPAIGN_FIXTURE_LEVELS, getTentacleWarsSilverPar } from '../src/tentaclewars/TwCampaignFixtures.js';
 import { TW_WORLD_1_LEVELS, TW_WORLD_1_PROTOTYPE_LEVELS } from '../src/tentaclewars/levels/TwWorld1.js';
+import { TW_WORLD_2_LEVELS } from '../src/tentaclewars/levels/TwWorld2.js';
+import { TW_WORLD_3_LEVELS, TW_WORLD_3_PROTOTYPE_LEVELS } from '../src/tentaclewars/levels/TwWorld3.js';
+import { TW_WORLD_4_LEVELS, TW_WORLD_4_PROTOTYPE_LEVELS } from '../src/tentaclewars/levels/TwWorld4.js';
 import { validateTentacleWarsLevelData } from '../src/tentaclewars/TwLevelSchema.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,6 +69,30 @@ async function main() {
       TW_WORLD_1_LEVELS.map(level => level.id),
       Array.from({ length: 20 }, (_, index) => `W1-${String(index + 1).padStart(2, '0')}`),
       'World 1 authoring should cover the full W1-01..W1-20 range in order',
+    );
+  });
+
+  await runCheck('authored World 2 phases stay contiguous from W2-01 to W2-20', () => {
+    assert.deepEqual(
+      TW_WORLD_2_LEVELS.map(level => level.id),
+      Array.from({ length: 20 }, (_, index) => `W2-${String(index + 1).padStart(2, '0')}`),
+      'World 2 authoring should cover the full W2-01..W2-20 range in order',
+    );
+  });
+
+  await runCheck('authored World 3 phases stay contiguous from W3-01 to W3-20', () => {
+    assert.deepEqual(
+      TW_WORLD_3_LEVELS.map(level => level.id),
+      Array.from({ length: 20 }, (_, index) => `W3-${String(index + 1).padStart(2, '0')}`),
+      'World 3 authoring should cover the full W3-01..W3-20 range in order',
+    );
+  });
+
+  await runCheck('authored World 4 phases stay contiguous from W4-01 to W4-20', () => {
+    assert.deepEqual(
+      TW_WORLD_4_LEVELS.map(level => level.id),
+      Array.from({ length: 20 }, (_, index) => `W4-${String(index + 1).padStart(2, '0')}`),
+      'World 4 authoring should cover the full W4-01..W4-20 range in order',
     );
   });
 
@@ -158,11 +185,11 @@ async function main() {
     );
   });
 
-  await runCheck('balance matrix rows exist for each authored World 1 level', async () => {
+  await runCheck('balance matrix rows exist for each authored World 1, World 2, World 3, and World 4 level', async () => {
     const raw = await fs.readFile(TW_BALANCE_MATRIX_PATH, 'utf8');
     const rows = raw.trim().split(/\r?\n/).slice(1).map(parseCsvLine);
     const ids = new Set(rows.map(row => row[0]));
-    TW_WORLD_1_LEVELS.forEach(level => {
+    [...TW_WORLD_1_LEVELS, ...TW_WORLD_2_LEVELS, ...TW_WORLD_3_LEVELS, ...TW_WORLD_4_LEVELS].forEach(level => {
       assert.ok(ids.has(level.id), `${level.id} should exist in the TentacleWars balance matrix`);
     });
   });
@@ -175,7 +202,23 @@ async function main() {
     );
   });
 
-  console.log('\n10/10 TentacleWars campaign sanity checks passed');
+  await runCheck('World 3 prototype subset remains stable for preview and gate tooling', () => {
+    assert.deepEqual(
+      TW_WORLD_3_PROTOTYPE_LEVELS.map(level => level.id),
+      ['W3-01', 'W3-02', 'W3-03', 'W3-04', 'W3-05'],
+      'World 3 prototype subset should remain the first five authored World 3 levels',
+    );
+  });
+
+  await runCheck('World 4 prototype subset remains stable for preview and gate tooling', () => {
+    assert.deepEqual(
+      TW_WORLD_4_PROTOTYPE_LEVELS.map(level => level.id),
+      ['W4-01', 'W4-02', 'W4-03', 'W4-04', 'W4-05'],
+      'World 4 prototype subset should remain the first five authored World 4 levels',
+    );
+  });
+
+  console.log('\n15/15 TentacleWars campaign sanity checks passed');
 }
 
 try {

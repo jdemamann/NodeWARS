@@ -239,7 +239,9 @@ function sampleTentacleWarsPacketProgresses(packetTravelQueue, travelDuration, m
   return sampled;
 }
 
-/* Draw the original-style TentacleWars lane body as a thin line plus repeated chain glyphs. */
+/* Draw the TentacleWars lane as a contiguous chain of filled diamonds — the biological
+   "spine" pillar from the original. Each diamond sits flush with its neighbours along the
+   bezier so the lane reads as physical mass rather than a data wire. */
 function drawTentacleWarsChain(ctx, {
   esx,
   esy,
@@ -255,56 +257,58 @@ function drawTentacleWarsChain(ctx, {
 }) {
   if (laneEnd - laneStart < 0.02) return;
 
+  const laneLength = estimateBezierLength(esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
+  const d = 4.5 + level * 0.25 + flowRatio * 0.9;
+  const spacing = d * 2.0 + 1.8;
+  const glyphCount = Math.max(2, Math.floor(laneLength / spacing));
+
+  /* Dark spine fills the gaps between diamonds and gives each one a thin dark border. */
   ctx.save();
   ctx.beginPath();
   drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
-  ctx.strokeStyle = colorWithAlpha('#06111f', 0.58);
-  ctx.lineWidth = 2.2 + flowRatio * 0.6;
-  ctx.stroke();
-  ctx.beginPath();
-  drawBezierSegment(ctx, esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
-  ctx.strokeStyle = colorWithAlpha(color, 0.82);
-  ctx.lineWidth = 0.75 + level * 0.02;
-  sg(ctx, color, highGraphics ? 4 : 0);
+  ctx.strokeStyle = colorWithAlpha('#06111f', 0.78);
+  ctx.lineWidth = d * 1.6;
   ctx.stroke();
   ctx.restore();
 
-  const laneLength = estimateBezierLength(esx, esy, controlPoint.x, controlPoint.y, etx, ety, laneStart, laneEnd);
-  const glyphSpacing = 8.5;
-  const glyphCount = Math.max(2, Math.floor(laneLength / glyphSpacing));
-
-  for (let glyphIndex = 0; glyphIndex <= glyphCount; glyphIndex += 1) {
-    const laneT = laneStart + (laneEnd - laneStart) * (glyphIndex / glyphCount);
-    const glyphPoint = computeBezierPoint(laneT, esx, esy, controlPoint.x, controlPoint.y, etx, ety);
-    const behindPoint = computeBezierPoint(Math.max(0, laneT - 0.008), esx, esy, controlPoint.x, controlPoint.y, etx, ety);
-    const aheadPoint = computeBezierPoint(Math.min(1, laneT + 0.008), esx, esy, controlPoint.x, controlPoint.y, etx, ety);
-    const tangentX = aheadPoint.x - behindPoint.x;
-    const tangentY = aheadPoint.y - behindPoint.y;
-    const tangentLength = Math.hypot(tangentX, tangentY) || 1;
-    const normalX = -tangentY / tangentLength;
-    const normalY = tangentX / tangentLength;
-    const armHalf = 4.2 + flowRatio * 1.1;
+  for (let i = 0; i <= glyphCount; i += 1) {
+    const laneT = laneStart + (laneEnd - laneStart) * (i / glyphCount);
+    const pt = computeBezierPoint(laneT, esx, esy, controlPoint.x, controlPoint.y, etx, ety);
+    const ahead = computeBezierPoint(Math.min(1, laneT + 0.008), esx, esy, controlPoint.x, controlPoint.y, etx, ety);
+    const behind = computeBezierPoint(Math.max(0, laneT - 0.008), esx, esy, controlPoint.x, controlPoint.y, etx, ety);
+    const angle = Math.atan2(ahead.y - behind.y, ahead.x - behind.x);
 
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(glyphPoint.x - normalX * armHalf, glyphPoint.y - normalY * armHalf);
-    ctx.lineTo(glyphPoint.x + normalX * armHalf, glyphPoint.y + normalY * armHalf);
-    ctx.strokeStyle = colorWithAlpha(color, 0.84);
-    ctx.lineWidth = 1.2;
-    sg(ctx, color, highGraphics ? 6 : 0);
-    ctx.stroke();
+    ctx.translate(pt.x, pt.y);
+    ctx.rotate(angle);
 
+    /* Filled diamond body — vertices along and across the lane axis. */
     ctx.beginPath();
-    ctx.arc(glyphPoint.x, glyphPoint.y, 1.5 + flowRatio * 0.18, 0, Math.PI * 2);
-    ctx.fillStyle = colorWithAlpha(color, 0.94);
+    ctx.moveTo(d, 0);
+    ctx.lineTo(0, d);
+    ctx.lineTo(-d, 0);
+    ctx.lineTo(0, -d);
+    ctx.closePath();
+    ctx.fillStyle = colorWithAlpha(color, 0.93);
+    if (highGraphics) sg(ctx, color, 5);
     ctx.fill();
 
+    /* Upper-face highlight gives a subtle convex depth to each link. */
     if (highGraphics) {
       ctx.beginPath();
-      ctx.arc(glyphPoint.x, glyphPoint.y, 0.42, 0, Math.PI * 2);
-      ctx.fillStyle = colorWithAlpha('#ffffff', 0.55);
+      ctx.moveTo(-d, 0);
+      ctx.lineTo(0, -d);
+      ctx.lineTo(d, 0);
+      ctx.strokeStyle = colorWithAlpha('#ffffff', 0.28);
+      ctx.lineWidth = 0.9;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.1, 0, Math.PI * 2);
+      ctx.fillStyle = colorWithAlpha('#ffffff', 0.38);
       ctx.fill();
     }
+
     ctx.restore();
   }
 }
@@ -444,16 +448,33 @@ export class TentRenderer {
     const lvl = src.level;
     const col = tentCol(t);
     const isTentacleWarsLane = t.effectiveSourceNode?.simulationMode === 'tentaclewars';
+    let twEsx = esx;
+    let twEsy = esy;
+    let twEtx = etx;
+    let twEty = ety;
+    if (isTentacleWarsLane) {
+      const rawDx = etx - esx;
+      const rawDy = ety - esy;
+      const rawLen = Math.hypot(rawDx, rawDy) || 1;
+      const nx = rawDx / rawLen;
+      const ny = rawDy / rawLen;
+      const srcNode = t.reversed ? tg : s;
+      const tgtNode = t.reversed ? s : tg;
+      twEsx = esx + nx * srcNode.radius;
+      twEsy = esy + ny * srcNode.radius;
+      twEtx = etx - nx * tgtNode.radius;
+      twEty = ety - ny * tgtNode.radius;
+    }
     const highGraphics = STATE.settings.graphicsMode === 'high';
     const segmentCount = highGraphics ? RENDER_RULES.TENTACLE.BEZIER_SEGMENTS : Math.max(6, Math.floor(RENDER_RULES.TENTACLE.BEZIER_SEGMENTS * 0.58));
     const renderNow = (t.game?.time || 0) * 1000;
 
     if (t.twCutRetraction) {
       drawTentacleWarsCutRetraction(ctx, t, {
-        esx,
-        esy,
-        etx,
-        ety,
+        esx: twEsx,
+        esy: twEsy,
+        etx: twEtx,
+        ety: twEty,
         controlPoint: cp,
         color: col,
         level: lvl,
@@ -462,7 +483,7 @@ export class TentRenderer {
       });
 
       if (t.cutFlash > 0 && t.cutPoint !== undefined) {
-        const sp = computeBezierPoint(t.cutPoint, esx, esy, cp.x, cp.y, etx, ety);
+        const sp = computeBezierPoint(t.cutPoint, twEsx, twEsy, cp.x, cp.y, twEtx, twEty);
         const alpha = t.cutFlash;
         const r2 = 18 + alpha * 14;
         ctx.save();
@@ -595,10 +616,10 @@ export class TentRenderer {
     ctx.save();
     if (isTentacleWarsLane) {
       drawTentacleWarsChain(ctx, {
-        esx,
-        esy,
-        etx,
-        ety,
+        esx: twEsx,
+        esy: twEsy,
+        etx: twEtx,
+        ety: twEty,
         controlPoint: cp,
         laneStart: sT,
         laneEnd: visEnd,
@@ -712,12 +733,14 @@ export class TentRenderer {
       }
     }
 
-    if (isTentacleWarsLane && t.state === TentState.ACTIVE && !isClash) {
+    /* During clash visEnd is already capped at the clash front (line 487), so packets
+       naturally stop before the collision point — the !isClash guard was wrong. */
+    if (isTentacleWarsLane && t.state === TentState.ACTIVE) {
       drawTentacleWarsEnergyPackets(ctx, {
-        esx,
-        esy,
-        etx,
-        ety,
+        esx: twEsx,
+        esy: twEsy,
+        etx: twEtx,
+        ety: twEty,
         controlPoint: cp,
         packetTravelQueue: t.packetTravelQueue || [],
         travelDuration: t.travelDuration || 1,

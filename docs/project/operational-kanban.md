@@ -16,6 +16,7 @@ Use it as the local source of truth when:
 
 - investigate additional tutorial playtest feedback once new sessions are recorded
 - evaluate whether `24 RELAY RACE` needs structural player opening support
+- `TASK-TWL-BALANCE-CROSS` TentacleWars Cross-World Balance Pass — review par values and energyCaps for flagged phases: W3-15, W3-16, W4-16, W4-19, W4-20. Requires real timed playtests. Not blocking integration.
 
 ## Planned
 
@@ -32,16 +33,13 @@ Phase C — World 1:
 - none
 
 Phase D — World 2:
-- `TASK-TWL-010 TentacleWars World 2 Authoring Pack`
-- `TASK-TWL-011 TentacleWars World 2 Playtest and Reconstruction Review`
+- none
 
 Phase E — World 3:
-- `TASK-TWL-012 TentacleWars World 3 Authoring Pack`
-- `TASK-TWL-013 TentacleWars World 3 Playtest and Reconstruction Review`
+- none
 
 Phase F — World 4:
-- `TASK-TWL-014 TentacleWars World 4 Authoring Pack`
-- `TASK-TWL-015 TentacleWars World 4 Playtest and Reconstruction Review`
+- none
 
 Phase G — Polish Final:
 - `TASK-TWL-018 TentacleWars Phase Editor Feasibility Review`
@@ -52,13 +50,72 @@ Phase G — Polish Final:
 
 ## Needs Validation
 
-- `TASK-TWL-009 TentacleWars World 1 Playtest and Reconstruction Review`
-  - reconstruction complete (TWL-009 + TWL-009b): mechanics, energyCap, initialEnergy all correct
-  - remaining: live playtest of W1-01..W1-05 in browser to validate feel under corrected model
-  - static checks all pass: 9/9 + 85/85 + 1/1
-  - can be closed to Done after one live session confirms W1-01..W1-05 feel correct
+- none
 
 ## Done Recently
+
+- `TASK-TWL-020 TW Result Screen + Campaign Ending + Browser Validation`
+  - output: `src/ui/resultScreenView.js`, `src/ui/twCampaignEndingView.js`, `output/playwright/twl-020/`
+  - validation: `90/90 + 11/11 + 10/10 + 1/1 PASS`
+  - added a TW-specific result layout, replaced the TW campaign-ending stub with a dedicated ending screen, and captured the integrated flow with the repo-local Chromium visual-validation path
+
+- `TASK-TWL-019 TentacleWars Navigation Integration`
+  - output: `index.html`, `src/ui/ScreenController.js`, `src/main.js`, `src/ui/twWorldSelectView.js`, `src/ui/twLevelSelectView.js`
+  - validation: `90/90 + 1/1 + 10/10 + 8/8 PASS`
+  - integrated the authored TW campaign into the main menu with dedicated world/level shells and mode-aware result progression
+
+- `TASK-TWL-015 TentacleWars World 4 Playtest and Reconstruction Review`
+  - output: `output/playwright/twl-015/`
+  - validation: `90/90 + 15/15 PASS`
+  - World 4 still set and final-world readability review completed; no structural fixes required, with late endgame par scrutiny deferred to a future balance wave
+
+- `TASK-TWL-014 TentacleWars World 4 Authoring Pack`
+  - output: `src/tentaclewars/levels/TwWorld4.js`, `src/tentaclewars/TwCampaignFixtures.js`, `docs/tentaclewars/tw-balance-matrix.csv`
+  - validation: `90/90 + 15/15 + 1/1 PASS`
+  - authored `W4-01..W4-20`, extended the fixture/schema/sanity path to World 4, and raised the TW schema cap for the final 600-cap boss
+
+- `TASK-TWL-013 TentacleWars World 3 Playtest and Reconstruction Review`
+  - closed by Claude review after the captured still set and the no-fix acceptance pass
+  - World 3 readability review is complete; follow-up balance scrutiny is deferred to later playtest evidence
+
+- `TASK-TWL-012 TentacleWars World 3 Authoring Pack`
+  - output: `src/tentaclewars/levels/TwWorld3.js`, `src/tentaclewars/TwCampaignFixtures.js`, `docs/tentaclewars/tw-balance-matrix.csv`
+  - validation: `90/90 + 13/13 + 1/1 PASS`
+  - authored `W3-01..W3-20`, extended the fixture/schema/sanity path to World 3, and corrected multiple sealed-opening obstacle layouts before handoff
+
+- `TASK-TWL-011 TentacleWars World 2 Playtest and Reconstruction Review`
+  - closed by Claude review after the captured still set and the in-wave `W2-16` defect fix
+  - World 2 does not need a dedicated balance wave now; `par` review is deferred to a later timing pass
+
+- `TASK-TWL-010 TentacleWars World 2 Authoring Pack`
+  - output: `src/tentaclewars/levels/TwWorld2.js`, `src/tentaclewars/TwCampaignFixtures.js`, `docs/tentaclewars/tw-balance-matrix.csv`
+  - companion visual fix: `src/rendering/TentRenderer.js` (`TW-LANE-EDGE`)
+  - validation: `90/90 + 11/11 + 1/1 PASS`
+  - authored `W2-01..W2-20`, removed the old W2 stub, extended TW schema/sanity to the new world, and moved TW lane origins to node edges
+
+- `TASK-TWL-009 TentacleWars World 1 Playtest and Reconstruction Review`
+  - closed by Claude review after `TW-VISUAL-WAVE2`
+  - World 1 reconstruction, energy model, obstacle path, and cell-fidelity gate are now complete
+
+- `TW-VISUAL-WAVE2 TentacleWars Cell Fidelity Pass`
+  - output: `src/rendering/NodeRenderer.js`, `output/playwright/tw-visual-wave2/`
+  - validation: `90/90 + 10/10 + 1/1 PASS`
+  - TW cells now use rigid radial spikes, static white grade dots, and a segmented energy ring in the authored World 1 pack
+
+- `TASK-TWL-OBS-001 TentacleWars Capsule Obstacles`
+  - output: `src/tentaclewars/TwLevelSchema.js`, `src/tentaclewars/TwObstacleRuntime.js`, `src/rendering/HazardRenderer.js`
+  - validation: `89/89 + 10/10 + 1/1 PASS`
+  - authored World 1 obstacle levels now use capsule blockers instead of the earlier temporary circle shell
+
+- `TASK-TWL-GUARD-001 TentacleWars Guardrails`
+  - output: `scripts/smoke-checks.mjs`, `src/entities/Tent.js`
+  - validation: `87/87 + 1/1 PASS`
+  - added clash-approach and clash-preview guardrails; fixed the TW midpoint lock bug they exposed
+
+- `TASK-TWL-VIS-001 TentacleWars Visual Fidelity VIS-A`
+  - output: `src/rendering/TentRenderer.js`, `src/rendering/NodeRenderer.js`
+  - validation: `90/90 + 1/1 PASS`
+  - TW lanes now use the audited diamond-chain body and data-driven yellow packet rendering
 
 - `TASK-TWL-009b TentacleWars World 1 energyCap Alignment Pass`
   - output: `src/tentaclewars/levels/TwWorld1.js` (W1-06..W1-20 corrected), `docs/tentaclewars/tw-balance-matrix.csv`
@@ -97,7 +154,7 @@ Phase G — Polish Final:
 
 - `TASK-TWL-004 TentacleWars Obstacle Spec`
   - output: `docs/tentaclewars/tw-obstacle-spec.md`
-  - decision: Option A (static circles), no TWL-004b needed for W1-2
+  - decision: authoring/runtime later converged to canonical capsule blockers via `TASK-TWL-OBS-001`
 
 - `TASK-TWL-003 TentacleWars Progression and Score Spec`
   - output: `docs/tentaclewars/tw-progression-score-spec.md`

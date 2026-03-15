@@ -54,7 +54,7 @@ This is the stable cross-surface level identifier.
 ### `energyCap`
 
 - type: `integer`
-- allowed range: `1..200`
+- allowed range: `1..700`
 
 This is the per-level maximum cell energy.
 
@@ -99,12 +99,6 @@ Each obstacle object requires:
 - `id`
   - type: `string`
   - unique inside the level
-- `x`
-  - type: `number`
-  - normalized range: `0..1`
-- `y`
-  - type: `number`
-  - normalized range: `0..1`
 - `shape`
   - type: `object`
   - required discriminator: `kind`
@@ -112,14 +106,21 @@ Each obstacle object requires:
 Current schema-valid shape kinds:
 
 - `circle`
+  - requires `cx`
+  - requires `cy`
   - requires `radius`
-- `blob`
-  - requires `lobes`
+- `capsule`
+  - requires `ax`
+  - requires `ay`
+  - requires `bx`
+  - requires `by`
+  - requires `radius`
 
 Important:
 
-- allowing both `circle` and `blob` in the schema does **not** decide obstacle runtime complexity
-- the runtime decision remains owned by `TASK-TWL-004`
+- allowing both `circle` and `capsule` in the schema does **not** widen the runtime family again
+- canonical authored TentacleWars blockers currently use capsules
+- runtime obstacle geometry remains owned by the obstacle-spec track
 - this schema only keeps the authoring format forward-compatible enough to avoid rewriting it later
 
 ### `winCondition`

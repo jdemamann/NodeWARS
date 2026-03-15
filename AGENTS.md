@@ -172,6 +172,21 @@ Installed Codex skills:
 - `sentry`
 - `spreadsheet`
 
+Priority superpowers:
+
+- `systematic-debugging`
+  - default for bugs, regressions, and unexpected runtime behavior
+- `test-driven-development`
+  - default for bugfixes and guarded gameplay changes
+- `verification-before-completion`
+  - required before claiming a wave is validated
+- `writing-plans`
+  - default for medium or large multi-step waves
+- `requesting-code-review`
+  - use before closing sensitive gameplay, campaign, or TentacleWars waves
+- `using-git-worktrees`
+  - use when isolating parallel or high-risk workstreams
+
 ## Audio Reconstruction Workflow
 
 When rebuilding a soundtrack track from an authored audio file:
@@ -200,6 +215,13 @@ When rebuilding a soundtrack track from an authored audio file:
 - Prefer small, test-backed changes.
 - Start each meaningful wave by checking the relevant domain agent and the check matrix.
 - If the task clearly matches an installed Codex skill, use the skill before ad-hoc work.
+- For any multi-step wave, use `update_plan` at the start and keep it current as steps move from `in_progress` to `completed`.
+- Default superpowers stack:
+  - `systematic-debugging` for bugs
+  - `test-driven-development` for fixes and guarded behavior changes
+  - `writing-plans` for non-trivial waves
+  - `verification-before-completion` before claiming success
+  - `requesting-code-review` before closing sensitive waves
 - When the user reports a bug, do not start by fixing it. Start by adding or extending a test/guardrail that reproduces the bug, then fix it, then prove the fix with the passing test.
 - Keep source comments in English only.
 - If a touched `src/*.js` file still lacks a module header, add one in the same wave.
@@ -211,6 +233,8 @@ When rebuilding a soundtrack track from an authored audio file:
 - If changing campaign layouts, run both `smoke-checks` and `campaign-sanity`.
 - If changing world systems or simulation math, run `simulation-soak` too.
 - Before reporting a task result as validated, check that your evidence directly measures what you claim, not a proxy or a window that includes unrelated phases (build time, travel time, warm-up).
+- For browser validation in this repo, prefer `bash scripts/tw-visual-validation.sh ...` and the Chromium-backed `scripts/tw-visual-playwright.mjs` flow.
+- Do not default to the older `playwright-cli` + Firefox path here; this Linux environment has a documented history of Firefox instability and the project-local Chromium workflow is the canonical browser-validation path.
 
 ## Safe Restart Point For New Skills
 

@@ -69,11 +69,11 @@ run('TentacleWars campaign config builder maps authored level data into runtime 
   assert.ok(config.twCostNormalizer > 0, 'loader should expose a positive cost normalizer for authored TW levels');
 });
 
-run('TentacleWars campaign config builder keeps phase-one circle obstacles in runtime space', () => {
+run('TentacleWars campaign config builder keeps authored capsule obstacles in runtime space', () => {
   const config = buildTentacleWarsCampaignConfig(byId('W1-05'), 1000, 800);
   assert.equal(config.fixedLayout.twObstacles.length, 2, 'loader should expose authored obstacles to the runtime');
-  assert.equal(config.fixedLayout.twObstacles[0].kind, 'circle', 'phase-one TW obstacles should stay on the circle path');
-  assert.ok(config.fixedLayout.twObstacles[0].r > 0, 'scaled circle obstacle should preserve a positive blocking radius');
+  assert.equal(config.fixedLayout.twObstacles[0].kind, 'capsule', 'authored TW obstacles should stay on the capsule path');
+  assert.ok(config.fixedLayout.twObstacles[0].r > 0, 'scaled capsule obstacle should preserve a positive blocking radius');
 });
 
 run('TentacleWars authored obstacle geometry keeps at least one canonical blocked lane pair', () => {
@@ -143,4 +143,14 @@ run('TentacleWars W1-01 and W1-05 expose safe opening reserves under the re-auth
   assert.ok(firstMoveW105.reserve >= 4, 'W1-05 should leave a safe reserve after its opening relay connection');
 });
 
-console.log('\n6/6 TentacleWars campaign loader sanity checks passed');
+run('TentacleWars World 4 levels expose safe opening reserves for the final-world pack', () => {
+  const world4LevelIds = Array.from({ length: 20 }, (_, index) => `W4-${String(index + 1).padStart(2, '0')}`);
+
+  world4LevelIds.forEach(levelId => {
+    const firstMove = getCheapestOpeningMove(byId(levelId), targetCell => targetCell.owner !== 'player');
+    assert.ok(firstMove, `${levelId} should expose a measurable opening path`);
+    assert.ok(firstMove.reserve >= 4, `${levelId} should leave a safe reserve after its opening connection`);
+  });
+});
+
+console.log('\n7/7 TentacleWars campaign loader sanity checks passed');

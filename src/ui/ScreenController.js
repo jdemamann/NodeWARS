@@ -18,8 +18,12 @@ import { buildResultInfoMarkup } from './resultScreenView.js';
 import { buildCampaignEndingMarkup } from './campaignEndingView.js';
 import { buildStoryMarkup } from './storyScreenView.js';
 import { buildCreditsMarkup } from './creditsView.js';
+import { buildTwCampaignEndingMarkup } from './twCampaignEndingView.js';
+import { buildTwWorldCardsMarkup, buildTwWorldSummaryMarkup } from './twWorldSelectView.js';
+import { buildTwLevelCardsMarkup, buildTwLevelMetaMarkup } from './twLevelSelectView.js';
 import { applyDebugSettingsVisibility, applySettingsToggleState } from './settingsView.js';
 import { buildTentacleWarsDebugMetrics } from '../tentaclewars/TwDebugMetrics.js';
+import { TW_CAMPAIGN_FIXTURE_LEVELS, getTentacleWarsCampaignLevelById } from '../tentaclewars/TwCampaignFixtures.js';
 
 function $(id) { return document.getElementById(id); }
 
@@ -27,6 +31,9 @@ function $(id) { return document.getElementById(id); }
 const SCR = {
   menu:     DOM_IDS.SCREEN_MENU,
   levels:   DOM_IDS.SCREEN_LEVELS,
+  twWorlds: DOM_IDS.SCREEN_TW_WORLDS,
+  twLevels: DOM_IDS.SCREEN_TW_LEVELS,
+  twEnding: DOM_IDS.SCREEN_TW_ENDING,
   story:    DOM_IDS.SCREEN_STORY,
   result:   DOM_IDS.SCREEN_RESULT,
   ending:   DOM_IDS.SCREEN_ENDING,
@@ -37,6 +44,21 @@ const SCR = {
 
 /* Active world tab in the level-select screen */
 let _activeWorldTab = STATE.getActiveWorldTab();
+let _activeTwWorldTab = STATE.getTentacleWarsActiveWorldTab();
+
+/* Parse TW ids locally so UI helpers can derive world/phase without new deps. */
+function parseTentacleWarsLevelId(levelId) {
+  const match = typeof levelId === 'string' ? levelId.match(/^W(\d+)-(\d+)$/) : null;
+  if (!match) return null;
+  return { world: Number(match[1]), phase: Number(match[2]) };
+}
+
+/* Fixture order is canonical for next-phase routing inside the TW shell. */
+function getNextTentacleWarsLevel(levelId) {
+  const currentIndex = TW_CAMPAIGN_FIXTURE_LEVELS.findIndex(level => level.id === levelId);
+  if (currentIndex < 0) return null;
+  return TW_CAMPAIGN_FIXTURE_LEVELS[currentIndex + 1] || null;
+}
 
 /* ── Core screen helpers ── */
 export function showScr(name) {
@@ -239,6 +261,92 @@ export function buildGrid(worldFilter = _activeWorldTab) {
   });
 }
 
+/*
+ * Build the TW world shell from canonical unlock state so the separate
+ * campaign never duplicates progression logic inside the UI layer.
+ */
+export function showTwWorldSelect() {
+  STATE.setGameMode('tentaclewars');
+  const worldGridElement = $(DOM_IDS.TW_WORLD_GRID);
+  const worldSummaryElement = $(DOM_IDS.TW_WORLD_SUMMARY);
+  if (!worldGridElement || !worldSummaryElement) return;
+
+  const currentLevelId = STATE.getTentacleWarsCurrentLevel();
+  const parsedCurrentLevel = parseTentacleWarsLevelId(currentLevelId);
+  _activeTwWorldTab = parsedCurrentLevel?.world || STATE.getTentacleWarsActiveWorldTab() || 1;
+  STATE.setTentacleWarsActiveWorldTab(_activeTwWorldTab);
+
+  const worldCards = [1, 2, 3, 4].map(worldId => ({
+    worldId,
+    unlocked: STATE.isTentacleWarsWorldUnlocked(worldId),
+    isCurrent: worldId === _activeTwWorldTab,
+    currentLevelLabel: currentLevelId,
+    phaseRangeLabel: `W${worldId}-01 → W${worldId}-20`,
+  }));
+
+  worldSummaryElement.textContent = buildTwWorldSummaryMarkup(
+    currentLevelId,
+    worldCards.filter(worldCard => worldCard.unlocked).length,
+  );
+  worldGridElement.innerHTML = buildTwWorldCardsMarkup(worldCards);
+  worldGridElement.querySelectorAll('[data-tw-world]').forEach(button => {
+    button.addEventListener('click', () => {
+      const worldId = Number(button.getAttribute('data-tw-world'));
+      if (!STATE.isTentacleWarsWorldUnlocked(worldId)) return;
+      fadeGo(() => showTwLevelSelect(worldId));
+    });
+  });
+
+  showScr('twWorlds');
+}
+
+/*
+ * Render one TW world worth of authored phases and wire each unlocked card
+ * straight into the existing authored-level loader.
+ */
+export function showTwLevelSelect(worldId = _activeTwWorldTab) {
+  STATE.setGameMode('tentaclewars');
+  _activeTwWorldTab = Number.isInteger(worldId) ? worldId : 1;
+  STATE.setTentacleWarsActiveWorldTab(_activeTwWorldTab);
+
+  const titleElement = $(DOM_IDS.TW_LEVEL_TITLE);
+  const metaElement = $(DOM_IDS.TW_LEVEL_META);
+  const levelGridElement = $(DOM_IDS.TW_LEVEL_GRID);
+  if (!titleElement || !metaElement || !levelGridElement) return;
+
+  const currentLevelId = STATE.getTentacleWarsCurrentLevel();
+  const levelsForWorld = TW_CAMPAIGN_FIXTURE_LEVELS.filter(level => level.world === _activeTwWorldTab);
+  const levelCards = levelsForWorld.map(level => ({
+    id: level.id,
+    shortId: String(level.phase || parseTentacleWarsLevelId(level.id)?.phase || 0).padStart(2, '0'),
+    energyCap: level.energyCap || level.nodeEnergyCap || 0,
+    par: level.par || 0,
+    stars: STATE.getTentacleWarsStars(level.id) || 0,
+    locked: !STATE.isTentacleWarsLevelUnlocked(level.id),
+    isCurrent: level.id === currentLevelId,
+    isNext: level.id === currentLevelId && STATE.isTentacleWarsLevelUnlocked(level.id),
+  }));
+
+  titleElement.textContent = `WORLD ${_activeTwWorldTab}`;
+  metaElement.textContent = buildTwLevelMetaMarkup(_activeTwWorldTab, currentLevelId);
+  levelGridElement.innerHTML = buildTwLevelCardsMarkup(levelCards);
+  levelGridElement.querySelectorAll('[data-tw-level]').forEach(button => {
+    button.addEventListener('click', () => {
+      const levelId = button.getAttribute('data-tw-level');
+      if (!STATE.isTentacleWarsLevelUnlocked(levelId)) return;
+      const levelData = getTentacleWarsCampaignLevelById(levelId);
+      if (!levelData || !Screens._game) return;
+      STATE.setTentacleWarsCurrentLevel(levelId);
+      fadeGo(() => {
+        showScr(null);
+        Screens._game.loadTentacleWarsCampaignLevel(levelData);
+      });
+    });
+  });
+
+  showScr('twLevels');
+}
+
 function _makeLvBtn(levelConfig, phaseNum, accentColor, isLocked, isDone, isNext, worldLocked, isTutorialLevel) {
   const btn = document.createElement('div');
   let className   = 'lb2';
@@ -430,6 +538,71 @@ export function endLevel(win, game) {
   }, 500);
 }
 
+/*
+ * Keep TW campaign completion on the shared result shell while storing stars,
+ * fail streaks, and next-level pointer through the separate TW namespace.
+ */
+export function endTentacleWarsLevel(win, game) {
+  const levelConfig = game.cfg;
+  const levelId = levelConfig?.twLevelId || levelConfig?.id;
+  const nextLevel = getNextTentacleWarsLevel(levelId);
+
+  if (win) {
+    STATE.recordTentacleWarsLevelWin(levelId, game.scoreTime, levelConfig?.par);
+    SFX.win();
+    if (levelId !== 'W4-20') setTimeout(() => Music.playMenu(), 1500);
+  } else {
+    STATE.recordTentacleWarsLevelLoss(levelId);
+    SFX.lose();
+    setTimeout(() => Music.playMenu(), 1200);
+  }
+
+  setTimeout(() => {
+    if (win && levelId === 'W4-20') {
+      showTwCampaignEnding();
+      return;
+    }
+
+    const resultTitleElement = $(DOM_IDS.RTITLE);
+    const resultSubtitleElement = $(DOM_IDS.RSUB);
+    const scoreElement = $(DOM_IDS.RSCORE);
+    const infoElement = $(DOM_IDS.RINFO);
+    const nextButton = $(DOM_IDS.BTN_RN);
+
+    if (resultTitleElement) {
+      resultTitleElement.textContent = win ? T('phaseClear') : T('annihilated');
+      resultTitleElement.className = 'rt ' + (win ? 'win' : 'lose');
+    }
+    if (resultSubtitleElement) {
+      resultSubtitleElement.textContent = win
+        ? `${levelId} — ${nextLevel ? T('nextPhase', nextLevel.id) : T('allComplete')}`
+        : `${levelId} — ${T('retry')}`;
+    }
+    if (scoreElement) {
+      scoreElement.style.display = 'none';
+      scoreElement.innerHTML = '';
+    }
+    if (infoElement) {
+      infoElement.innerHTML = buildResultInfoMarkup(levelConfig, game, T, 80);
+    }
+    if (nextButton) nextButton.style.display = win && nextLevel ? '' : 'none';
+
+    const tutbox = $(DOM_IDS.TUTBOX);
+    if (tutbox) tutbox.style.display = 'none';
+    const scoreHudElement = $(DOM_IDS.HSCORE);
+    if (scoreHudElement) scoreHudElement.style.display = 'none';
+    const quickTipElement = $(DOM_IDS.DC);
+    if (quickTipElement) quickTipElement.classList.remove('on');
+
+    showScr('result');
+    const phasesButton = $(DOM_IDS.BTN_RL);
+    const retryButton = $(DOM_IDS.BTN_RR);
+    if (phasesButton) phasesButton.textContent = 'MUNDOS';
+    if (retryButton) retryButton.textContent = T('retry');
+    if (win && nextLevel && nextButton) nextButton.textContent = 'PRÓXIMA FASE';
+  }, 500);
+}
+
 export function showCampaignEnding(game, { debugPreview = false } = {}) {
   Music.playEnding();
   const endingModel = buildCampaignEndingMarkup(game, T, curLang(), { debugPreview });
@@ -453,6 +626,31 @@ export function showCampaignEnding(game, { debugPreview = false } = {}) {
   if (quickTipElement) quickTipElement.classList.remove('on');
 
   showScr('ending');
+}
+
+/*
+ * The dedicated TW ending is still a stub, so route back to the TW campaign
+ * shell after surfacing a clear runtime marker for future implementation.
+ */
+export function showTwCampaignEnding() {
+  const endingModel = buildTwCampaignEndingMarkup();
+  const titleElement = $(DOM_IDS.TW_ENDING_TITLE);
+  const subtitleElement = $(DOM_IDS.TW_ENDING_SUB);
+  const metaElement = $(DOM_IDS.TW_ENDING_META);
+
+  if (titleElement) titleElement.textContent = endingModel.title;
+  if (subtitleElement) subtitleElement.textContent = endingModel.subtitle;
+  if (metaElement) metaElement.textContent = endingModel.meta;
+
+  const tutbox = $(DOM_IDS.TUTBOX);
+  if (tutbox) tutbox.style.display = 'none';
+  const scoreHudElement = $(DOM_IDS.HSCORE);
+  if (scoreHudElement) scoreHudElement.style.display = 'none';
+  const quickTipElement = $(DOM_IDS.DC);
+  if (quickTipElement) quickTipElement.classList.remove('on');
+
+  Music.playMenu();
+  showScr('twEnding');
 }
 
 /* ── Settings UI ── */

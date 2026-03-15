@@ -116,7 +116,17 @@ export function applyTentaclePayloadToTarget({
 
 export function applyTentacleFriendlyFlow(targetNode, feedRate, relayFlowMultiplier, dt) {
   const incomingEnergy = feedRate * relayFlowMultiplier * dt;
-  if (targetNode.energy < targetNode.maxE) {
+  if (targetNode.simulationMode === 'tentaclewars') {
+    const availableRoom = Math.max(0, targetNode.maxE - targetNode.energy);
+    const absorbedEnergy = Math.min(availableRoom, incomingEnergy);
+    const overflowEnergy = Math.max(0, incomingEnergy - absorbedEnergy);
+    if (absorbedEnergy > 0) {
+      targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + absorbedEnergy);
+    }
+    if (overflowEnergy > 0) {
+      targetNode.twOverflowBudget = (targetNode.twOverflowBudget || 0) + overflowEnergy;
+    }
+  } else if (targetNode.energy < targetNode.maxE) {
     targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + incomingEnergy);
   }
   targetNode.inFlow = (targetNode.inFlow || 0) + (
