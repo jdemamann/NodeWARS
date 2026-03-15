@@ -46,6 +46,7 @@ Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrat
 
 No active wave. Review open tracks above and await playtest data.
 If a new implementation track is needed, start with the brainstorming skill.
+For bounded boot-chain integrity checks, run `node scripts/doc-audit.mjs`.
 
 ## Tiebreaker
 

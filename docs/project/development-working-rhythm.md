@@ -45,7 +45,7 @@ Choose a small wave:
 Also choose the most relevant domain agent before starting.
 If the task clearly matches an installed Codex skill, choose that skill before implementation.
 If the wave has more than one concrete step, start it with `update_plan` and keep that plan current during the wave.
-If the wave touches `src/*.js`, also open `docs/project/commentary-header-template.md` before editing.
+If the wave touches source `.js` files, also open `docs/project/commentary-header-template.md` before editing.
 
 ### 3. Write a short spec
 
@@ -87,7 +87,7 @@ Rules:
 ### 5. Validate
 
 Run the minimum checks from the matrix.
-If the wave touched `src/*.js`, always include:
+If the wave touched source `.js` files, always include:
 
 ```bash
 node scripts/commentary-policy.mjs

@@ -1686,7 +1686,7 @@ Goal:
 Target files:
 
 - `README.md`
-- `docs/implementation/*.md`
+- implementation docs under `docs/implementation/`
 - gameplay-critical comments in `src/entities/Tent.js`, `src/core/Game.js`, `src/systems/Physics.js`
 
 Validation:
@@ -2286,7 +2286,7 @@ Goal:
 
 Target files:
 
-- `docs/project/*.md`
+- project docs under `docs/project/`
 - status-facing implementation docs where needed
 
 Validation:

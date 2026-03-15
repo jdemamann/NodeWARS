@@ -1003,7 +1003,7 @@ Original prompt: faça isso. E especifique em quais fases essas musicas aparecem
     - `node scripts/smoke-checks.mjs` → `90/90`
     - `node scripts/tw-campaign-sanity.mjs` → `11/11`
 - 2026-03-14: Resumed and completed `TASK-TWL-013 TentacleWars World 3 Playtest and Reconstruction Review`.
-  - confirmed the restarted session now has `superpowers` available and followed the manual inbox resume flow from `docs/project/RESUME-CODEX.md`
+  - confirmed the restarted session now has `superpowers` available and followed the manual inbox resume flow from `docs/project/RESUME.md`
   - captured required World 3 stills:
     - `output/playwright/twl-013/W3-01.png`
     - `output/playwright/twl-013/W3-05.png`

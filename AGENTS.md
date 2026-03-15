@@ -220,8 +220,8 @@ When rebuilding a soundtrack track from an authored audio file:
 - Before closing any design or planning wave (spec, implementation plan, or major architectural decision), send the spec to Codex via the async inbox protocol and wait for Codex considerations before finalizing. Do not write the implementation plan until Codex has reviewed the design.
 - When the user reports a bug, do not start by fixing it. Start by adding or extending a test/guardrail that reproduces the bug, then fix it, then prove the fix with the passing test.
 - Keep source comments in English only.
-- If a touched `src/*.js` file still lacks a module header, add one in the same wave.
-- If a created or materially changed function in `src/*.js` lacks a short block header, add one in the same wave.
+- If a touched source `.js` file still lacks a module header, add one in the same wave.
+- If a created or materially changed function in a source `.js` file lacks a short block header, add one in the same wave.
 - Reuse `docs/project/commentary-header-template.md` instead of inventing ad-hoc header styles.
 - If changing gameplay rules, update at least one guardrail or explain why not.
 - If changing settings, tutorial, story, or persistence, verify all linked surfaces still agree.

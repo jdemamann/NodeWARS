@@ -222,7 +222,7 @@ node scripts/commentary-policy.mjs
 
 Protects:
 
-- module headers in changed `src/*.js` files
+- module headers in changed source `.js` files
 - short block headers for newly added or modified function signatures
 - English-only commentary policy in touched source files
 
