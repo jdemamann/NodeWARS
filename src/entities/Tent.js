@@ -988,12 +988,17 @@ export class Tent {
       + this.twOverflowShare;
     const opposingPressure = computeTentacleClashFeedRate(opposingSource, opposingTentacle.maxBandwidth, dt)
       + opposingTentacle.twOverflowShare;
-    const netDamage = Math.max(0, myPressure - opposingPressure);
+    /* Bidirectional: damage flows to whoever has lower pressure, regardless
+       of which tentacle is the canonical driver. */
+    const netDamage = Math.abs(myPressure - opposingPressure);
 
     if (netDamage === 0) return;
 
-    /* Apply net damage to the losing side's source */
-    const losingSource = opposingSource;
+    const iAmWinner = myPressure >= opposingPressure;
+    const winnerTentacle = iAmWinner ? this : opposingTentacle;
+    const loserTentacle  = iAmWinner ? opposingTentacle : this;
+    const losingSource   = loserTentacle.effectiveSourceNode;
+
     losingSource.energy = Math.max(0, losingSource.energy - netDamage * dt);
 
     /* Critical threshold check — using post-damage energy */
@@ -1017,7 +1022,7 @@ export class Tent {
     opposingTentacle.clashPartner = null;
     opposingTentacle.clashVisualT = null;
     opposingTentacle.clashApproachActive = false;
-    opposingTentacle.clashT = null;
+    loserTentacle.clashT = null;
 
     /* Step 3c: retract all losing tentacles — programmatic retract refunds paidCost + energyInPipe */
     for (const t of losingTents) {
@@ -1025,8 +1030,8 @@ export class Tent {
     }
 
     /* Step 3d: winning tentacle advances */
-    this.state = TentState.ADVANCING;
-    this.clashT = null;
+    winnerTentacle.state = TentState.ADVANCING;
+    winnerTentacle.clashT = null;
   }
 
   /* ── Bursting (kamikaze cut: tail rushes to target) ── */

@@ -113,6 +113,24 @@ async function testTwClashThresholdTriggersRetractAndAdvance() {
   }
 }
 
+async function testTwClashBidirectionalDamage() {
+  // Canonical driver (tentA, source.id=0) is the WEAKER side.
+  // tentB has large overflow → higher pressure → damage should flow to sourceA.
+  const { tentA, tentB, sourceA, sourceB, TentState } = await makeTwFixtures({ energyA: 8, energyB: 50 });
+  tentA.twOverflowShare = 0;
+  tentB.twOverflowShare = 10; // opposing side has overflow advantage
+
+  tentB._updateClashState(0.1); // non-canonical: Block A only
+  tentA._updateClashState(0.1); // canonical: Block A + Block B
+
+  assert.equal(tentA.state, TentState.RETRACTING,
+    'canonical tentacle should retract when it is the weaker side');
+  assert.equal(tentB.state, TentState.ADVANCING,
+    'non-canonical tentacle should advance when it is the stronger side');
+  assert.equal(tentA.clashT, null, 'losing tentacle clashT should be null after retract');
+  assert.equal(tentB.clashT, null, 'winning tentacle clashT should be null after advance');
+}
+
 async function testTwClashFlowRateStaysAliveOnBothSides() {
   const { tentA, tentB } = await makeTwFixtures({ energyA: 50, energyB: 50 });
 
@@ -2776,6 +2794,7 @@ async function main() {
     ['TentacleWars AI tactical state modulates scoring by intent', testTwAiTacticalStateModulatesScoring],
     ['TentacleWars clash damage applies to losing source node', testTwClashDamageAppliesToLosingNode],
     ['TentacleWars clash threshold triggers auto-retract and auto-advance', testTwClashThresholdTriggersRetractAndAdvance],
+    ['TentacleWars clash damage is bidirectional (canonical driver can lose)', testTwClashBidirectionalDamage],
     ['TentacleWars clash flowRate stays alive on both tentacle sides', testTwClashFlowRateStaysAliveOnBothSides],
   ];
 
