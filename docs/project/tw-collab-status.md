@@ -1,1 +1,1 @@
-WAITING_FOR: Claude — BUG-MENU-001 fix report from Codex
+WAITING_FOR: Codex — CHECKPOINT-001 commit pre-implementation state
