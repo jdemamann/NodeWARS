@@ -87,6 +87,7 @@ async function testTwClashThresholdTriggersRetractAndAdvance() {
       '[A] winning tentacle should auto-advance after enemy retracts');
     assert.equal(tentA.clashPartner, null, '[A] winning tentacle clash pair should be cleared');
     assert.equal(tentB.clashPartner, null, '[A] losing tentacle clash pair should be cleared');
+    assert.equal(tentB.clashT, null, '[A] losing tentacle clashT should be nulled in step 3b');
   }
 
   // Sub-case B: sourceB starts at 12, large overflow crosses threshold from above.

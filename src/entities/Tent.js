@@ -1017,6 +1017,7 @@ export class Tent {
     opposingTentacle.clashPartner = null;
     opposingTentacle.clashVisualT = null;
     opposingTentacle.clashApproachActive = false;
+    opposingTentacle.clashT = null;
 
     /* Step 3c: retract all losing tentacles — programmatic retract refunds paidCost + energyInPipe */
     for (const t of losingTents) {
