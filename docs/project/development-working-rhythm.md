@@ -28,13 +28,10 @@ If automation fails, fall back to the manual inbox flow and continue working.
 
 Read in this order:
 
-1. `AGENTS.md`
-2. `docs/project/stabilization-status.md`
-3. `docs/project/task-backlog.md`
-4. `docs/implementation/current-gameplay-baseline.md`
-5. `docs/project/check-matrix.md`
-6. `docs/project/operational-kanban.md`
-7. `docs/project/skill-usage-map.md`
+1. `AGENTS.md` — stable rules and structure
+2. `docs/project/RESUME.md` — live state: current phase, open tracks, what to ignore
+3. `docs/project/inbox-codex.md` — current task
+4. `docs/project/tw-collab-status.md` — handoff state
 
 ### 2. Choose the wave
 

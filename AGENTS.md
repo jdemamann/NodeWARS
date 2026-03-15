@@ -18,16 +18,10 @@ It should stay short, current, and action-oriented.
 
 ## First Files To Read
 
-1. `docs/project/stabilization-status.md`
-2. `docs/project/source-structure.md`
-3. `docs/project/task-backlog.md`
-4. `docs/implementation/current-gameplay-baseline.md`
-5. `docs/implementation/tentaclewars-fidelity-spec.md`
-6. `docs/project/check-matrix.md`
-7. `docs/project/development-working-rhythm.md`
-8. `docs/project/operational-kanban.md`
-9. `docs/project/skill-usage-map.md`
-10. `docs/project/linux-audio-extraction-playbook.md`
+1. `AGENTS.md` — stable rules and structure (this file)
+2. `docs/project/RESUME.md` — live state: current phase, open tracks, what to ignore
+3. `docs/project/inbox-codex.md` — current task
+4. `docs/project/tw-collab-status.md` — handoff state
 
 ## Code Structure
 
@@ -223,6 +217,7 @@ When rebuilding a soundtrack track from an authored audio file:
   - `writing-plans` for non-trivial waves
   - `verification-before-completion` before claiming success
   - `requesting-code-review` before closing sensitive waves
+- Before closing any design or planning wave (spec, implementation plan, or major architectural decision), send the spec to Codex via the async inbox protocol and wait for Codex considerations before finalizing. Do not write the implementation plan until Codex has reviewed the design.
 - When the user reports a bug, do not start by fixing it. Start by adding or extending a test/guardrail that reproduces the bug, then fix it, then prove the fix with the passing test.
 - Keep source comments in English only.
 - If a touched `src/*.js` file still lacks a module header, add one in the same wave.

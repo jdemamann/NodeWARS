@@ -17,13 +17,6 @@ Use it as the local source of truth when:
 - investigate additional tutorial playtest feedback once new sessions are recorded
 - evaluate whether `24 RELAY RACE` needs structural player opening support
 - `TASK-TWL-BALANCE-CROSS` TentacleWars Cross-World Balance Pass — review par values and energyCaps for flagged phases: W3-15, W3-16, W4-16, W4-19, W4-20. Requires real timed playtests. Not blocking integration.
-- `TASK-TW-POSTMERGE-DEBT` TentacleWars post-merge debt cluster:
-  - `W4-20` hardcoded final-level trigger should move to a TW constant
-  - `twCampaignEndingView.js` should align with sibling view builders and receive `T` as a parameter
-  - TW result path still reuses the shared NW result DOM
-  - `ScreenController.js` should eventually split TW navigation into `TwScreenController.js`
-  - `colorWithAlpha` is still duplicated across renderers
-  - `applyTentacleWarsPreviewWorldJump()` still returns `null` silently outside debug
 
 ## Planned
 
@@ -60,6 +53,11 @@ Phase G — Polish Final:
 - none
 
 ## Done Recently
+
+- `POSTMERGE-WAVE-001 Merge + Post-Merge Debt Wave`
+  - output: `src/tentaclewars/TwCampaignFixtures.js`, `src/ui/ScreenController.js`, `src/ui/twCampaignEndingView.js`, `src/rendering/canvasPrimitives.js`, `src/rendering/NodeRenderer.js`, `src/rendering/TentRenderer.js`, `src/rendering/UIRenderer.js`, `src/tentaclewars/TwCampaignPreview.js`, `styles/main.css`
+  - validation: 90/90 + 15/15 PASS (completed, branch merged to main)
+  - merged `feature/tentaclewars-mode` into `main`, replaced the last TW final-level hardcode with a campaign constant, aligned the TW ending builder with injected localization, centralized renderer alpha color helpers, and documented the remaining shared-result / future screen-controller debt without expanding the runtime surface
 
 - `REVIEW-TW-CLEANUP-001 Pre-Merge Cleanup Wave`
   - output: `src/tentaclewars/TwBalance.js`, `src/tentaclewars/TwCampaignLoader.js`, `src/tentaclewars/TwSandboxConfig.js`, `src/tentaclewars/TwAI.js`, `src/tentaclewars/TwAIScoring.js`, `docs/project/tw-level-authoring-principles.md`
