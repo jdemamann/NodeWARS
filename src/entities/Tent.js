@@ -739,11 +739,8 @@ export class Tent {
    */
   _updateTentacleWarsActiveFlowState(sourceNode, targetNode, dt) {
     const baseThroughputPerSecond = computeTentacleSourceFeedRate(sourceNode, this.maxBandwidth, dt);
-    const outgoingTentacles = Math.max(1, sourceNode.outCount);
-    const overflowShareUnits = distributeTentacleWarsOverflow(
-      sourceNode.twOverflowBudget || 0,
-      outgoingTentacles,
-    ).laneOverflowShares[0] || 0;
+    /* Overflow share is pre-assigned by Physics.updateOutCounts each frame. */
+    const overflowShareUnits = this.twOverflowShare;
     const relayFlowMultiplier = this._getRelayFlowMultiplier(sourceNode);
     const laneStep = advanceTentacleWarsLaneRuntime({
       accumulatorUnits: this.packetAccumulatorUnits + overflowShareUnits,
