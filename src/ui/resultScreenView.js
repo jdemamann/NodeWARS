@@ -31,9 +31,17 @@ export function buildResultInfoMarkup(levelConfig, game, translate, totalLevels)
         ? 'result-alert'
         : 'result-bad';
 
-    return '<div class="lr"><div class="ll">' + translate('phase') + '</div><div class="lv">' + levelId + '</div></div>' +
-      '<div class="lr"><div class="ll">STARS</div><div class="lv">' + ('★'.repeat(stars) + '☆'.repeat(3 - stars)) + '</div></div>' +
-      '<div class="lr"><div class="ll">' + translate('time') + '</div><div class="lv"><span class="' + gradeClass + '">' + elapsedSeconds + 's</span> | ' + translate('par') + ': ' + parSeconds + 's</div></div>';
+    return (
+      '<div class="tw-result-block">' +
+        '<div class="tw-phase-badge">' + levelId + '</div>' +
+        '<div class="tw-stars">' + translate('twStars') + ' · ' + '★'.repeat(stars) + '☆'.repeat(3 - stars) + '</div>' +
+        '<div class="tw-time-row">' +
+          '<span class="ll">' + translate('time') + '</span>' +
+          '<span class="lv"><span class="' + gradeClass + '">' + elapsedSeconds + 's</span></span>' +
+          '<span class="tw-par-note">' + translate('twParTime', parSeconds) + '</span>' +
+        '</div>' +
+      '</div>'
+    );
   }
 
   const parSeconds = levelConfig.par || 120;

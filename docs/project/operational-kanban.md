@@ -54,6 +54,16 @@ Phase G — Polish Final:
 
 ## Done Recently
 
+- `TASK-TWL-018 TentacleWars Phase Editor Feasibility Review`
+  - output: research-only recommendation in `docs/project/inbox-claude.md`
+  - recommendation: defer
+  - conclusion: a TW phase editor is technically viable, but the right first shape would be a separate-page debug tool and it does not yet justify implementation while TW work is still primarily balance/playtest driven
+
+- `TASK-TWL-021 TentacleWars i18n Compliance + Result/Ending Visual Polish`
+  - output: `src/ui/ScreenController.js`, `src/ui/resultScreenView.js`, `src/ui/twWorldSelectView.js`, `src/ui/twLevelSelectView.js`, `src/ui/twCampaignEndingView.js`, `src/localization/i18n.js`, `output/playwright/twl-021/`
+  - validation: `90/90 + 11/11 + 10/10 + 1/1 PASS`
+  - removed remaining hardcoded TW shell strings, added live EN/PT rerender for the active TW screen, and polished the dedicated TW result + ending presentation with browser-backed verification
+
 - `TASK-TWL-020 TW Result Screen + Campaign Ending + Browser Validation`
   - output: `src/ui/resultScreenView.js`, `src/ui/twCampaignEndingView.js`, `output/playwright/twl-020/`
   - validation: `90/90 + 11/11 + 10/10 + 1/1 PASS`

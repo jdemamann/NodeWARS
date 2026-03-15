@@ -76,9 +76,7 @@ export const DOM_IDS = Object.freeze({
   BTN_TW_LEVEL_BACK:'btnTwLevelBack',
 
   /* TentacleWars campaign ending */
-  TW_ENDING_TITLE:'twEndingTitle',
-  TW_ENDING_SUB:  'twEndingSub',
-  TW_ENDING_META: 'twEndingMeta',
+  TW_ENDING_CONTENT:'twEndingContent',
   BTN_TW_ENDING_MENU:'btnTwEndingMenu',
 
   /* Story screen */

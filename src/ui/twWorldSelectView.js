@@ -12,18 +12,13 @@ function getWorldAccent(worldId) {
   return '#00e5ff';
 }
 
-/* Keep world labels explicit so the shell stays readable without i18n churn. */
-function getWorldLabel(worldId) {
-  return `WORLD ${worldId}`;
-}
-
 /* Surface only the current TW pointer and world unlock breadth in one line. */
-export function buildTwWorldSummaryMarkup(currentLevelId, unlockedWorldCount) {
-  return `CURRENT POINTER ${currentLevelId} · ${unlockedWorldCount}/4 WORLDS OPEN`;
+export function buildTwWorldSummaryMarkup(currentLevelId, unlockedWorldCount, T) {
+  return T('twWorldPointer', currentLevelId, unlockedWorldCount);
 }
 
 /* World cards stay compact and reuse the shared level-card visual language. */
-export function buildTwWorldCardsMarkup(worldCards) {
+export function buildTwWorldCardsMarkup(worldCards, T) {
   return worldCards.map(worldCard => {
     const accent = getWorldAccent(worldCard.worldId);
     const classes = ['lb2', 'tw-world-card'];
@@ -34,10 +29,10 @@ export function buildTwWorldCardsMarkup(worldCards) {
       `data-tw-world="${worldCard.worldId}" ` +
       `style="border-color:${accent}40">` +
         `<div class="ln" style="color:${accent}">${worldCard.worldId}</div>` +
-        `<div class="lna">${getWorldLabel(worldCard.worldId)}</div>` +
+        `<div class="lna">${T('twWorldLabel', worldCard.worldId)}</div>` +
         `<div class="lb-meta">${worldCard.phaseRangeLabel}</div>` +
         `<div class="lb-score">${worldCard.currentLevelLabel}</div>` +
-        `<div class="lb-meta">${worldCard.unlocked ? 'SELECT WORLD' : '🔒 LOCKED'}</div>` +
+        `<div class="lb-meta">${worldCard.unlocked ? T('twSelectWorld') : T('twLocked')}</div>` +
       '</button>'
     );
   }).join('');

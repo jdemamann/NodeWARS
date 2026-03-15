@@ -14,7 +14,7 @@ import { DOM_IDS }  from './ui/DomIds.js';
 import {
   showScr, fadeGo, showToast, showNotification, buildWorldTabs, buildStory, buildCredits,
   syncWorldTab, refreshSettingsUI, updateDebugInfo, Screens, endLevel, endTentacleWarsLevel,
-  showCampaignEnding, showTwCampaignEnding, showTwWorldSelect, showTwLevelSelect,
+  showCampaignEnding, showTwCampaignEnding, showTwWorldSelect, showTwLevelSelect, rerenderActiveTwScreen,
 } from './ui/ScreenController.js';
 import { LEVELS } from './config/gameConfig.js';
 import { buildTentacleWarsDebugMetrics } from './tentaclewars/TwDebugMetrics.js';
@@ -459,8 +459,8 @@ function wireButtons() {
   });
 
   /* Language buttons (now in settings) */
-  $id(DOM_IDS.BTN_LANG_PT)?.addEventListener('click', () => setLang('pt'));
-  $id(DOM_IDS.BTN_LANG_EN)?.addEventListener('click', () => setLang('en'));
+  $id(DOM_IDS.BTN_LANG_PT)?.addEventListener('click', () => { setLang('pt'); rerenderActiveTwScreen(); });
+  $id(DOM_IDS.BTN_LANG_EN)?.addEventListener('click', () => { setLang('en'); rerenderActiveTwScreen(); });
 
   /* Font cycle */
   $id(DOM_IDS.BTN_FONT_CYCLE)?.addEventListener('click', () => {

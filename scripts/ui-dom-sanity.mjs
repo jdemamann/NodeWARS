@@ -194,9 +194,7 @@ async function setupUiDomHarness() {
     DOM_IDS.TW_LEVEL_GRID,
     DOM_IDS.TW_LEVEL_TITLE,
     DOM_IDS.TW_LEVEL_META,
-    DOM_IDS.TW_ENDING_TITLE,
-    DOM_IDS.TW_ENDING_SUB,
-    DOM_IDS.TW_ENDING_META,
+    DOM_IDS.TW_ENDING_CONTENT,
     DOM_IDS.TUTBOX,
     DOM_IDS.HSCORE,
     DOM_IDS.DC,
@@ -413,9 +411,9 @@ async function testTentacleWarsWorldSelectBuildsFromCanonicalProgress() {
     screenController.showTwWorldSelect();
 
     assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_TW_WORLDS).classList.contains('off'), false, 'TW world-select screen should become visible');
-    assert.match(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 1/i, 'TW world-select should render World 1');
-    assert.match(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 2/i, 'TW world-select should render World 2 when unlocked');
-    assert.doesNotMatch(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 3[\s\S]*SELECT/i, 'locked TW worlds should not expose a selectable state');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 1|MUNDO 1/i, 'TW world-select should render World 1');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 2|MUNDO 2/i, 'TW world-select should render World 2 when unlocked');
+    assert.doesNotMatch(fakeDocument.getElementById(DOM_IDS.TW_WORLD_GRID).innerHTML, /WORLD 3[\s\S]*SELECT|MUNDO 3[\s\S]*SELECIONAR/i, 'locked TW worlds should not expose a selectable state');
     assert.match(fakeDocument.getElementById(DOM_IDS.TW_WORLD_SUMMARY).textContent, /W2-01/i, 'TW world summary should surface the canonical current level pointer');
   } finally {
     STATE.twCampaign = originalTwCampaign;
@@ -437,10 +435,10 @@ async function testTentacleWarsLevelSelectBuildsWorldCards() {
     screenController.showTwLevelSelect(1);
 
     assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_TW_LEVELS).classList.contains('off'), false, 'TW level-select screen should become visible');
-    assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_TITLE).textContent, /WORLD 1/i, 'TW level-select title should identify the selected world');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_TITLE).textContent, /WORLD 1|MUNDO 1/i, 'TW level-select title should identify the selected world');
     assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_GRID).innerHTML, /W1-01/i, 'TW level-select should render the first level id');
     assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_GRID).innerHTML, /☆☆☆|★★★/, 'TW level-select should render a star strip per phase card');
-    assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_GRID).innerHTML, /ENERGY CAP/i, 'TW level-select should show energy-cap metadata');
+    assert.match(fakeDocument.getElementById(DOM_IDS.TW_LEVEL_GRID).innerHTML, /ENERGY CAP|ENERGIA MÁX/i, 'TW level-select should show energy-cap metadata');
   } finally {
     STATE.twCampaign = originalTwCampaign;
     STATE.settings = originalSettings;
@@ -451,11 +449,13 @@ async function testTentacleWarsCampaignEndingRendersDedicatedScreen() {
   const { DOM_IDS, screenController, fakeDocument } = await setupUiDomHarness();
 
   screenController.showTwCampaignEnding();
+  const endingMarkup = fakeDocument.getElementById(DOM_IDS.TW_ENDING_CONTENT).innerHTML;
 
   assert.equal(fakeDocument.getElementById(DOM_IDS.SCREEN_TW_ENDING).classList.contains('off'), false, 'TW campaign ending should show the dedicated ending screen');
-  assert.match(fakeDocument.getElementById(DOM_IDS.TW_ENDING_TITLE).textContent, /TENTACLE WARS/i, 'TW campaign ending should render its title');
-  assert.match(fakeDocument.getElementById(DOM_IDS.TW_ENDING_SUB).textContent, /80/i, 'TW campaign ending should mention the completed 80-phase campaign');
-  assert.match(fakeDocument.getElementById(DOM_IDS.TW_ENDING_META).textContent, /WORLD 1[\s\S]*WORLD 4|MUNDO 1[\s\S]*MUNDO 4/i, 'TW campaign ending should summarize the world span');
+  assert.match(endingMarkup, /tw-ending-title/, 'TW campaign ending should inject its dedicated title wrapper');
+  assert.match(endingMarkup, /TENTACLE WARS/i, 'TW campaign ending should render its title');
+  assert.match(endingMarkup, /80/i, 'TW campaign ending should mention the completed 80-phase campaign');
+  assert.match(endingMarkup, /WORLD 1[\s\S]*WORLD 4|Mundo 1[\s\S]*Mundo 4/i, 'TW campaign ending should summarize the world span');
 }
 
 async function testTentacleWarsResultMarkupDropsNodewarsStats() {
@@ -477,6 +477,7 @@ async function testTentacleWarsResultMarkupDropsNodewarsStats() {
     }, key => key, 80);
 
     assert.match(markup, /W1-01/, 'TW result markup should include the phase id');
+    assert.match(markup, /STARS|ESTRELAS/i, 'TW result markup should label the star strip through i18n');
     assert.match(markup, /★★☆|☆☆☆|★★★/, 'TW result markup should render stars with glyphs');
     assert.match(markup, /PAR/i, 'TW result markup should include time-vs-par information');
     assert.doesNotMatch(markup, /wasted|frenzies|hostile starts/i, 'TW result markup should not include NodeWARS-only result stats');

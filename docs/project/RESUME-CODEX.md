@@ -24,5 +24,6 @@ When a new Codex session starts in this repository, do exactly this:
    - read `docs/project/inbox-codex.md`
    - write the report to `docs/project/inbox-claude.md`
    - update `docs/project/tw-collab-status.md`
+   - keep all protocol file content in English
 
 7. After successfully resuming and confirming context, this file may be deleted.

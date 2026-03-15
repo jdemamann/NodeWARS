@@ -1136,3 +1136,58 @@ Original prompt: faça isso. E especifique em quais fases essas musicas aparecem
     - `node scripts/ui-actions-sanity.mjs` → `11/11`
     - `node scripts/ui-dom-sanity.mjs` → `10/10`
     - `node scripts/commentary-policy.mjs` → `1/1`
+- 2026-03-14: Implemented `TASK-TWL-021 TentacleWars i18n Compliance + Result/Ending Visual Polish`.
+  - updated:
+    - `index.html`
+    - `src/localization/i18n.js`
+    - `src/main.js`
+    - `src/ui/DomIds.js`
+    - `src/ui/ScreenController.js`
+    - `src/ui/resultScreenView.js`
+    - `src/ui/twCampaignEndingView.js`
+    - `src/ui/twLevelSelectView.js`
+    - `src/ui/twWorldSelectView.js`
+    - `styles/main.css`
+    - `scripts/ui-dom-sanity.mjs`
+  - behavior changes:
+    - moved the remaining TentacleWars shell copy into `i18n.js` and threaded `T()` through the dedicated world/level builders
+    - added `rerenderActiveTwScreen()` so the visible TW world select, level select, result screen, and ending screen rebuild immediately after EN/PT language swaps
+    - kept TW result rerender side-effect-safe by rebuilding from cached result state rather than replaying progression writes
+    - migrated the TW ending screen to injected HTML inside `#twEndingContent`
+    - polished the dedicated TW result and ending presentation in CSS
+  - browser artifacts:
+    - `output/playwright/twl-021/twl-021-world-pt.png`
+    - `output/playwright/twl-021/twl-021-level-pt.png`
+    - `output/playwright/twl-021/twl-021-result-pt.png`
+    - `output/playwright/twl-021/twl-021-ending-pt.png`
+  - browser method:
+    - used the canonical Chromium-backed local Playwright workflow already documented for this repo
+    - verified live PT → EN rerender directly on the visible TW shell surfaces through page-driven module calls
+    - browser output showed autoplay warnings before user gesture, but no runtime/page errors
+  - checks:
+    - `node scripts/smoke-checks.mjs` → `90/90`
+    - `node scripts/ui-actions-sanity.mjs` → `11/11`
+    - `node scripts/ui-dom-sanity.mjs` → `10/10`
+    - `node scripts/commentary-policy.mjs` → `1/1`
+- 2026-03-14: Completed `TASK-TWL-018 TentacleWars Phase Editor Feasibility Review`.
+  - no implementation started
+  - sources reviewed:
+    - `src/tentaclewars/TwLevelSchema.js`
+    - `src/tentaclewars/TwCampaignLoader.js`
+    - `src/tentaclewars/TwObstacleRuntime.js`
+    - `src/tentaclewars/TwCampaignFixtures.js`
+    - `src/tentaclewars/TwCampaignPreview.js`
+    - `src/tentaclewars/TwModeRuntime.js`
+    - `src/rendering/NodeRenderer.js`
+    - `src/rendering/TentRenderer.js`
+    - `docs/project/ai-improvement-and-debug-editor-study-2026-03-10.md`
+  - recommendation:
+    - defer building the editor for now
+  - rationale:
+    - the current TW level format is already simple, normalized, and validator-backed
+    - the 80-phase authored campaign is complete, so the highest-value TW work remains playtest-driven balance and selective structural fixes
+    - an editor becomes attractive only if future work shifts back into repeated layout creation or large-scale spatial remixing
+  - if reopened later:
+    - build a separate-page debug tool first, not an in-game overlay
+    - keep JS objects as canonical output
+    - use live `validateTentacleWarsLevelData()` checks plus normal campaign sanity after export

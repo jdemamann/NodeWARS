@@ -216,6 +216,7 @@ When rebuilding a soundtrack track from an authored audio file:
 - Start each meaningful wave by checking the relevant domain agent and the check matrix.
 - If the task clearly matches an installed Codex skill, use the skill before ad-hoc work.
 - For any multi-step wave, use `update_plan` at the start and keep it current as steps move from `in_progress` to `completed`.
+- All file-based collaboration protocol content (`inbox-codex.md`, `inbox-claude.md`, `tw-collab-status.md`) must stay in English.
 - Default superpowers stack:
   - `systematic-debugging` for bugs
   - `test-driven-development` for fixes and guarded behavior changes

@@ -11,12 +11,12 @@ function buildStarStrip(starCount) {
 }
 
 /* Mirror the live TW pointer above the grid so world navigation stays grounded. */
-export function buildTwLevelMetaMarkup(worldId, currentLevelId) {
-  return `WORLD ${worldId} · CURRENT POINTER ${currentLevelId}`;
+export function buildTwLevelMetaMarkup(worldId, currentLevelId, T) {
+  return T('twLevelPointer', worldId, currentLevelId);
 }
 
 /* Phase cards surface just enough authored metadata for fast selection. */
-export function buildTwLevelCardsMarkup(levelCards) {
+export function buildTwLevelCardsMarkup(levelCards, T) {
   return levelCards.map(levelCard => {
     const classes = ['lb2', 'tw-level-card'];
     if (levelCard.locked) classes.push('lk');
@@ -28,9 +28,9 @@ export function buildTwLevelCardsMarkup(levelCards) {
         `<div class="ln">${levelCard.shortId}</div>` +
         `<div class="lna">${levelCard.id}</div>` +
         buildStarStrip(levelCard.stars) +
-        `<div class="lb-meta">ENERGY CAP ${levelCard.energyCap}</div>` +
-        `<div class="lb-meta">PAR ${levelCard.par}s</div>` +
-        `<div class="lb-score">${levelCard.locked ? '🔒 LOCKED' : 'OPENING READY'}</div>` +
+        `<div class="lb-meta">${T('twEnergyCap', levelCard.energyCap)}</div>` +
+        `<div class="lb-meta">${T('twParTime', levelCard.par)}</div>` +
+        `<div class="lb-score">${levelCard.locked ? T('twLocked') : T('twOpeningReady')}</div>` +
       '</button>'
     );
   }).join('');

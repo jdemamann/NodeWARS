@@ -479,13 +479,22 @@ html[data-debug-logo-preview="on"] .hero-logo-preview {
 /* ── Level select ── */
 #sl,
 #stw,
-#stwl,
-#stwe {
+#stwl {
   gap: 18px;
   width: 100%;
   margin: 0 auto;
   padding: 76px 0 18px;
   justify-content: center;
+}
+#stwe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 60vh;
+  padding: 40px 24px;
 }
 .st {
   font-family: var(--font-ui);
@@ -546,15 +555,11 @@ html[data-debug-logo-preview="on"] .hero-logo-preview {
 }
 #twWorldSummary,
 #twLevelMeta,
-#twEndingSub,
-#twEndingMeta {
+#twEndingContent {
   font: 10px/1.55 var(--font-copy);
   color: var(--mid);
   text-align: center;
   max-width: 480px;
-}
-#twEndingTitle {
-  font-size: 24px;
 }
 .tw-world-card,
 .tw-level-card {
@@ -751,12 +756,81 @@ html[data-debug-logo-preview="on"] .hero-logo-preview {
   letter-spacing: 1px;
   margin-top: 2px;
 }
+.tw-result-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 0 8px;
+}
+.tw-phase-badge {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: var(--p);
+  text-shadow: 0 0 14px var(--pg);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 4px 14px;
+  display: inline-block;
+}
+.tw-stars {
+  font-size: 28px;
+  letter-spacing: 6px;
+  color: var(--ac);
+  text-shadow: 0 0 20px var(--ag);
+  text-align: center;
+  display: block;
+}
+.tw-time-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.tw-par-note {
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 1px;
+  margin-left: 6px;
+}
 .result-good { color: var(--ok); }
 .result-bad { color: #ff7090; }
 .result-alert { color: var(--e); }
 .result-subnote { font-size: 7px; color: var(--dim); }
 .result-bonus { font-size: 7px; color: var(--ac); }
 .lv-mech { font-size: 7px; color: #9dc3ff; }
+.tw-ending-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 0 12px;
+}
+.tw-ending-title {
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: clamp(22px, 5vw, 36px);
+  letter-spacing: 8px;
+  color: var(--p);
+  text-shadow: 0 0 30px var(--pg);
+}
+.tw-ending-divider {
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--p), transparent);
+  margin: 4px 0;
+}
+.tw-ending-sub {
+  font: 700 13px/1 var(--font-ui);
+  letter-spacing: 3px;
+  color: var(--tx-soft);
+}
+.tw-ending-meta {
+  font: 10px/1.6 var(--font-copy);
+  color: var(--mid);
+  letter-spacing: 1px;
+}
 
 /* ── Campaign ending screen ── */
 #se { gap: 14px; overflow: hidden; }
