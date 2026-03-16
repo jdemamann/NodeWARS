@@ -53,7 +53,9 @@ export class GameNode {
     this.availPower = 0;
     this.inFlow     = 0;
     this.relayFeedBudget = 0;
-    this.twOverflowBudget = 0;
+    this.twOverflowBudget = 0;       // legacy — removed in Wave 1 final cleanup
+    this.excessFeed = 0;             // TW double-buffer: read buffer (previous frame excess)
+    this.pendingExcessFeed = 0;      // TW double-buffer: write buffer (current frame accumulation)
     this.simulationMode = 'nodewars';
 
     /* Pulsar countdown (only relevant for NodeType.PULSAR) */

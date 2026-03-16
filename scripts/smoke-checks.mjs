@@ -1186,6 +1186,15 @@ async function testTentacleWarsOverflowBudgetAccumulatesAtCap() {
   assert.ok(targetNode.twOverflowBudget > 0, 'TentacleWars full-cap friendly flow should accumulate overflow budget');
 }
 
+async function testGameNodeHasExcessFeedProperties() {
+  const { GameNode } = await load('src/entities/GameNode.js');
+  const node = new GameNode(0, 0, 0, 0, 1);
+  node.maxE = 100;
+  assert.strictEqual(node.excessFeed, 0, 'GameNode.excessFeed must initialize to 0');
+  assert.strictEqual(node.pendingExcessFeed, 0, 'GameNode.pendingExcessFeed must initialize to 0');
+  return { ok: true };
+}
+
 async function testTentacleWarsSandboxPrototypeBoundary() {
   const twModeSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwModeRuntime.js'), 'utf8');
   const gameSource = await fs.readFile(path.join(ROOT, 'src/core/Game.js'), 'utf8');
@@ -2789,6 +2798,7 @@ async function main() {
     ['TentacleWars tentacle economy stays linear and fully refundable', testTentacleWarsTentacleEconomyCore],
     ['TentacleWars overflow and capture core stays parameterized and deterministic', testTentacleWarsOverflowAndCaptureCore],
     ['TentacleWars overflow budget accumulates when node is at energyCap', testTentacleWarsOverflowBudgetAccumulatesAtCap],
+    ['GameNode initializes excessFeed and pendingExcessFeed to zero', testGameNodeHasExcessFeedProperties],
     ['TentacleWars sandbox prototype stays isolated from campaign flow', testTentacleWarsSandboxPrototypeBoundary],
     ['TentacleWars sandbox disables world-layer gimmicks', testTentacleWarsSandboxDisablesWorldLayerGimmicks],
     ['TentacleWars sandbox disables frenzy and auto-retract', testTentacleWarsSandboxDisablesFrenzyAndAutoRetract],
