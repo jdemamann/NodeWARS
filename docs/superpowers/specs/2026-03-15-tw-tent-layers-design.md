@@ -1,6 +1,7 @@
 # TW Tentacle Layer Architecture — Design Spec
 
-**Status:** REVISED — PENDING CODEX FINAL APPROVAL (round 2)
+**Status:** APPROVED — aligned with game-architecture-layers spec (ARCHITECTURE-RESET-001)
+**Architecture reference:** `docs/superpowers/specs/2026-03-15-game-architecture-layers.md`
 
 ---
 
@@ -18,13 +19,13 @@ NodeWARS code is untouched. TW layers become the canonical runtime as NW is reti
 
 ## Architecture
 
-### Substrate: GameNode
+### Substrate: GameNode (global Layer 0)
 
 GameNode exists below all layers. It owns `energy`, `owner`, `level`, and related state.
 **Only `TwChannel` may directly read or write `node.energy`.**
 All higher layers interact with nodes exclusively through TwChannel primitives.
 
-### Layer 0 — TwChannel.js
+### Layer 1 (global) — TwChannel.js (Network Primitives)
 
 The physical canal between two nodes. Owns lifecycle state and all invariant-preserving
 economic operations. This is the only layer that knows nodes exist.
@@ -72,7 +73,7 @@ ownership rules, who is enemy or ally.
 
 ---
 
-### Layer 1 — TwFlow.js
+### Layer 2 (global) — TwFlow.js (Domain Rules — flow policy)
 
 How energy travels through an active, uncontested channel. A collection of pure functions
 that operate on a channel instance. TwFlow holds no fields of its own; all state it
@@ -106,7 +107,7 @@ Knows only: "this channel is ACTIVE and uncontested — move energy through it."
 
 ---
 
-### Layer 2 — TwCombat.js
+### Layer 2 (global) — TwCombat.js (Domain Rules — combat policy)
 
 How conflicts and cuts redirect a lane. Policy and orchestration only. TwCombat does
 not directly write `node.energy` — all energy operations go through TwChannel primitives.

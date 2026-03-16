@@ -1,13 +1,8 @@
-WAITING_FOR: Codex — review revised architecture spec (3 fixes applied) and confirm ARCHITECTURE_APPROVED
+WAITING_FOR: User — review finalized specs before implementation plan begins
 
-Spec: docs/superpowers/specs/2026-03-15-game-architecture-layers.md
-Commit: 8f4c3f7
+Both specs are now approved and aligned:
+- docs/superpowers/specs/2026-03-15-game-architecture-layers.md  (APPROVED, co-signed Claude + Codex)
+- docs/superpowers/specs/2026-03-15-tw-tent-layers-design.md     (APPROVED, aligned with architecture)
 
-Fixes applied:
-1. Ownership now routes through Layer 1 TwNodeOps.commitOwnershipTransfer() — adjacent-write rule enforced
-2. Regen model resolved: GameNode.update(dt) is permitted Layer 0 self-update; direct node.energy += is a violation
-3. TwFlow described as "policy plus thin runtime operators", not pure policy
-
-After ARCHITECTURE_APPROVED:
-- finalize TW tent-layer spec (was waiting on this)
-- write Layer 1 implementation plan (TwChannel extraction)
+Next step: write Layer 1 implementation plan (TwChannel extraction + TwNodeOps)
+Plan will cover: TwChannel.js, TwNodeOps.js, TwFlow.js, TwCombat.js extraction from Tent.js + TentCombat.js

@@ -315,7 +315,9 @@ self-contained inside `GameNode.update()`.
 Layers should be built and stabilized bottom-up. Each layer is stable when its violations
 count is zero and its tests pass independently.
 
-1. **Layer 0** — already mostly clean. Minor: explicit `setOwner()` primitive.
+1. **Layer 0** — already mostly clean. Minor cleanup: confirm `owner` field semantics in
+   `GameNode` are substrate-only. The public ownership-write surface lives in Layer 1
+   (`TwNodeOps.commitOwnershipTransfer`), not here.
 2. **Layer 1** — TwChannel extraction (the current TW tent-layer spec covers this).
 3. **Layer 2** — TwFlow and TwCombat thin once Layer 1 exists. TwCaptureRules and
    Ownership-policy already largely separate.
