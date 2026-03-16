@@ -4,7 +4,9 @@
 
 **Goal:** Extract TW active-flow logic from `Tent.js` into `TwFlow.js` (Layer 2) and TW clash/cut logic into `TwCombat.js` (Layer 2). `TwChannel.js` `advanceActive` drops the Wave 1 call-backs into `Tent.js` methods and calls the new modules directly.
 
-**Architecture:** `TwFlow.js` owns the packet-accumulator flow tick and per-delivery routing. `TwCombat.js` owns the clash front, cut retraction animation, and slice-cut resolution. Both import Layer 1 primitives from `TwChannel.js`; neither touches `node.owner`. After this wave, `TwChannel.advanceActive` has no remaining call-backs into `Tent.js` TW methods. `Tent.kill()` routes TW slices through `TwCombat.applyTwSliceCut`. `TentCombat.js` is untouched — its shared NW/TW helpers remain in use by both paths.
+**Architecture:** `TwFlow.js` owns the packet-accumulator flow tick and per-delivery routing. `TwCombat.js` owns the clash front, cut retraction animation, and slice-cut resolution. Both import Layer 1 primitives from `TwChannel.js`; neither touches `node.owner`. Source energy drains (emitted packets, clash drain, clash damage) all route through `TwChannel.drainSourceEnergy`. After this wave, `TwChannel.advanceActive` has no remaining call-backs into `Tent.js` TW methods. `Tent.kill()` routes TW slices through `TwCombat.applyTwSliceCut`.
+
+**Migration debt:** `TentCombat.js` delivery helpers (`applyTentacleFriendlyFlow`, `applyTentacleNeutralCaptureFlow`, `applyTentacleEnemyAttackFlow`, `applyTentaclePayloadToTarget`) still write `node.energy` directly — they are shared NW/TW code and cleaning them up requires either TW-specific Layer 1 delivery primitives or restructuring the NW path too. This wave treats them as a **bounded migration bridge** (not a clean final boundary). Wave 3 / TASK-TW-007 will either create TW-specific Layer 1 delivery primitives or migrate TentCombat.js into the layer model. The remaining source-side drains, however, are fixed in this wave via `drainSourceEnergy`.
 
 **Tech Stack:** Vanilla JS ES modules. Node.js test scripts (`scripts/*.mjs`). No build step.
 
@@ -21,6 +23,7 @@
 - Clash auto-retract MUST fire for all outgoing tentacles from the losing source when energy < `TW_RETRACT_CRITICAL_ENERGY`
 - `advanceTwClash` is TW-only — no NW mode guard needed (called only from `advanceActive` which is inside the TW lifecycle path)
 - `collapseForOwnershipLoss` on `Tent.js` still works (it calls `_resolveClashPartnerOnCut` which is the Tent.js instance method — do not break it)
+- All source energy drains in TwFlow.js and TwCombat.js MUST use `drainSourceEnergy(channel, amount)` from TwChannel.js — no direct `node.energy =` writes from Layer 2
 
 **Checks to run:**
 - `node scripts/smoke-checks.mjs` — after every commit (102 checks)
@@ -170,6 +173,12 @@ import { GAME_BALANCE } from '../config/gameConfig.js';
 import { computeTentacleSourceFeedRate } from '../systems/EnergyBudget.js';
 import { areAlliedOwners } from '../systems/OwnerTeams.js';
 import { advanceTentacleWarsLaneRuntime } from '../tentaclewars/TwPacketFlow.js';
+import { drainSourceEnergy } from '../tentaclewars/TwChannel.js';
+/*
+ * MIGRATION BRIDGE: These helpers still write node.energy directly.
+ * They are shared NW/TW code; creating TW-specific Layer 1 delivery
+ * primitives is out of scope for Wave 2. Wave 3 / TASK-TW-007 resolves this.
+ */
 import {
   applyTentaclePayloadToTarget,
   applyTentacleFriendlyFlow,
@@ -250,7 +259,7 @@ export function advanceTwFlow(channel, dt) {
 
   const emittedEnergy = laneStep.emittedPacketCount;
   if (emittedEnergy > 0) {
-    sourceNode.energy = Math.max(0, sourceNode.energy - emittedEnergy);
+    drainSourceEnergy(channel, emittedEnergy); // Layer 1 write surface
   }
 
   channel.energyInPipe = channel.packetTravelQueue.length;
@@ -587,11 +596,16 @@ import { computeTentacleClashFeedRate } from '../systems/EnergyBudget.js';
 import { advanceTentacleWarsLaneRuntime } from '../tentaclewars/TwPacketFlow.js';
 import { resolveTentacleWarsCutDistribution } from '../tentaclewars/TwCutRules.js';
 import {
+  drainSourceEnergy,
   partialRefund,
   resolveClashPartnerOnCut,
   clearEconomicPayload,
 } from '../tentaclewars/TwChannel.js';
 import { applyTwPayloadToTarget, clearFlowState } from '../tentaclewars/TwFlow.js';
+/*
+ * MIGRATION BRIDGE: applyTentaclePayloadToTarget still writes node.energy directly.
+ * See TwFlow.js migration bridge note — same bounded debt applies here.
+ */
 
 /* ── Clash front helpers ── */
 
@@ -610,7 +624,7 @@ function prepareTwClashState(channel, feedRate, dt) {
 
 function drainTwClashSourceBudget(channel, dt) {
   const feedRate = computeTentacleClashFeedRate(channel.effectiveSourceNode, channel.maxBandwidth, dt);
-  channel.effectiveSourceNode.energy = Math.max(0, channel.effectiveSourceNode.energy - feedRate * dt);
+  drainSourceEnergy(channel, feedRate * dt); // Layer 1 write surface
   return feedRate;
 }
 
@@ -673,7 +687,7 @@ function applyTwClashDamage(channel, opposing, dt) {
   const loserTentacle  = iAmWinner ? opposing : channel;
   const losingSource   = loserTentacle.effectiveSourceNode;
 
-  losingSource.energy = Math.max(0, losingSource.energy - netDamage * dt);
+  drainSourceEnergy(loserTentacle, netDamage * dt); // Layer 1 write surface — loserTentacle.effectiveSourceNode is losingSource
 
   if (losingSource.energy >= TW_BALANCE.TW_RETRACT_CRITICAL_ENERGY) return;
 
@@ -1045,8 +1059,9 @@ When all 5 tasks are complete, respond with `IMPL_REPORT` including:
 
 ## What this wave does NOT cover (Wave 3 / TASK-TW-007)
 
-- Deleting `_applyTentacleWarsSliceCut`, `_advanceTwCutRetraction`, `_updateTentacleWarsActiveFlowState`, `_updateClashState` from `Tent.js` — these are left as dead code / reference until Wave 3 confirms stability
+- Deleting `_applyTentacleWarsSliceCut`, `_advanceTwCutRetraction`, `_updateTentacleWarsActiveFlowState`, `_updateClashState` from `Tent.js` — left as dead code until Wave 3 confirms stability
 - Renaming `collapseForOwnershipLoss` → `TwChannel.collapseCommittedPayload` on the instance level
-- Deleting `TentCombat.js` (shared NW/TW helpers — stays until NW retirement)
+- Resolving the TentCombat.js migration bridge — `applyTentacleFriendlyFlow`, `applyTentacleNeutralCaptureFlow`, `applyTentacleEnemyAttackFlow`, `applyTentaclePayloadToTarget` still write node.energy directly; introducing TW-specific Layer 1 delivery primitives is deferred to Wave 3
+- Deleting `TentCombat.js` (shared NW/TW code — stays until NW retirement or Layer 1 delivery primitives land)
 - `pairChannels` / `unpairChannels` explicit clash-pair API (TASK-TW-007)
 - Packet-native lane runtime (TASK-TW-007)
