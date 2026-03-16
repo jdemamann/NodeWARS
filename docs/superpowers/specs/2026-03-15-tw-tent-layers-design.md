@@ -1,6 +1,6 @@
 # TW Tentacle Layer Architecture — Design Spec
 
-**Status:** APPROVED FOR PLANNING
+**Status:** REVISED — PENDING CODEX FINAL APPROVAL (round 2)
 
 ---
 
@@ -56,11 +56,11 @@ exclusively — it is accessible to TwChannel for lifecycle-critical operations.
 | `retract()` | Returns `paidCost + energyInPipe` to source, begins RETRACTING | Source always gets full refund |
 | `partialRefund(amount)` | Credits `amount` to source immediately, no state change | Used by animated cut payouts; still routes through TwChannel |
 | `drainSourceEnergy(amount)` | Debits `amount` from source, no payload accounting | Used by TwCombat for clash damage only |
-| `collapseCommittedPayload()` | Clears clash partner, destroys payload without refund, goes DEAD | Used only by Ownership.js for ownership loss |
+| `collapseCommittedPayload()` | Clears clash partner, destroys payload without refund, sets state=RETRACTING (preserves visible reachT for retract animation) | Used only by Ownership.js for ownership loss — matches current `collapseForOwnershipLoss()` behavior: lane collapses out visually, does not vanish instantly |
 | `beginBurst(payload, startT)` | Sets state=BURSTING, stores payload | Combat decision, channel execution |
 | `transfer(energy)` | Moves energy directly from source to target, no ownership logic | source -= energy, target += energy — use only for uncontested delivery |
 | `advanceLifecycle(dt)` | Runs the full state machine for this frame | Single update entry point |
-| `getCommittedPayload()` | Returns `paidCost + energyInPipe` | Read-only query for ownership cleanup |
+| `getCommittedPayload()` | Returns `_burstPayload` if state===BURSTING, otherwise `paidCost + energyInPipe` | Read-only query for ownership cleanup — must preserve both branches to avoid accounting regression on bursting lanes |
 
 **Invariant:** `retract()` ALWAYS refunds. No flags, no exceptions.
 `partialRefund(amount)` and `drainSourceEnergy(amount)` are the only other energy ops
@@ -280,7 +280,7 @@ primitive; the clash teardown is guaranteed before payload destruction.
 
 | Current | New name | Notes |
 |---|---|---|
-| `applySliceCut()` | `applyTwSliceCut(channel, cutRatio)` | TW entry point |
+| `applySliceCut()` | `applyTwSliceCut(channel, cutRatio)` | TW implementation — public `applySliceCut()` stays as shell on Tent.js during migration, delegates to TwCombat for TW and keeps NW path inline |
 | `_applyTentacleWarsSliceCut()` | `_resolveTwSliceCut()` | Calls classifyTwCut; initializes `twCutRetraction` for animated payout |
 | `_resolveClashPartnerOnCut()` | `unpairChannels(a, b)` | Explicit contract |
 | `initializeFreshClashVisual()` | `pairChannels(a, b)` | Explicit contract |
@@ -347,6 +347,28 @@ update(dt) {
 state-specific advance (_advanceGrowing, _advanceActive, _advanceRetracting,
 _advanceAdvancing, _advanceBursting). `_advanceActive` is the only state that
 dispatches to TwCombat or TwFlow.
+
+**`_advanceActive(dt)` required guard bundle** (must be preserved verbatim from
+`_updateActiveState()` — these guards are behavior contracts, not implementation details):
+
+```
+1. if (effectiveSourceNode.owner === 0) → retract()
+   // source was captured by enemy while lane was active
+
+2. if (!clashPartner && effectiveSourceNode.energy < 0.25) → retract()
+   // low-energy auto-retract — only when NOT in clash (clash resolves depletion naturally)
+
+3. _previousTargetOwner race guard:
+   if (effectiveTargetNode.owner changed since last frame && owner !== myOwner) → retract()
+   // virgin-target captured by AI while tentacle was growing toward it
+
+4. if (clashT !== null && (!clashPartner || clashPartner.state === RETRACTING)):
+   → clear clashT / clashVisualT / clashApproachActive / clashPartner, state = ADVANCING
+   // clash partner gone but clashT residue — clean up and advance uncontested
+```
+
+Guards 1, 2, 4 call `TwChannel.retract()` or set channel state via a TwChannel primitive.
+Guard 3 calls `TwChannel.retract()`. None of them write `node.energy` directly.
 
 All NW-specific methods stay in `Tent.js` until NW is retired.
 
