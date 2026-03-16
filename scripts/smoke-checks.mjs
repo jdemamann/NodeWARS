@@ -1124,7 +1124,7 @@ async function testTentacleWarsTentacleEconomyCore() {
 
 async function testTentacleWarsOverflowAndCaptureCore() {
   const { TW_BALANCE } = await load('src/tentaclewars/TwBalance.js');
-  const { canTentacleWarsOverflow, distributeTentacleWarsOverflow } = await load('src/tentaclewars/TwEnergyModel.js');
+  const { applyTentacleFriendlyFlow } = await load('src/entities/TentCombat.js');
   const {
     applyTentacleWarsNeutralCaptureProgress,
     computeTentacleWarsNeutralCaptureCost,
@@ -1132,23 +1132,17 @@ async function testTentacleWarsOverflowAndCaptureCore() {
     resolveTentacleWarsHostileCapture,
   } = await load('src/tentaclewars/TwCaptureRules.js');
 
-  assert.equal(TW_BALANCE.OVERFLOW_MODE, 'broadcast_full', 'TentacleWars should start with full-broadcast overflow');
+  // OVERFLOW_MODE constant is kept as a dormant reference for Wave 2 balance decisions.
+  assert.equal(TW_BALANCE.OVERFLOW_MODE, 'broadcast_full', 'TentacleWars OVERFLOW_MODE constant should stay anchored to broadcast_full (dormant in Wave 1)');
   assert.equal(TW_BALANCE.OVERFLOW_REQUIRES_FULL_CAP, true, 'TentacleWars overflow should require full saturation in phase one');
   assert.equal(TW_BALANCE.HOSTILE_CAPTURE_RESET_ENERGY, 10, 'TentacleWars hostile capture should reset to ten energy before carryover');
   assert.equal(TW_BALANCE.NEUTRAL_CAPTURE_COST_RATIO, 0.4, 'TentacleWars neutral capture cost should start at forty percent of displayed neutral energy');
   assert.equal(TW_BALANCE.NEUTRAL_CAPTURE_ROUNDING_MODE, 'ceil', 'TentacleWars neutral capture should use the agreed conservative rounding mode');
 
-  assert.equal(canTentacleWarsOverflow(159, 160), false, 'TentacleWars overflow should not begin before the cell reaches full cap');
-  assert.equal(canTentacleWarsOverflow(160, 160), true, 'TentacleWars overflow should begin at full cap');
-
-  const broadcastOverflow = distributeTentacleWarsOverflow(6, 3);
-  assert.deepEqual(broadcastOverflow.laneOverflowShares, [6, 6, 6], 'TentacleWars overflow should broadcast the full value to each active outgoing lane');
-  assert.equal(broadcastOverflow.lostOverflowEnergy, 0, 'TentacleWars overflow should not lose energy when outgoing lanes exist');
-  assert.equal(broadcastOverflow.totalDistributedEnergy, 18, 'TentacleWars overflow broadcast should duplicate the full overflow value per outgoing lane');
-
-  const droppedOverflow = distributeTentacleWarsOverflow(5, 0);
-  assert.deepEqual(droppedOverflow.laneOverflowShares, [], 'TentacleWars overflow should emit nothing when no outgoing lane exists');
-  assert.equal(droppedOverflow.lostOverflowEnergy, 5, 'TentacleWars overflow should be lost when the cell has no outgoing lane');
+  // Behavioral replacement: friendly flow to a full-cap TW node accumulates pendingExcessFeed.
+  const twNode = { simulationMode: 'tentaclewars', energy: 100, maxE: 100, isRelay: false, inFlow: 0, excessFeed: 0, pendingExcessFeed: 0 };
+  applyTentacleFriendlyFlow(twNode, 10, 1.0, 0.016);
+  assert.ok(twNode.pendingExcessFeed > 0, 'friendly flow to a full TW node should accumulate pendingExcessFeed');
 
   assert.equal(computeTentacleWarsNeutralCaptureCost(18), 8, 'TentacleWars neutral capture cost should use the configured ratio and rounding mode');
   assert.equal(applyTentacleWarsNeutralCaptureProgress(7, 4), 11, 'TentacleWars neutral capture should stack allied pressure directly in phase one');
