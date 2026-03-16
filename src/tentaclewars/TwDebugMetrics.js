@@ -17,7 +17,7 @@ export function buildTentacleWarsDebugMetrics(game) {
   const tents = Array.isArray(game.tents) ? game.tents : [];
   const neutralNodes = nodes.filter(node => node.owner === 0 && !node.isRelay);
   const contestedNeutralNodes = neutralNodes.filter(node => Object.keys(node.contest || {}).length > 0);
-  const overflowReadyNodes = nodes.filter(node => (node.twOverflowBudget || 0) > 0);
+  const overflowReadyNodes = nodes.filter(node => (node.excessFeed || 0) > 0);
   const packetLaneTentacles = tents.filter(tentacle => tentacle.effectiveSourceNode?.simulationMode === 'tentaclewars');
 
   const queuedPacketCount = packetLaneTentacles.reduce(
