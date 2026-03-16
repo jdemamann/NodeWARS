@@ -13,19 +13,22 @@ Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrat
 
 ## Latest validated baseline
 
-- smoke-checks.mjs: 102/102 (post TW-WAVE2-001, commit after merge)
+- smoke-checks.mjs: 102/102 (post TW-WAVE4, commit after merge)
 - tw-campaign-sanity.mjs: 15/15
 - tw-channel-sanity.mjs: 16/16
 - tw-flow-sanity.mjs: 7/7
 - tw-combat-sanity.mjs: 6/6
 - tw-energy-sanity.mjs: 6/6
+- tw-ownership-sanity.mjs: 5/5
 
 ## Completed waves (this cycle)
 
 - **TW-WAVE1**: TwChannel + TwNodeOps Layer 1 extraction — merged
 - **TW-WAVE2**: TwFlow + TwCombat Layer 2 extraction — merged
-  - Bounded migration debt: TentCombat.js delivery helpers (target-side), `targetNode.underAttack`
-  - Wave 3 scope: TW-specific Layer 1 delivery primitives, pairChannels API, legacy code removal
+- **TW-WAVE3**: TwDelivery Layer 1 target-side delivery primitives — merged
+- **TW-WAVE4**: TwOwnership Layer 1 ownership transitions + legacy clash shell removal — merged
+  - TentCombat.js: fully NW-only. Tent._updateClashState: no TW branches.
+  - All TW delivery and ownership routes through TwDelivery + TwOwnership.
 
 ## Open tracks
 
@@ -35,7 +38,6 @@ Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrat
 - TASK-TWL-009 World 1 Playtest Review — `needs validation`
 - TASK-TWL-003 Progression and Score Spec — `planned`, depends on TWL-001 ✓
 - TASK-TWL-004 Obstacle Spec — `planned`, depends on TWL-001 ✓
-- TW Wave 3 (Packet-Native Lane Runtime) — ready to start, resolves TentCombat.js bridge
 
 ## Cold-start order
 
@@ -58,10 +60,10 @@ Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrat
 
 ## Next recommended action
 
-TWL-002 closed. Immediate candidates:
-1. **TW Wave 3** — resolve TentCombat.js migration debt (Layer 1 delivery primitives)
-2. **TASK-TWL-009** — validate World 1 levels against current runtime
-3. **TASK-TWL-003** — Progression and Score Spec (unblocks TWL-005/006)
+TW layer extraction pipeline complete (Waves 1–4). Immediate candidates:
+1. **TASK-TWL-009** — validate World 1 levels against current runtime
+2. **TASK-TWL-003** — Progression and Score Spec (unblocks TWL-005/006)
+3. **TASK-TWL-004** — Obstacle Spec
 
 Start with the brainstorming skill for any new wave.
 
