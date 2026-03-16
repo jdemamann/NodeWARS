@@ -19,7 +19,7 @@ import {
   resolveTentacleWarsHostileCapture,
   resolveTentacleWarsNeutralCapture,
 } from '../src/tentaclewars/TwCaptureRules.js';
-import { applyTentacleFriendlyFlow } from '../src/entities/TentCombat.js';
+import { applyTwFriendlyDelivery } from '../src/tentaclewars/TwDelivery.js';
 
 // ── Double-buffer model ──────────────────────────────────────────
 
@@ -38,16 +38,16 @@ function makeTwNode(overrides = {}) {
 
 function testFullCapNodeAccumulatesPendingExcessFeed() {
   const node = makeTwNode({ energy: 100, maxE: 100 });
-  applyTentacleFriendlyFlow(node, 10, 1.0, 0.016);
+  applyTwFriendlyDelivery(node, 10 * 1.0 * 0.016);
   assert.ok(node.pendingExcessFeed > 0,
-    'full-cap TW node: applyTentacleFriendlyFlow should accumulate pendingExcessFeed');
+    'full-cap TW node: applyTwFriendlyDelivery should accumulate pendingExcessFeed');
   assert.strictEqual(node.excessFeed, 0,
     'excessFeed stays 0 until Physics double-buffer swap');
 }
 
 function testBelowCapNodeAbsorbsNoExcess() {
   const node = makeTwNode({ energy: 50, maxE: 100 });
-  applyTentacleFriendlyFlow(node, 5, 1.0, 0.016);
+  applyTwFriendlyDelivery(node, 5 * 1.0 * 0.016);
   assert.strictEqual(node.pendingExcessFeed, 0,
     'below-cap TW node: no pendingExcessFeed should accumulate when energy fits');
 }
@@ -55,7 +55,7 @@ function testBelowCapNodeAbsorbsNoExcess() {
 function testPhysicsSwapPattern() {
   // Simulate the double-buffer swap that Physics.updateOutCounts performs.
   const node = makeTwNode({ energy: 100, maxE: 100 });
-  applyTentacleFriendlyFlow(node, 20, 1.0, 0.016);
+  applyTwFriendlyDelivery(node, 20 * 1.0 * 0.016);
   const accumulated = node.pendingExcessFeed;
   assert.ok(accumulated > 0, 'setup: pendingExcessFeed must be > 0 before swap');
 

@@ -1124,7 +1124,7 @@ async function testTentacleWarsTentacleEconomyCore() {
 
 async function testTentacleWarsOverflowAndCaptureCore() {
   const { TW_BALANCE } = await load('src/tentaclewars/TwBalance.js');
-  const { applyTentacleFriendlyFlow } = await load('src/entities/TentCombat.js');
+  const { applyTwFriendlyDelivery } = await load('src/tentaclewars/TwDelivery.js');
   const {
     applyTentacleWarsNeutralCaptureProgress,
     computeTentacleWarsNeutralCaptureCost,
@@ -1141,7 +1141,7 @@ async function testTentacleWarsOverflowAndCaptureCore() {
 
   // Behavioral replacement: friendly flow to a full-cap TW node accumulates pendingExcessFeed.
   const twNode = { simulationMode: 'tentaclewars', energy: 100, maxE: 100, isRelay: false, inFlow: 0, excessFeed: 0, pendingExcessFeed: 0 };
-  applyTentacleFriendlyFlow(twNode, 10, 1.0, 0.016);
+  applyTwFriendlyDelivery(twNode, 10 * 1.0 * 0.016);
   assert.ok(twNode.pendingExcessFeed > 0, 'friendly flow to a full TW node should accumulate pendingExcessFeed');
 
   assert.equal(computeTentacleWarsNeutralCaptureCost(18), 8, 'TentacleWars neutral capture cost should use the configured ratio and rounding mode');
@@ -1160,7 +1160,7 @@ async function testTentacleWarsOverflowAndCaptureCore() {
 }
 
 async function testTentacleWarsOverflowBudgetAccumulatesAtCap() {
-  const { applyTentacleFriendlyFlow } = await load('src/entities/TentCombat.js');
+  const { applyTwFriendlyDelivery } = await load('src/tentaclewars/TwDelivery.js');
 
   const targetNode = {
     simulationMode: 'tentaclewars',
@@ -1171,7 +1171,7 @@ async function testTentacleWarsOverflowBudgetAccumulatesAtCap() {
     pendingExcessFeed: 0,
   };
 
-  applyTentacleFriendlyFlow(targetNode, 10, 1, 0.5);
+  applyTwFriendlyDelivery(targetNode, 10 * 1 * 0.5);
 
   assert.equal(targetNode.energy, targetNode.maxE, 'TentacleWars friendly overflow should not push energy beyond maxE');
   assert.ok(targetNode.pendingExcessFeed > 0, 'TentacleWars full-cap friendly flow should accumulate pendingExcessFeed');
