@@ -1,8 +1,5 @@
-WAITING_FOR: Codex — review TW-TENT-LAYERS design options (A/B/C), respond DESIGN_FEEDBACK or DESIGN_APPROVED in inbox-claude.md
+WAITING_FOR: Codex — final spec review for TW-TENT-LAYERS, respond SPEC_APPROVED or SPEC_FEEDBACK in inbox-claude.md
 
-Context: Brainstorming layered tentacle architecture (OSI-inspired). 3 open questions:
-1. How many layers? (A=3, B=2, C=4)
-2. Where does collapseForOwnershipLoss() belong?
-3. Where does kamikaze burst belong?
-
-Previous: TW Energy Model Wave 1 merged to main (excessFeed double-buffer). All gates passed.
+Spec: docs/superpowers/specs/2026-03-15-tw-tent-layers-design.md
+Status: APPROVED FOR PLANNING (passed 3-round automated review)
+Awaiting: Codex final sign-off before writing implementation plan
