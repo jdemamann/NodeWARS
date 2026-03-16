@@ -1,6 +1,6 @@
 # TW Tentacle Layer Architecture — Design Spec
 
-**Status:** DRAFT — PENDING SPEC REVIEW (round 2)
+**Status:** APPROVED FOR PLANNING
 
 ---
 
@@ -42,6 +42,12 @@ in TwChannel. All TwChannel primitives that reference source/target use `effecti
 and `effectiveTargetNode` — never `source`/`target` directly — so `reversed` is always
 respected without callers needing to know about it.
 
+Note on `clashT`: this field lives on the channel instance and is readable by TwChannel
+even though TwCombat manages it (sets/clears it). TwChannel's `collapseCommittedPayload()`
+reads `this.clashT` directly to compute the surviving partner's new `reachT` during the
+partner-advance step. `clashT` is channel state that TwCombat manages but does not own
+exclusively — it is accessible to TwChannel for lifecycle-critical operations.
+
 **Public primitives (the only way higher layers interact with the channel):**
 
 | Primitive | What it does | What it guarantees |
@@ -52,7 +58,7 @@ respected without callers needing to know about it.
 | `drainSourceEnergy(amount)` | Debits `amount` from source, no payload accounting | Used by TwCombat for clash damage only |
 | `collapseCommittedPayload()` | Clears clash partner, destroys payload without refund, goes DEAD | Used only by Ownership.js for ownership loss |
 | `beginBurst(payload, startT)` | Sets state=BURSTING, stores payload | Combat decision, channel execution |
-| `transfer(energy)` | Moves energy from source to target | source -= energy, target += energy |
+| `transfer(energy)` | Moves energy directly from source to target, no ownership logic | source -= energy, target += energy — use only for uncontested delivery |
 | `advanceLifecycle(dt)` | Runs the full state machine for this frame | Single update entry point |
 | `getCommittedPayload()` | Returns `paidCost + energyInPipe` | Read-only query for ownership cleanup |
 
@@ -117,8 +123,10 @@ not directly write `node.energy` — all energy operations go through TwChannel 
   → calls a TwChannel advance primitive to put winner in ADVANCING state
 - Cut classification: kamikaze / defensive / split
 - Burst decision: classifies a cut as burst → calls `channel.beginBurst(payload, startT)`
-- Animated slice payout: calls `channel.partialRefund(sourceDelta)` and
-  `channel.transfer(targetDelta)` per frame as the animation progresses
+- Animated slice payout: calls `channel.partialRefund(sourceDelta)` for the source side
+  and `TwFlow.applyTwPayloadToTarget(channel, targetDelta)` for the target side — the
+  target path uses the ownership-aware dispatch (capture scoring, defeat logic), not
+  `channel.transfer()` which has no ownership awareness
 
 **`this.game` back-reference:** `_applyTwClashDamage` (→ `_applyClashDamage`) currently
 reads `this.game?.tents` to enumerate all outgoing tentacles from the losing source.
@@ -273,7 +281,7 @@ primitive; the clash teardown is guaranteed before payload destruction.
 | Current | New name | Notes |
 |---|---|---|
 | `applySliceCut()` | `applyTwSliceCut(channel, cutRatio)` | TW entry point |
-| `_applyTentacleWarsSliceCut()` | `_resolveTwSliceCut()` | Calls classifyTwCut |
+| `_applyTentacleWarsSliceCut()` | `_resolveTwSliceCut()` | Calls classifyTwCut; initializes `twCutRetraction` for animated payout |
 | `_resolveClashPartnerOnCut()` | `unpairChannels(a, b)` | Explicit contract |
 | `initializeFreshClashVisual()` | `pairChannels(a, b)` | Explicit contract |
 | `_updateClashApproach()` | `_advanceClashApproach()` | |
@@ -287,7 +295,7 @@ primitive; the clash teardown is guaranteed before payload destruction.
 | `_applyTwClashDamage()` | `_applyClashDamage(channel, opposing, tentRegistry, dt)` | Calls drainSourceEnergy; tentRegistry passed by Tent.js shell |
 | `_prepareClashState()` | `_prepareClash()` | |
 | `_applyTentacleWarsCutRetractionTargetEffect()` | `_applyCutRetractionEffect()` | |
-| `_releaseTentacleWarsCutPayout()` | `_releaseCutPayout()` | Calls channel.partialRefund() + channel.transfer() |
+| `_releaseTentacleWarsCutPayout()` | `_releaseCutPayout()` | Source: channel.partialRefund() — Target: TwFlow.applyTwPayloadToTarget() (ownership-aware, not channel.transfer()) |
 | *(new)* | `classifyTwCut(cutRatio)` | TW-specific cut classifier (kamikaze/defensive/split) |
 | `_applyImmediateTargetEffect()` TW branch | `_applyImmediateCutEffect()` | Cut context only |
 
@@ -381,7 +389,8 @@ Each layer is independently testable with lightweight fixtures:
    `partialRefund()` primitives — TwCombat never writes `node.energy` directly ✅
 5. **`reversed` field:** lives in TwChannel; all TwChannel ops use `effectiveSourceNode`
    / `effectiveTargetNode` so `reversed` is transparent to callers ✅
-6. **`_releaseTentacleWarsCutPayout` energy writes:** routed through `channel.partialRefund()`
-   and `channel.transfer()` — no direct `node.energy` mutation from TwCombat ✅
+6. **`_releaseTentacleWarsCutPayout` energy writes:** source side through `channel.partialRefund()`;
+   target side through `TwFlow.applyTwPayloadToTarget()` (ownership-aware) — `channel.transfer()`
+   is reserved for uncontested direct delivery only ✅
 7. **`this.game` back-reference in clash damage:** resolved by passing `tentRegistry`
    as a parameter to `_applyClashDamage` ✅
