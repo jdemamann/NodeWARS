@@ -55,8 +55,8 @@ async function testTwClashDamageAppliesToLosingNode() {
 
   const energyBefore = sourceB.energy;
 
-  tentB._updateClashState(0.1); // non-canonical: Block A only
-  tentA._updateClashState(0.1); // canonical: Block A + Block B
+  tentB.update(0.1); // non-canonical
+  tentA.update(0.1); // canonical
 
   // sourceB should have lost energy (net damage from A's advantage)
   assert.ok(
@@ -76,8 +76,8 @@ async function testTwClashThresholdTriggersRetractAndAdvance() {
 
     sourceA.excessFeed = 10;
 
-    tentB._updateClashState(0.1);
-    tentA._updateClashState(0.1);
+    tentB.update(0.1);
+    tentA.update(0.1);
 
     assert.equal(tentB.state, TentState.RETRACTING,
       '[A] losing tentacle should auto-retract when source starts below TW_RETRACT_CRITICAL_ENERGY');
@@ -98,8 +98,8 @@ async function testTwClashThresholdTriggersRetractAndAdvance() {
 
     sourceA.excessFeed = 50;
 
-    tentB._updateClashState(0.1);
-    tentA._updateClashState(0.1);
+    tentB.update(0.1);
+    tentA.update(0.1);
 
     assert.ok(sourceB.energy < 10,
       '[B] sourceB energy should be below TW_RETRACT_CRITICAL_ENERGY after large overflow damage');
@@ -116,8 +116,8 @@ async function testTwClashBidirectionalDamage() {
   const { tentA, tentB, sourceA, sourceB, TentState } = await makeTwFixtures({ energyA: 8, energyB: 50 });
   sourceB.excessFeed = 10; // opposing side has overflow advantage
 
-  tentB._updateClashState(0.1); // non-canonical: Block A only
-  tentA._updateClashState(0.1); // canonical: Block A + Block B
+  tentB.update(0.1); // non-canonical
+  tentA.update(0.1); // canonical
 
   assert.equal(tentA.state, TentState.RETRACTING,
     'canonical tentacle should retract when it is the weaker side');
@@ -133,8 +133,8 @@ async function testTwClashFlowRateStaysAliveOnBothSides() {
   tentA.flowRate = 0;
   tentB.flowRate = 0;
 
-  tentB._updateClashState(0.1); // Block A runs for non-canonical
-  tentA._updateClashState(0.1); // Block A + Block B for canonical
+  tentB.update(0.1); // non-canonical
+  tentA.update(0.1); // canonical
 
   assert.ok(tentA.flowRate > 0, 'canonical tentacle flowRate should be positive during TW clash');
   assert.ok(tentB.flowRate > 0, 'non-canonical tentacle flowRate should be positive during TW clash');
@@ -147,8 +147,8 @@ async function testTwClashPacketQueueFedDuringClash() {
 
   // Run several ticks so the accumulator has time to emit at least one packet
   for (let i = 0; i < 10; i++) {
-    tentB._updateClashState(0.1);
-    tentA._updateClashState(0.1);
+    tentB.update(0.1);
+    tentA.update(0.1);
   }
 
   assert.ok(tentA.packetTravelQueue.length > 0,
@@ -518,10 +518,12 @@ async function testTentacleWarsCutUsesContinuousGeometry() {
 }
 
 async function testTentacleWarsNeutralCapturePathStaysModeOwned() {
-  const tentCombatSource = await fs.readFile(path.join(ROOT, 'src/entities/TentCombat.js'), 'utf8');
+  // TentacleWars sustained flow delivery now routes through TwDelivery, not TentCombat.
+  // TwDelivery owns TW neutral capture helpers; TentCombat is NW-only.
+  const twDeliverySource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwDelivery.js'), 'utf8');
 
-  assert.match(tentCombatSource, /from '\.\.\/tentaclewars\/TwNeutralCapture\.js'/, 'TentacleWars neutral capture should route through a mode-owned helper module');
-  assert.match(tentCombatSource, /getTentacleWarsNeutralCaptureScore/, 'TentacleWars neutral capture should use mode-specific capture score helpers');
+  assert.match(twDeliverySource, /from '\.\/TwNeutralCapture\.js'/, 'TentacleWars neutral capture should route through a mode-owned helper module');
+  assert.match(twDeliverySource, /getTentacleWarsNeutralCaptureScore/, 'TentacleWars neutral capture should use mode-specific capture score helpers');
 }
 
 async function testImmediateActivationTracksPaidCostCorrectly() {
@@ -1385,9 +1387,11 @@ async function testTentacleWarsRuntimeMathIntegration() {
   assert.equal(twBuildCost.rangeSurcharge, 0, 'TentacleWars player build cost should ignore NodeWARS range surcharge');
 
   assert.match(tentSource, /sourceNode\.simulationMode === 'tentaclewars'/, 'Tent should branch build cost and bandwidth on the source simulation mode');
-  assert.match(tentSource, /advanceTentacleWarsLaneRuntime\(/, 'TentacleWars active lanes should use the packet-native lane runtime helper');
-  assert.match(tentSource, /resolveTentacleWarsHostileCapture\(/, 'TentacleWars hostile takeovers should resolve through the dedicated reset-plus-carryover helper');
-  assert.match(tentSource, /resolveTentacleWarsNeutralCapture\(/, 'TentacleWars neutral takeovers should resolve through the dedicated acquisition helper');
+  const twFlowSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwFlow.js'), 'utf8');
+  assert.match(twFlowSource, /advanceTentacleWarsLaneRuntime\(/, 'TentacleWars active lanes should use the packet-native lane runtime helper');
+  const twOwnershipSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwOwnership.js'), 'utf8');
+  assert.match(twOwnershipSource, /resolveTentacleWarsHostileCapture\(/, 'TentacleWars hostile takeovers should resolve through the dedicated reset-plus-carryover helper');
+  assert.match(twOwnershipSource, /resolveTentacleWarsNeutralCapture\(/, 'TentacleWars neutral takeovers should resolve through the dedicated acquisition helper');
   assert.match(physicsSource, /n\.pendingExcessFeed = 0/, 'Physics reset loop should zero pendingExcessFeed each frame via double-buffer swap');
   assert.match(gameSource, /computeTentacleWarsNeutralCaptureCost\(this\.nodes\[i\]\.energy\)/, 'TentacleWars mode should set neutral capture thresholds from displayed neutral energy on load');
   assert.match(gameSource, /this\.nodes\[i\]\.simulationMode = this\.twMode\.isTentacleWarsConfig\(cfg\) \? 'tentaclewars' : 'nodewars'/, 'Game should mark TW nodes with TentacleWars simulation mode before syncing levels');

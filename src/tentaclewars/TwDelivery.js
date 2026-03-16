@@ -2,10 +2,11 @@
    TwDelivery — Layer 1 TW Target-Side Delivery
 
    Owns the TentacleWars target-side delivery primitives for packet-native
-   lanes. Called by TwFlow so Layer 2 no longer routes sustained TW flow
-   through shared TentCombat helpers.
+   lanes. Called by TwFlow so Layer 2 no longer routes TW flow or
+   burst/cut delivery through shared TentCombat helpers.
    ================================================================ */
 
+import { areAlliedOwners } from '../systems/OwnerTeams.js';
 import {
   applyTentacleWarsNeutralCaptureProgress,
 } from './TwCaptureRules.js';
@@ -15,6 +16,10 @@ import {
   getTentacleWarsNeutralCaptureScore,
   setTentacleWarsNeutralCaptureProgress,
 } from './TwNeutralCapture.js';
+import {
+  resolveTwNeutralCaptureTransition,
+  resolveTwHostileCaptureTransition,
+} from './TwOwnership.js';
 
 /*
  * Applies allied packet delivery to a TW target.
@@ -38,7 +43,7 @@ export function applyTwFriendlyDelivery(targetNode, amount) {
 
 /*
  * Marks a TW target as under hostile packet pressure.
- * Isolated here so TwFlow does not mutate the node directly for this visual hint.
+ * Isolated here so callers do not mutate the node directly for this visual hint.
  */
 export function markNodeUnderAttack(targetNode) {
   targetNode.underAttack = Math.max(targetNode.underAttack || 0, 1);
@@ -78,24 +83,65 @@ export function applyTwEnemyAttack(channel, targetNode, sourceNode, amount) {
   markNodeUnderAttack(targetNode);
 
   if (targetNode.energy <= 0) {
-    resolveTwHostileCapture(channel, targetNode, sourceNode.owner, deliveredPacketEnergy);
+    resolveTwHostileCapture(channel, targetNode, sourceNode.owner);
   }
 
   return deliveredPacketEnergy;
 }
 
 /*
- * Resolves a TW neutral capture through the current named ownership pass-through.
- * Wave 4 can extract this terminal transition fully out of Tent.js.
+ * Applies a lump-sum TW payload to a target node (burst or cut-retraction path).
+ * Handles all three ownership states and accepts contestFlash + burstPulse visual opts.
+ * Replaces the TW branch of TentCombat.applyTentaclePayloadToTarget for this delivery path.
  */
-function resolveTwNeutralCapture(channel, targetNode, newOwner, captureProgress) {
-  channel._captureNeutralTarget(targetNode, newOwner, captureProgress);
+export function applyTwBurstDelivery(channel, targetNode, sourceNode, amount, opts = {}) {
+  const { contestFlash = 0, burstPulse = 0 } = opts;
+  const directPayload = Math.max(0, amount);
+
+  if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
+    targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + directPayload);
+    return;
+  }
+
+  if (targetNode.owner === 0) {
+    const currentProgress = getTentacleWarsNeutralCaptureProgress(targetNode, sourceNode.owner);
+    const nextProgress = applyTentacleWarsNeutralCaptureProgress(currentProgress, directPayload);
+    setTentacleWarsNeutralCaptureProgress(targetNode, sourceNode.owner, nextProgress);
+    targetNode.cFlash = (targetNode.cFlash || 0) + contestFlash;
+    if (burstPulse > 0) targetNode.burstPulse = Math.max(targetNode.burstPulse || 0, burstPulse);
+
+    const captureScore = getTentacleWarsNeutralCaptureScore(targetNode, sourceNode.owner);
+    if (captureScore >= Math.max(1, targetNode.captureThreshold || 1)) {
+      resolveTwNeutralCapture(
+        channel,
+        targetNode,
+        getTentacleWarsNeutralCaptureOwner(targetNode, sourceNode.owner),
+        captureScore,
+      );
+    }
+    return;
+  }
+
+  targetNode.energy -= directPayload;
+  markNodeUnderAttack(targetNode);
+  targetNode.cFlash = (targetNode.cFlash || 0) + contestFlash;
+  if (burstPulse > 0) targetNode.burstPulse = Math.max(targetNode.burstPulse || 0, burstPulse);
+
+  if (targetNode.energy <= 0) {
+    resolveTwHostileCapture(channel, targetNode, sourceNode.owner);
+  }
 }
 
 /*
- * Resolves a TW hostile capture through the current named ownership pass-through.
- * Wave 4 can extract this terminal transition fully out of Tent.js.
+ * Resolves a TW neutral capture through TwOwnership.
  */
-function resolveTwHostileCapture(channel, targetNode, attackerOwner, offensivePayload) {
-  channel._defeatEnemyTarget(targetNode, attackerOwner, offensivePayload);
+function resolveTwNeutralCapture(channel, targetNode, newOwner, captureProgress) {
+  resolveTwNeutralCaptureTransition(channel.game, targetNode, newOwner, captureProgress);
+}
+
+/*
+ * Resolves a TW hostile capture through TwOwnership.
+ */
+function resolveTwHostileCapture(channel, targetNode, attackerOwner) {
+  resolveTwHostileCaptureTransition(channel.game, channel, targetNode, attackerOwner);
 }
