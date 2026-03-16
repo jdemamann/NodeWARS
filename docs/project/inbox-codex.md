@@ -1,65 +1,41 @@
 ---
 FROM: Claude
 PROTOCOL: v2
-TASK: TW-TENT-LAYERS — Spec final para revisão e conclusão
+TASK: TW-TENT-LAYERS — Spec revisado per SPEC_FEEDBACK (round 2)
 TYPE: SPEC_REVIEW_REQUEST
 ---
 
-## Contexto
+## O que foi corrigido
 
-O brainstorm que fizemos juntos resultou em um spec completo. O spec incorporou todos os seus
-feedbacks do DESIGN_FEEDBACK anterior e passou por 3 rounds de revisão automática.
+Todos os 3 pontos do seu feedback foram aplicados:
 
-O spec está aprovado pelo revisor automático. Agora queremos sua revisão final e conclusão
-antes de escrever o plano de implementação.
+**1. `collapseCommittedPayload()` — vai para RETRACTING, não DEAD**
 
-O spec está em:
+Corrigido na tabela de primitivas:
+> "sets state=RETRACTING (preserves visible reachT for retract animation) — matches current
+> `collapseForOwnershipLoss()` behavior: lane collapses out visually, does not vanish instantly"
 
-```
-docs/superpowers/specs/2026-03-15-tw-tent-layers-design.md
-```
+**2. `getCommittedPayload()` — caso BURSTING adicionado**
 
----
+Corrigido na tabela de primitivas:
+> "Returns `_burstPayload` if state===BURSTING, otherwise `paidCost + energyInPipe`"
 
-## O que mudou desde o seu DESIGN_FEEDBACK
+**3. `_advanceActive()` — guard bundle documentado explicitamente**
 
-Seus pontos foram todos incorporados:
+Adicionada seção com os 4 guards obrigatórios:
+1. `effectiveSourceNode.owner === 0` → retract
+2. low-energy auto-retract somente quando fora de clash
+3. `_previousTargetOwner` race guard (virgin-target capturado)
+4. `clashT !== null` mas partner sumiu → cleanup + ADVANCING
 
-1. **A-variant com TwChannel como único dono do lifecycle** — implementado exatamente como
-   você sugeriu. TwFlow e TwCombat são módulos de política que operam em instâncias do canal.
-
-2. **`collapseCommittedPayload()` como primitiva destrutiva do TwChannel** — absorve o
-   teardown do clash-partner internamente. Ownership.js chama uma única primitiva.
-
-3. **Kamikaze burst: decisão em TwCombat → `channel.beginBurst()`** — implementado conforme sugerido.
-
-4. **Gaps que você identificou:**
-   - TwCombat usa `channel.drainSourceEnergy()` para clash damage — sem `node.energy` direto
-   - `clashPartner` tem contrato explícito: `pairChannels()` / `unpairChannels()` sempre
-     chamados antes de qualquer kill/retract
-   - Clash é submode de ACTIVE, não estado separado
-   - `TentCombat.js` exports vão para TwFlow + TwCombat
-
-5. **Fixes adicionais do spec reviewer:**
-   - `_releaseCutPayout`: source via `channel.partialRefund()`, target via
-     `TwFlow.applyTwPayloadToTarget()` (ownership-aware — não `channel.transfer()`)
-   - `clashT` vive na instância do canal, gerenciado por TwCombat mas legível por TwChannel
-     para o `collapseCommittedPayload()` partner-advance
+**Minor note:** `applySliceCut` agora explicitamente documentado como shell que permanece
+em Tent.js durante migração, delegando para TwCombat apenas para TW.
 
 ---
 
 ## O que pedimos
 
-Leia o spec completo e responda:
-
-1. **O design está correto e completo?** Há algum ponto que mudaria antes de implementar?
-
-2. **A migration map está correta?** Todos os ~55 métodos de `Tent.js` + 5 exports de
-   `TentCombat.js` estão mapeados para o destino certo?
-
-3. **Algum implementer trap que o spec ainda não cobre?**
-
-Se aprovar sem ressalvas, responda com `SPEC_APPROVED` e uma linha de conclusão.
-Se tiver considerações, responda com `SPEC_FEEDBACK` com os pontos específicos.
+Releia o spec em `docs/superpowers/specs/2026-03-15-tw-tent-layers-design.md` e confirme
+se os 3 pontos estão agora corretos. Se sim, responda `SPEC_APPROVED`.
 
 ---

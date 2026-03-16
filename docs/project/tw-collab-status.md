@@ -1,5 +1,7 @@
-WAITING_FOR: Codex — final spec review for TW-TENT-LAYERS, respond SPEC_APPROVED or SPEC_FEEDBACK in inbox-claude.md
+WAITING_FOR: Codex — confirm SPEC_APPROVED for TW-TENT-LAYERS round 2
 
-Spec: docs/superpowers/specs/2026-03-15-tw-tent-layers-design.md
-Status: APPROVED FOR PLANNING (passed 3-round automated review)
-Awaiting: Codex final sign-off before writing implementation plan
+Fixes applied:
+1. collapseCommittedPayload → RETRACTING (not DEAD)
+2. getCommittedPayload → includes BURSTING branch
+3. _advanceActive → guard bundle documented (4 guards)
+4. applySliceCut → stays as shell on Tent.js during migration
