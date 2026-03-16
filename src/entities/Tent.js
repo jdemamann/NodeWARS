@@ -20,10 +20,6 @@ import { computeTentacleWarsBuildCost } from '../tentaclewars/TwTentacleEconomy.
 import { getTentacleWarsPacketRateForGrade } from '../tentaclewars/TwGradeTable.js';
 import { TW_BALANCE } from '../tentaclewars/TwBalance.js';
 import { advanceTentacleWarsLaneRuntime } from '../tentaclewars/TwPacketFlow.js';
-import {
-  resolveTentacleWarsHostileCapture,
-  resolveTentacleWarsNeutralCapture,
-} from '../tentaclewars/TwCaptureRules.js';
 import { advanceLifecycle } from '../tentaclewars/TwChannel.js';
 import { applyTwSliceCut } from '../tentaclewars/TwCombat.js';
 import {
@@ -189,24 +185,8 @@ export class Tent {
     }
   }
 
+  /* NodeWARS neutral capture transition. TentacleWars routes through TwOwnership. */
   _captureNeutralTarget(targetNode, newOwner, captureProgress) {
-    if (targetNode.simulationMode === 'tentaclewars') {
-      const neutralCapture = resolveTentacleWarsNeutralCapture(
-        captureProgress,
-        targetNode.captureThreshold || 0,
-        targetNode.energy,
-      );
-      applyOwnershipChange({
-        game: this.game,
-        node: targetNode,
-        newOwner,
-        startingEnergy: Math.min(targetNode.maxE, neutralCapture.nextEnergy),
-        previousOwner: targetNode.owner,
-        wasNeutralCapture: true,
-      });
-      return;
-    }
-
     const bonusEnergy = captureProgress - EMBRYO;
     applyOwnershipChange({
       game: this.game,
@@ -218,33 +198,8 @@ export class Tent {
     });
   }
 
-  /* Resolve hostile takeover starting energy under the active simulation mode. */
-  _defeatEnemyTarget(targetNode, attackerOwner, offensivePayload = 0) {
-    if (targetNode.simulationMode === 'tentaclewars') {
-      const releasedOutgoingEnergy = this.game?.tents
-        ?.filter(tentacle =>
-          tentacle !== this &&
-          tentacle.alive &&
-          tentacle.state !== TentState.RETRACTING &&
-          tentacle.effectiveSourceNode === targetNode
-        )
-        .reduce((sum, tentacle) => sum + (tentacle.getCommittedPayloadForOwnershipCleanup?.() || 0), 0) || 0;
-      const hostileCapture = resolveTentacleWarsHostileCapture(
-        Math.max(0, -targetNode.energy),
-        releasedOutgoingEnergy,
-      );
-      applyOwnershipChange({
-        game: this.game,
-        node: targetNode,
-        newOwner: attackerOwner,
-        startingEnergy: Math.min(targetNode.maxE, hostileCapture.nextEnergy),
-        previousOwner: targetNode.owner,
-        attackerOwner,
-        suppressOutgoingTentacleRefunds: true,
-      });
-      return;
-    }
-
+  /* NodeWARS hostile takeover transition. TentacleWars routes through TwOwnership. */
+  _defeatEnemyTarget(targetNode, attackerOwner) {
     const overflowEnergy = Math.abs(targetNode.energy) * 0.10;
     applyOwnershipChange({
       game: this.game,

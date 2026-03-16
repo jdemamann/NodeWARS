@@ -518,10 +518,12 @@ async function testTentacleWarsCutUsesContinuousGeometry() {
 }
 
 async function testTentacleWarsNeutralCapturePathStaysModeOwned() {
-  const tentCombatSource = await fs.readFile(path.join(ROOT, 'src/entities/TentCombat.js'), 'utf8');
+  // TentacleWars sustained flow delivery now routes through TwDelivery, not TentCombat.
+  // TwDelivery owns TW neutral capture helpers; TentCombat is NW-only.
+  const twDeliverySource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwDelivery.js'), 'utf8');
 
-  assert.match(tentCombatSource, /from '\.\.\/tentaclewars\/TwNeutralCapture\.js'/, 'TentacleWars neutral capture should route through a mode-owned helper module');
-  assert.match(tentCombatSource, /getTentacleWarsNeutralCaptureScore/, 'TentacleWars neutral capture should use mode-specific capture score helpers');
+  assert.match(twDeliverySource, /from '\.\/TwNeutralCapture\.js'/, 'TentacleWars neutral capture should route through a mode-owned helper module');
+  assert.match(twDeliverySource, /getTentacleWarsNeutralCaptureScore/, 'TentacleWars neutral capture should use mode-specific capture score helpers');
 }
 
 async function testImmediateActivationTracksPaidCostCorrectly() {
@@ -1386,8 +1388,9 @@ async function testTentacleWarsRuntimeMathIntegration() {
 
   assert.match(tentSource, /sourceNode\.simulationMode === 'tentaclewars'/, 'Tent should branch build cost and bandwidth on the source simulation mode');
   assert.match(tentSource, /advanceTentacleWarsLaneRuntime\(/, 'TentacleWars active lanes should use the packet-native lane runtime helper');
-  assert.match(tentSource, /resolveTentacleWarsHostileCapture\(/, 'TentacleWars hostile takeovers should resolve through the dedicated reset-plus-carryover helper');
-  assert.match(tentSource, /resolveTentacleWarsNeutralCapture\(/, 'TentacleWars neutral takeovers should resolve through the dedicated acquisition helper');
+  const twOwnershipSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwOwnership.js'), 'utf8');
+  assert.match(twOwnershipSource, /resolveTentacleWarsHostileCapture\(/, 'TentacleWars hostile takeovers should resolve through the dedicated reset-plus-carryover helper');
+  assert.match(twOwnershipSource, /resolveTentacleWarsNeutralCapture\(/, 'TentacleWars neutral takeovers should resolve through the dedicated acquisition helper');
   assert.match(physicsSource, /n\.pendingExcessFeed = 0/, 'Physics reset loop should zero pendingExcessFeed each frame via double-buffer swap');
   assert.match(gameSource, /computeTentacleWarsNeutralCaptureCost\(this\.nodes\[i\]\.energy\)/, 'TentacleWars mode should set neutral capture thresholds from displayed neutral energy on load');
   assert.match(gameSource, /this\.nodes\[i\]\.simulationMode = this\.twMode\.isTentacleWarsConfig\(cfg\) \? 'tentaclewars' : 'nodewars'/, 'Game should mark TW nodes with TentacleWars simulation mode before syncing levels');

@@ -17,16 +17,6 @@ import {
   getContestCaptureScore,
   shouldIgnoreAlliedContestContribution,
 } from '../systems/NeutralContest.js';
-import {
-  applyTentacleWarsNeutralCaptureProgress,
-} from '../tentaclewars/TwCaptureRules.js';
-import {
-  getTentacleWarsNeutralCaptureOwner,
-  getTentacleWarsNeutralCaptureProgress,
-  getTentacleWarsNeutralCaptureScore,
-  setTentacleWarsNeutralCaptureProgress,
-} from '../tentaclewars/TwNeutralCapture.js';
-
 export function applyTentaclePayloadToTarget({
   tentacle,
   targetNode,
@@ -36,45 +26,8 @@ export function applyTentaclePayloadToTarget({
   burstPulse = 0,
   damageMultiplier = 1,
 }) {
-  // Burst and split cuts both end up here so ownership, neutral contest, and
-  // direct enemy damage share the same resolution rules.
-  if (targetNode.simulationMode === 'tentaclewars') {
-    const directPayload = Math.max(0, payloadAmount);
-
-    if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
-      targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + directPayload);
-      return;
-    }
-
-    if (targetNode.owner === 0) {
-      const currentProgress = getTentacleWarsNeutralCaptureProgress(targetNode, sourceNode.owner);
-      const nextProgress = applyTentacleWarsNeutralCaptureProgress(currentProgress, directPayload);
-      setTentacleWarsNeutralCaptureProgress(targetNode, sourceNode.owner, nextProgress);
-      targetNode.cFlash = (targetNode.cFlash || 0) + contestFlash;
-      if (burstPulse > 0) targetNode.burstPulse = Math.max(targetNode.burstPulse || 0, burstPulse);
-
-      const captureScore = getTentacleWarsNeutralCaptureScore(targetNode, sourceNode.owner);
-      if (captureScore >= Math.max(1, targetNode.captureThreshold || 1)) {
-        tentacle._captureNeutralTarget(
-          targetNode,
-          getTentacleWarsNeutralCaptureOwner(targetNode, sourceNode.owner),
-          captureScore,
-        );
-      }
-      return;
-    }
-
-    targetNode.energy -= directPayload;
-    targetNode.underAttack = 1;
-    targetNode.cFlash = (targetNode.cFlash || 0) + contestFlash;
-    if (burstPulse > 0) targetNode.burstPulse = Math.max(targetNode.burstPulse || 0, burstPulse);
-
-    if (targetNode.energy <= 0) {
-      tentacle._defeatEnemyTarget(targetNode, sourceNode.owner, directPayload);
-    }
-    return;
-  }
-
+  // NodeWARS burst and split-cut delivery path. TentacleWars delivery routes
+  // through TwDelivery.applyTwBurstDelivery instead.
   const directDamage = payloadAmount * computeAttackLevelMultiplier(sourceNode.level) * damageMultiplier;
 
   if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
