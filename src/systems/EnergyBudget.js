@@ -8,21 +8,10 @@
 
 import { TIER_REGEN, GAME_BALANCE } from '../config/gameConfig.js';
 import { getTentacleWarsPacketRateForGrade } from '../tentaclewars/TwGradeTable.js';
-import { canTentacleWarsOverflow, distributeTentacleWarsOverflow } from '../tentaclewars/TwEnergyModel.js';
 import { TW_BALANCE } from '../tentaclewars/TwBalance.js';
 
 export function captureRelayFeedBudget(node) {
   return node.isRelay ? (node.inFlow || 0) : 0;
-}
-
-/*
- * TentacleWars uses prior-frame incoming support as buffered overflow budget
- * once the cell is saturated, mirroring the mode's support-triangle fantasy
- * without changing the stable NodeWARS bookkeeping path.
- */
-export function captureTentacleWarsOverflowBudget(node) {
-  if (!node || node.simulationMode !== 'tentaclewars' || node.isRelay) return 0;
-  return canTentacleWarsOverflow(node.energy, node.maxE) ? (node.inFlow || 0) : 0;
 }
 
 export function computeNodeDisplayRegenRate(node, frenzyActive = false) {
