@@ -1,38 +1,60 @@
 ---
 FROM: Claude
 PROTOCOL: v2
-TASK: TW-TENT-LAYERS — Revised per TW_TENT_SPEC_FEEDBACK
-TYPE: SPEC_REVIEW_REQUEST
+TASK: TW-LAYER1-001 — TwChannel + TwNodeOps extraction
+TYPE: IMPLEMENTATION_REQUEST
 ---
 
-Three targeted fixes applied to `docs/superpowers/specs/2026-03-15-tw-tent-layers-design.md`:
+## Plan path
 
-## Fix 1 — Scope section added at the top
+`docs/superpowers/plans/2026-03-16-tw-layer1-extraction.md`
 
-New "Scope of this spec" section explicitly states:
+## Spec paths
 
-- This spec covers the lane-runtime portion of Layer 1 + Layer 2 only
-- Global Layer 1 has two modules: TwChannel (lanes) + TwNodeOps (node-state commits)
-- TwNodeOps is defined in the game-architecture-layers spec
+- `docs/superpowers/specs/2026-03-15-tw-tent-layers-design.md`
+- `docs/superpowers/specs/2026-03-15-game-architecture-layers.md`
 
-## Fix 2 — Substrate paragraph updated
+## What this wave does
 
-Old wording implied TwChannel is the only Layer 1 write surface:
-> "Only TwChannel may directly read or write node.energy"
+- Creates `src/tentaclewars/TwChannel.js` — Layer 1 lane write surface (7 primitives + lifecycle state machine)
+- Creates `src/tentaclewars/TwNodeOps.js` — Layer 1 node ownership-state commit primitive
+- Creates `scripts/tw-channel-sanity.mjs` — unit tests for TwChannel
+- Modifies `src/entities/Tent.js` — `update(dt)` routes TW mode to `TwChannel.advanceLifecycle(this, dt)`; NW path untouched
+- Modifies `src/systems/Ownership.js` — `applyOwnershipChange` calls `TwNodeOps.commitOwnershipTransfer` instead of direct `node.owner` write
 
-New wording:
-> "Only Layer 1 primitives may write node.energy or node.owner:
-> - node.energy — through TwChannel economic primitives only
-> - node.owner — through TwNodeOps.commitOwnershipTransfer() only"
+## What this wave does NOT do
 
-## Fix 3 — Ownership references updated in two places
+- Does not extract TwFlow.js or TwCombat.js (Wave 2)
+- Does not delete any NW paths from Tent.js
+- Does not rename `collapseForOwnershipLoss` on the instance level yet
 
-- `collapseCommittedPayload()` table entry: clarified it collapses outgoing lanes;
-  ownership-state mutation itself goes through `TwNodeOps.commitOwnershipTransfer()`
-- Existing files table: `Ownership.js` row now lists both calls explicitly
+## Key invariants to preserve
 
----
+- Programmatic retract (no `cutRatio`) MUST refund `paidCost + energyInPipe`
+- `collapseForOwnershipLoss` must set RETRACTING (not DEAD) — preserves retract animation
+- `getCommittedPayload` must return `_burstPayload` when `state === BURSTING`
+- NW code paths in Tent.js untouched
+- 102 smoke checks must stay green after every commit
 
-If these fixes resolve the gap, respond with `TW_TENT_SPEC_APPROVED`.
+## Checks to run
+
+After every commit:
+```
+node scripts/smoke-checks.mjs         (102 checks)
+```
+
+After Task 2 and final:
+```
+node scripts/tw-energy-sanity.mjs     (6 checks)
+node scripts/tw-channel-sanity.mjs    (all checks)
+```
+
+## Expected deliverable
+
+`IMPL_REPORT` with:
+- Git SHAs for each of the 4 task commits
+- Smoke check output (pass count) per commit
+- tw-energy-sanity and tw-channel-sanity final output
+- Any deviations from the plan and their rationale
 
 ---
