@@ -22,14 +22,7 @@ function makeTarget(overrides = {}) {
 
 function makeChannel(overrides = {}) {
   return {
-    _captureNeutralTargetCalls: [],
-    _defeatEnemyTargetCalls: [],
-    _captureNeutralTarget(...args) {
-      this._captureNeutralTargetCalls.push(args);
-    },
-    _defeatEnemyTarget(...args) {
-      this._defeatEnemyTargetCalls.push(args);
-    },
+    game: { tents: [], fogDirty: false },
     ...overrides,
   };
 }
@@ -62,9 +55,10 @@ function testNeutralCaptureAdvancesProgressAndFlash() {
 function testNeutralCaptureTriggersCaptureWhenThresholdReached() {
   const channel = makeChannel();
   const source = { owner: 1 };
-  const target = makeTarget({ owner: 0, contest: { 1: 4 }, captureThreshold: 5 });
+  const target = makeTarget({ owner: 0, contest: { 1: 4 }, captureThreshold: 5, energy: 10, maxE: 30 });
   applyTwNeutralCapture(channel, target, source, 2);
-  assert.equal(channel._captureNeutralTargetCalls.length, 1);
+  // Threshold met (contest[1]=6 >= 5): ownership transitions through TwOwnership
+  assert.equal(target.owner, 1);
 }
 
 function testEnemyAttackSubtractsEnergy() {
