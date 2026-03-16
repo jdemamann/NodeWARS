@@ -26,6 +26,7 @@ import {
   resolveTentacleWarsNeutralCapture,
 } from '../tentaclewars/TwCaptureRules.js';
 import { resolveTentacleWarsCutDistribution } from '../tentaclewars/TwCutRules.js';
+import { advanceLifecycle } from '../tentaclewars/TwChannel.js';
 import {
   applyTentaclePayloadToTarget,
   applyTentacleFriendlyFlow,
@@ -573,6 +574,12 @@ export class Tent {
   /* ── Main update ── */
   update(dt) {
     if (this.state === TentState.DEAD) return;
+
+    if (this.effectiveSourceNode?.simulationMode === 'tentaclewars') {
+      advanceLifecycle(this, dt);
+      return;
+    }
+
     this.age += dt;
     if (this.cutFlash > 0) this.cutFlash = Math.max(0, this.cutFlash - dt * 3);
 
@@ -640,25 +647,34 @@ export class Tent {
     }
   }
 
+  /*
+   * Advances the TentacleWars cut-payout retract animation during the Layer 1 migration.
+   * Input: delta time while the lane is already in RETRACTING with twCutRetraction present.
+   * Output: progressive source refund + target payout until the lane reaches DEAD.
+   */
+  _advanceTwCutRetraction(dt) {
+    const retractionStep = (GROW_PPS / this.distance) * dt;
+    const nextSourceFront = Math.max(0, this.twCutRetraction.sourceFront - retractionStep);
+    const nextTargetFront = Math.min(1, this.twCutRetraction.targetFront + retractionStep);
+
+    this._releaseTentacleWarsCutPayout(nextSourceFront, nextTargetFront);
+
+    const sourceDone = nextSourceFront <= 0.0001;
+    const targetDone = nextTargetFront >= 0.9999;
+    if (sourceDone && targetDone) {
+      const sourceRemainder = this.twCutRetraction.sourceShare - this.twCutRetraction.sourceReleased;
+      const targetRemainder = this.twCutRetraction.targetShare - this.twCutRetraction.targetReleased;
+      if (sourceRemainder > 0) this._refundToSourceNode(this.effectiveSourceNode, sourceRemainder);
+      if (targetRemainder > 0) this._applyImmediateTargetEffect(this.effectiveTargetNode, this.effectiveSourceNode, targetRemainder);
+      this._clearTentacleWarsCutRetraction();
+      this.state = TentState.DEAD;
+    }
+  }
+
   /* ── Retracting ── */
   _updateRetractingState(dt) {
     if (this.twCutRetraction) {
-      const retractionStep = (GROW_PPS / this.distance) * dt;
-      const nextSourceFront = Math.max(0, this.twCutRetraction.sourceFront - retractionStep);
-      const nextTargetFront = Math.min(1, this.twCutRetraction.targetFront + retractionStep);
-
-      this._releaseTentacleWarsCutPayout(nextSourceFront, nextTargetFront);
-
-      const sourceDone = nextSourceFront <= 0.0001;
-      const targetDone = nextTargetFront >= 0.9999;
-      if (sourceDone && targetDone) {
-        const sourceRemainder = this.twCutRetraction.sourceShare - this.twCutRetraction.sourceReleased;
-        const targetRemainder = this.twCutRetraction.targetShare - this.twCutRetraction.targetReleased;
-        if (sourceRemainder > 0) this._refundToSourceNode(this.effectiveSourceNode, sourceRemainder);
-        if (targetRemainder > 0) this._applyImmediateTargetEffect(this.effectiveTargetNode, this.effectiveSourceNode, targetRemainder);
-        this._clearTentacleWarsCutRetraction();
-        this.state = TentState.DEAD;
-      }
+      this._advanceTwCutRetraction(dt);
       return;
     }
 
