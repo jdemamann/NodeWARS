@@ -30,9 +30,12 @@ TYPE: IMPLEMENTATION_REQUEST
 - Clash auto-retract fires for ALL outgoing tentacles when loser < `TW_RETRACT_CRITICAL_ENERGY`
 - All source energy drains use `TwChannel.drainSourceEnergy` — no direct `node.energy` writes from Layer 2
 
-## Architecture note
+## Migration debt (bounded, explicit — documented in plan header)
 
-Source energy drains (emitted packets, clash drain, clash damage) route through `TwChannel.drainSourceEnergy`. The TentCombat.js delivery helpers (`applyTentacleFriendlyFlow`, etc.) are used as a **migration bridge** — they still write `node.energy` directly on the target side and are explicitly named as bounded debt in the plan. Wave 3 / TASK-TW-007 resolves this.
+1. TentCombat.js delivery helpers — target-side node.energy writes, shared NW/TW code
+2. `targetNode.underAttack = ...` in advanceTwFlow — visual hint only, no economic effect
+
+Both are named inline in the plan code with comments. Wave 3 resolves.
 
 ## Checks to run
 
@@ -55,8 +58,7 @@ After Task 3: `node scripts/tw-combat-sanity.mjs` (6 checks)
 `IMPL_REPORT` with:
 - Git SHAs for each of the 5 task commits
 - Smoke check output (pass count) per commit
-- tw-energy-sanity final output (6 checks)
-- tw-flow-sanity (7/7) and tw-combat-sanity (6/6) final output
+- tw-energy-sanity (6/6), tw-flow-sanity (7/7), tw-combat-sanity (6/6) final output
 - Any deviations from the plan and their rationale
 
 ---
