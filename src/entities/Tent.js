@@ -19,7 +19,6 @@ import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
 import { computeTentacleWarsBuildCost } from '../tentaclewars/TwTentacleEconomy.js';
 import { getTentacleWarsPacketRateForGrade } from '../tentaclewars/TwGradeTable.js';
 import { TW_BALANCE } from '../tentaclewars/TwBalance.js';
-import { advanceTentacleWarsLaneRuntime } from '../tentaclewars/TwPacketFlow.js';
 import { advanceLifecycle } from '../tentaclewars/TwChannel.js';
 import { applyTwSliceCut } from '../tentaclewars/TwCombat.js';
 import {
@@ -667,18 +666,6 @@ export class Tent {
   }
 
   _updateClashFront(opposingTentacle, feedRate, dt) {
-    if (this.effectiveSourceNode?.simulationMode === 'tentaclewars') {
-      this.clashT = 0.5;
-      opposingTentacle.clashT = 0.5;
-      /* Only snap visual front when no approach animation is running on either side. */
-      if (!this.clashApproachActive && !opposingTentacle.clashApproachActive) {
-        this.clashVisualT = 0.5;
-        opposingTentacle.clashVisualT = 0.5;
-      }
-      opposingTentacle.clashSpark = this.clashSpark;
-      return;
-    }
-
     const { myForce, opposingForce } = this._computeClashForces(opposingTentacle, feedRate);
     this.clashT += (myForce - opposingForce) * GAME_BALANCE.CLASH_VOLATILITY * dt;
     opposingTentacle.clashT = 1 - this.clashT;
@@ -721,143 +708,18 @@ export class Tent {
     const feedRate = this._drainClashSourceBudget(sourceNode, dt);
     this._prepareClashState(feedRate, dt);
 
-    /* Block A — unconditional TW flowRate update (runs for both tentacles).
-       Keeps flowRate alive during clash so the renderer sees active packet glow
-       on both sides (fixes A2). Must run before the canonical guard.
-
-       Unit note: computeTentacleClashFeedRate returns energy/sec (same units as
-       instantFlowRate in advanceTwFlow / TwFlow), so localPressure is
-       directly compatible with the existing EMA formula — do NOT divide by dt. */
-    if (sourceNode.simulationMode === 'tentaclewars') {
-      const excessShare = sourceNode.outCount > 0
-        ? (sourceNode.excessFeed || 0) / sourceNode.outCount
-        : 0;
-      const localPressure = computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt)
-        + excessShare;
-      this.flowRate = this.flowRate * 0.80 + localPressure * 0.20;
-
-      /* Feed the packet queue toward the clash point so yellow orbs animate
-         on both tentacles during clash. Packets travel only to clashT (0.5),
-         so travelDuration is halved. deliveredPacketCount is ignored — packets
-         cancel at the midpoint, they do not deliver energy to the target. */
-      const clashStep = advanceTentacleWarsLaneRuntime({
-        accumulatorUnits: this.packetAccumulatorUnits + excessShare,
-        throughputPerSecond: computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt),
-        deltaSeconds: dt,
-        sourceAvailableEnergy: sourceNode.energy,
-        queuedPacketTravelTimes: this.packetTravelQueue,
-        travelDurationSeconds: this.travelDuration * (this.clashT ?? 0.5),
-      });
-      this.packetAccumulatorUnits = clashStep.nextAccumulatorUnits;
-      this.packetTravelQueue = clashStep.nextQueuedPacketTravelTimes;
-    }
-
     /* Only the canonical tent (lower source.id) drives the shared clash front.
        The other tent mirrors, preventing double-movement per frame. */
     if (!this._isCanonicalClashDriver()) return;
 
-    /* In TentacleWars the approach animation must run before the front is locked
-       at midpoint.  Check clashApproachActive first so the approach path is not
-       short-circuited by the TW-specific front update. */
     if (this.clashApproachActive || opposingTentacle.clashApproachActive) {
       this._updateClashApproach(opposingTentacle, dt);
-      return;
-    }
-
-    if (sourceNode.simulationMode === 'tentaclewars') {
-      /* Block B — canonical driver only: net damage model, threshold check,
-         auto-retract and auto-advance (fixes A1 and A3). */
-      this._updateClashFront(opposingTentacle, feedRate, dt);
-      this._applyTwClashDamage(opposingTentacle, dt);
       return;
     }
 
     this._updateClashFront(opposingTentacle, feedRate, dt);
     this._updateClashVisualFront(opposingTentacle, dt);
     this._resolveClashOutcome(opposingTentacle);
-  }
-
-  /*
-   * TentacleWars clash damage model.
-   * Called by the canonical clash driver each frame after _updateClashFront.
-   * Applies net pressure as direct energy damage to the losing source,
-   * and triggers auto-retract + auto-advance when the losing source falls
-   * below TW_RETRACT_CRITICAL_ENERGY.
-   *
-   * NOTE: _drainClashSourceBudget already runs for both tentacles before this
-   * method is called. Block B net damage is additional asymmetric pressure
-   * on top of that symmetric drain — do not remove _drainClashSourceBudget.
-   *
-   * NOTE: _isCanonicalClashDriver() uses this.source.id < this.target.id
-   * (original source/target, NOT effectiveSourceNode.id). The effective*
-   * properties are used only for pressure calculations, not for identity.
-   * Reversed tentacles are out of scope for this wave.
-   *
-   * NOTE: this.game must be set before this method can fire (set externally
-   * after Tent construction). this.game?.tents with optional chain is a
-   * defensive guard — it should not be reached with game === null in practice.
-   */
-  _applyTwClashDamage(opposingTentacle, dt) {
-    const sourceNode = this.effectiveSourceNode;
-    const opposingSource = opposingTentacle.effectiveSourceNode;
-
-    /* Pressure = base feed rate + on-demand excess share for each side.
-       Both sourceNode.energy and opposingSource.energy are already post-drain
-       when Block B runs (_drainClashSourceBudget fired earlier in _updateClashState
-       for each tentacle). Do NOT cache pre-drain values for symmetry — the drain
-       is intentional and both sides are correctly reduced before this point. */
-    const myExcessShare = sourceNode.outCount > 0
-      ? (sourceNode.excessFeed || 0) / sourceNode.outCount : 0;
-    const opposingExcessShare = opposingSource.outCount > 0
-      ? (opposingSource.excessFeed || 0) / opposingSource.outCount : 0;
-    const myPressure = computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt)
-      + myExcessShare;
-    const opposingPressure = computeTentacleClashFeedRate(opposingSource, opposingTentacle.maxBandwidth, dt)
-      + opposingExcessShare;
-    /* Bidirectional: damage flows to whoever has lower pressure, regardless
-       of which tentacle is the canonical driver. */
-    const netDamage = Math.abs(myPressure - opposingPressure);
-
-    if (netDamage === 0) return;
-
-    const iAmWinner = myPressure >= opposingPressure;
-    const winnerTentacle = iAmWinner ? this : opposingTentacle;
-    const loserTentacle  = iAmWinner ? opposingTentacle : this;
-    const losingSource   = loserTentacle.effectiveSourceNode;
-
-    losingSource.energy = Math.max(0, losingSource.energy - netDamage * dt);
-
-    /* Critical threshold check — using post-damage energy */
-    if (losingSource.energy >= TW_BALANCE.TW_RETRACT_CRITICAL_ENERGY) return;
-
-    /* Auto-retract: snapshot all outgoing tentacles from the losing source */
-    const losingTents = (this.game?.tents ?? []).filter(t =>
-      t.alive &&
-      t.state !== TentState.DEAD &&
-      t.state !== TentState.RETRACTING &&
-      (t.reversed ? t.target : t.source) === losingSource,
-    );
-
-    /* Step 3b: clear clash pair on both sides BEFORE calling kill().
-       Prevents re-entry into _updateClashState via the clashT branch
-       when the outer loop reaches the losing tentacle later this frame.
-       Pattern mirrors _resolveClashOutcome (Tent.js:883–908). */
-    this.clashPartner = null;
-    this.clashVisualT = null;
-    this.clashApproachActive = false;
-    opposingTentacle.clashPartner = null;
-    opposingTentacle.clashVisualT = null;
-    opposingTentacle.clashApproachActive = false;
-    loserTentacle.clashT = null;
-
-    /* Step 3c: retract all losing tentacles — programmatic retract refunds paidCost + energyInPipe */
-    for (const t of losingTents) {
-      t.kill(); // no cutRatio → isProgrammaticRetract branch at Tent.js:462–467
-    }
-
-    /* Step 3d: winning tentacle advances */
-    winnerTentacle.state = TentState.ADVANCING;
-    winnerTentacle.clashT = null;
   }
 
   /* ── Bursting (kamikaze cut: tail rushes to target) ── */
