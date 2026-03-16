@@ -183,7 +183,7 @@ function applyTwClashDamage(channel, opposingTentacle, dt) {
   const loserTentacle = iAmWinner ? opposingTentacle : channel;
   const losingSource = loserTentacle.effectiveSourceNode;
 
-  losingSource.energy = Math.max(0, losingSource.energy - netDamage * dt);
+  drainSourceEnergy(loserTentacle, netDamage * dt); // Layer 1 write surface
   if (losingSource.energy >= TW_BALANCE.TW_RETRACT_CRITICAL_ENERGY) return;
 
   const losingTents = (channel.game?.tents ?? []).filter(t =>
