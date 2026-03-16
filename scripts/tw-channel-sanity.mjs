@@ -13,8 +13,8 @@ import {
 import { commitOwnershipTransfer } from '../src/tentaclewars/TwNodeOps.js';
 
 function makeChannel(overrides = {}) {
-  const source = { energy: 50, id: 1 };
-  const target = { energy: 50, id: 2 };
+  const source = { energy: 50, id: 1, owner: 1, simulationMode: 'tentaclewars' };
+  const target = { energy: 50, id: 2, maxE: 100, owner: 2, simulationMode: 'tentaclewars' };
   return {
     state: TentState.ACTIVE,
     paidCost: 10,
@@ -163,17 +163,11 @@ function testAdvanceLifecyclePromotesBurstingToDead() {
     startT: 0.99,
     distance: 10,
     _burstPayload: 8,
-    _applyPayloadToTarget(targetNode, sourceNode, payloadAmount) {
-      this._burstRecord = { targetNode, sourceNode, payloadAmount };
-    },
   });
+  channel.effectiveTargetNode.owner = 1;
   advanceLifecycle(channel, 1);
   assert.equal(channel.state, TentState.DEAD);
-  assert.deepEqual(channel._burstRecord, {
-    targetNode: channel.target,
-    sourceNode: channel.source,
-    payloadAmount: 8,
-  });
+  assert.equal(channel.effectiveTargetNode.energy, 58);
 }
 
 function testAdvanceLifecycleDeadIsNoOp() {

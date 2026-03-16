@@ -16,6 +16,7 @@ import { ADV_PPS, GROW_PPS } from '../config/gameConfig.js';
 import { bus } from '../core/EventBus.js';
 import { areHostileOwners } from '../systems/OwnerTeams.js';
 import { resolveGrowingTentacleCollision } from '../entities/TentRules.js';
+import { advanceTwFlow, applyTwPayloadToTarget } from './TwFlow.js';
 
 function clearEconomicPayload(channel) {
   channel.paidCost = 0;
@@ -182,10 +183,10 @@ function advanceBursting(channel, dt) {
   const sourceNode = channel.effectiveSourceNode;
   const targetNode = channel.effectiveTargetNode;
   const payload = channel._burstPayload || 0;
-  channel._applyPayloadToTarget(targetNode, sourceNode, payload, {
+  applyTwPayloadToTarget(channel, targetNode, sourceNode, payload, {
     contestFlash: 0.8,
     burstPulse: 1.0,
-    damageMultiplier: sourceNode.simulationMode === 'tentaclewars' ? 1 : undefined,
+    damageMultiplier: 1,
   });
   channel.state = TentState.DEAD;
 }
@@ -225,6 +226,6 @@ function advanceActive(channel, dt) {
     channel.clashVisualT = null;
     channel.clashApproachActive = false;
     channel.clashPartner = null;
-    channel._updateActiveFlowState(dt);
+    advanceTwFlow(channel, dt);
   }
 }
