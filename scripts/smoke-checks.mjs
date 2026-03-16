@@ -1377,7 +1377,7 @@ async function testTentacleWarsRuntimeMathIntegration() {
     outCount: 2,
     energy: 180,
     maxE: 180,
-    twOverflowBudget: 4,
+    excessFeed: 4,
     underAttack: 0,
     x: 0,
     y: 0,
@@ -1398,7 +1398,7 @@ async function testTentacleWarsRuntimeMathIntegration() {
   assert.match(tentSource, /advanceTentacleWarsLaneRuntime\(/, 'TentacleWars active lanes should use the packet-native lane runtime helper');
   assert.match(tentSource, /resolveTentacleWarsHostileCapture\(/, 'TentacleWars hostile takeovers should resolve through the dedicated reset-plus-carryover helper');
   assert.match(tentSource, /resolveTentacleWarsNeutralCapture\(/, 'TentacleWars neutral takeovers should resolve through the dedicated acquisition helper');
-  assert.match(physicsSource, /n\.twOverflowBudget = 0/, 'Physics should zero twOverflowBudget after pass 4 so applyTentacleFriendlyFlow re-accumulates real overflow only');
+  assert.match(physicsSource, /n\.pendingExcessFeed = 0/, 'Physics reset loop should zero pendingExcessFeed each frame via double-buffer swap');
   assert.match(gameSource, /computeTentacleWarsNeutralCaptureCost\(this\.nodes\[i\]\.energy\)/, 'TentacleWars mode should set neutral capture thresholds from displayed neutral energy on load');
   assert.match(gameSource, /this\.nodes\[i\]\.simulationMode = this\.twMode\.isTentacleWarsConfig\(cfg\) \? 'tentaclewars' : 'nodewars'/, 'Game should mark TW nodes with TentacleWars simulation mode before syncing levels');
 }

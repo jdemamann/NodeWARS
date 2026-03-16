@@ -84,12 +84,17 @@ export class Physics {
       perNodeCounter.set(src.id, idx + 1);
     }
 
-    /* Step 4d: zero twOverflowBudget on all TW nodes so applyTentacleFriendlyFlow
-       can re-accumulate the real overflow (true excess only, after feeding the node)
-       during this frame. Pass 4 already read and distributed the prior-frame value. */
+    /* Step 4d: double-buffer swap — promote pending excess to readable buffer.
+       excessFeed = last-frame accumulated excess; available for tentacle reads this frame.
+       pendingExcessFeed = reset to 0; will accumulate this frame via applyTentacleFriendlyFlow.
+       Also zero twOverflowBudget (legacy — removed with Step 4 in Task 6). */
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
-      if (n.simulationMode === 'tentaclewars' && !n.isRelay) n.twOverflowBudget = 0;
+      if (n.simulationMode === 'tentaclewars' && !n.isRelay) {
+        n.excessFeed = n.pendingExcessFeed;
+        n.pendingExcessFeed = 0;
+        n.twOverflowBudget = 0;   // superseded by excessFeed — removed in Task 9
+      }
     }
   }
 }
