@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { TentState } from '../src/config/gameConfig.js';
 import {
+  advanceLifecycle,
   beginBurst,
   collapseCommittedPayload,
   drainSourceEnergy,
@@ -119,6 +120,70 @@ function testTransferMovesEnergyBetweenNodes() {
   assert.equal(channel.target.energy, 56);
 }
 
+function testAdvanceLifecyclePromotesGrowingToActive() {
+  const channel = makeChannel({
+    state: TentState.GROWING,
+    reachT: 0.99,
+    buildCost: 10,
+    paidCost: 9.9,
+    distance: 10,
+    source: { energy: 10, id: 1 },
+  });
+  advanceLifecycle(channel, 1);
+  assert.equal(channel.state, TentState.ACTIVE);
+  assert.equal(channel.pipeAge, 0);
+}
+
+function testAdvanceLifecyclePromotesRetractingToDead() {
+  const channel = makeChannel({
+    state: TentState.RETRACTING,
+    reachT: 0.01,
+    distance: 10,
+  });
+  advanceLifecycle(channel, 1);
+  assert.equal(channel.state, TentState.DEAD);
+}
+
+function testAdvanceLifecyclePromotesAdvancingToActive() {
+  const channel = makeChannel({
+    state: TentState.ADVANCING,
+    reachT: 0.99,
+    distance: 10,
+    travelDuration: 3,
+  });
+  advanceLifecycle(channel, 1);
+  assert.equal(channel.state, TentState.ACTIVE);
+  assert.equal(channel.pipeAge, 3);
+}
+
+function testAdvanceLifecyclePromotesBurstingToDead() {
+  const channel = makeChannel({
+    state: TentState.BURSTING,
+    startT: 0.99,
+    distance: 10,
+    _burstPayload: 8,
+    _applyPayloadToTarget(targetNode, sourceNode, payloadAmount) {
+      this._burstRecord = { targetNode, sourceNode, payloadAmount };
+    },
+  });
+  advanceLifecycle(channel, 1);
+  assert.equal(channel.state, TentState.DEAD);
+  assert.deepEqual(channel._burstRecord, {
+    targetNode: channel.target,
+    sourceNode: channel.source,
+    payloadAmount: 8,
+  });
+}
+
+function testAdvanceLifecycleDeadIsNoOp() {
+  const channel = makeChannel({
+    state: TentState.DEAD,
+    age: 2,
+  });
+  advanceLifecycle(channel, 1);
+  assert.equal(channel.age, 2);
+}
+
 const tests = [
   testRetractRefundsCommittedPayload,
   testRetractAdvancesClashPartner,
@@ -130,6 +195,11 @@ const tests = [
   testPartialRefundOnlyCreditsSource,
   testBeginBurstSetsBurstState,
   testTransferMovesEnergyBetweenNodes,
+  testAdvanceLifecyclePromotesGrowingToActive,
+  testAdvanceLifecyclePromotesRetractingToDead,
+  testAdvanceLifecyclePromotesAdvancingToActive,
+  testAdvanceLifecyclePromotesBurstingToDead,
+  testAdvanceLifecycleDeadIsNoOp,
 ];
 
 let passed = 0;
