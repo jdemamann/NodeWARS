@@ -7,6 +7,7 @@
    ================================================================ */
 
 import { bus } from '../core/EventBus.js';
+import { commitOwnershipTransfer } from '../tentaclewars/TwNodeOps.js';
 import { isPlayerEnemyOwner } from './OwnerTeams.js';
 
 /* Retract or collapse outgoing commitments rooted at the captured node. */
@@ -26,6 +27,7 @@ export function retractInvalidTentaclesAfterOwnershipChange(game, node, newOwner
     .forEach(tent => {
       if (suppressRefundOnOutgoingTentacles) {
         releasedOutgoingEnergy += tent.getCommittedPayloadForOwnershipCleanup?.() || 0;
+        // Wave 2: rename instance method call to TwChannel.collapseCommittedPayload.
         tent.collapseForOwnershipLoss?.();
         return;
       }
@@ -46,13 +48,9 @@ export function applyOwnershipChange({
   attackerOwner = null,
   suppressOutgoingTentacleRefunds = false,
 }) {
-  node.owner = newOwner;
-  node.regen = 0;
-  node.energy = startingEnergy;
+  commitOwnershipTransfer(node, newOwner, startingEnergy);
   node.cFlash = 1;
-  node.contest = null;
   node.shieldFlash = 0;
-  node.syncLevelFromEnergy?.();
 
   if (game) game.fogDirty = true;
 

@@ -10,6 +10,7 @@ import {
   retract,
   transfer,
 } from '../src/tentaclewars/TwChannel.js';
+import { commitOwnershipTransfer } from '../src/tentaclewars/TwNodeOps.js';
 
 function makeChannel(overrides = {}) {
   const source = { energy: 50, id: 1 };
@@ -184,6 +185,24 @@ function testAdvanceLifecycleDeadIsNoOp() {
   assert.equal(channel.age, 2);
 }
 
+function testCommitOwnershipTransfer() {
+  const node = {
+    owner: 2,
+    energy: 80,
+    regen: 5,
+    contest: { 1: 10 },
+    syncLevelFromEnergy() {
+      this._synced = true;
+    },
+  };
+  commitOwnershipTransfer(node, 1, 10);
+  assert.equal(node.owner, 1);
+  assert.equal(node.energy, 10);
+  assert.equal(node.regen, 0);
+  assert.equal(node.contest, null);
+  assert.equal(node._synced, true);
+}
+
 const tests = [
   testRetractRefundsCommittedPayload,
   testRetractAdvancesClashPartner,
@@ -200,6 +219,7 @@ const tests = [
   testAdvanceLifecyclePromotesAdvancingToActive,
   testAdvanceLifecyclePromotesBurstingToDead,
   testAdvanceLifecycleDeadIsNoOp,
+  testCommitOwnershipTransfer,
 ];
 
 let passed = 0;
