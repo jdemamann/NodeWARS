@@ -1,11 +1,14 @@
-WAITING_FOR: Codex — implement TW Layer 1 extraction (TW-LAYER1-001)
+MERGED: TW-LAYER1-001 — TwChannel + TwNodeOps on main
 
-Plan: docs/superpowers/plans/2026-03-16-tw-layer1-extraction.md
+Layer 1 extraction complete:
+- TwChannel.js: economic primitives + lifecycle state machine
+- TwNodeOps.js: commitOwnershipTransfer (only layer that writes node.owner)
+- Tent.js: delegates TW update(dt) to TwChannel.advanceLifecycle
+- Ownership.js: routes ownership-state mutation through TwNodeOps
 
-4 tasks:
-1. TwChannel.js — 7 economic primitives + tw-channel-sanity.mjs
-2. TwChannel.js — lifecycle state machine + Tent.js delegation
-3. TwNodeOps.js + Ownership.js update
-4. Module headers + final check run
+Verification on main: 102/102 smoke, 6/6 energy, 16/16 channel-sanity
 
-Deliverable: IMPL_REPORT with commit SHAs and check results
+Next wave (Wave 2): TwFlow.js + TwCombat.js extraction
+- TwFlow: extract _updateTentacleWarsActiveFlowState + flow helpers from Tent.js + TentCombat.js
+- TwCombat: extract clash/cut/burst logic from Tent.js
+- After both: _advanceTwCutRetraction moves to TwFlow, _updateClashState to TwCombat
