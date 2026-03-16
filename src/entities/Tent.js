@@ -771,7 +771,7 @@ export class Tent {
        on both sides (fixes A2). Must run before the canonical guard.
 
        Unit note: computeTentacleClashFeedRate returns energy/sec (same units as
-       instantFlowRate in _updateTentacleWarsActiveFlowState), so localPressure is
+       instantFlowRate in advanceTwFlow / TwFlow), so localPressure is
        directly compatible with the existing EMA formula — do NOT divide by dt. */
     if (sourceNode.simulationMode === 'tentaclewars') {
       const excessShare = sourceNode.outCount > 0
