@@ -1,25 +1,19 @@
-MERGED: TW-WAVE3-001 — TwDelivery on main
+WAITING_FOR: Codex — implement TW-WAVE4-001
 
-Wave 3 extraction complete:
-- TwDelivery.js: applyTwFriendlyDelivery, applyTwNeutralCapture, applyTwEnemyAttack, markNodeUnderAttack
-- TwFlow.js: sustained delivery routes through TwDelivery (not TentCombat)
-- TentCombat.js: TW simulationMode branches removed from flow helpers (NW-only now)
-- Tent.js: dead TW flow/cut helpers deleted (_updateTentacleWarsActiveFlowState, _advanceTwCutRetraction, _applyTentacleWarsSliceCut, and related helpers)
+Current task:
+- `TW-WAVE4-001` — TwOwnership extraction
+- No design consultation needed; scope follows directly from Wave 3 bounded debt
 
-Named pass-throughs in TwDelivery (private):
-- resolveTwNeutralCapture → channel._captureNeutralTarget
-- resolveTwHostileCapture → channel._defeatEnemyTarget
+Scope:
+- create `src/tentaclewars/TwOwnership.js` — TW ownership transition primitives
+- create `scripts/tw-ownership-sanity.mjs` (5 tests)
+- update TwDelivery.js — private helpers use TwOwnership; add applyTwBurstDelivery
+- update TwFlow.js — applyTwPayloadToTarget calls applyTwBurstDelivery
+- remove TW branch from TentCombat.applyTentaclePayloadToTarget (NW-only after this)
+- remove TW branches from Tent._captureNeutralTarget + _defeatEnemyTarget
+- delete legacy TW clash shell from Tent._updateClashState
 
-Option X chosen: applyTentaclePayloadToTarget TW branch retained for cut/burst delivery
-
-Verification on main: 102/102 smoke, 6/6 delivery, 7/7 flow, 6/6 combat, 16/16 channel, 6/6 energy
-
-Bounded migration debt (explicit, named for Wave 4):
-- resolveTwNeutral/HostileCapture still delegate to Tent.js instance methods
-- applyTentaclePayloadToTarget TW branch for cut/burst delivery
-- Legacy TW clash shell in Tent._updateClashState (inert residue; smoke suite probes it directly)
-
-Next wave (Wave 4): Ownership policy extraction
-- Extract _captureNeutralTarget / _defeatEnemyTarget into TwCaptureRules.js / TwNodeOps.js
-- Remove TW branch from applyTentaclePayloadToTarget (Option Y)
-- Delete legacy TW clash shell from Tent._updateClashState
+After Wave 4:
+- TentCombat.js fully NW-only (no simulationMode checks)
+- Tent._captureNeutralTarget + _defeatEnemyTarget NW-only
+- All TW delivery and ownership routes through TwDelivery + TwOwnership
