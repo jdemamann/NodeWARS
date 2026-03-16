@@ -4,8 +4,8 @@
  *
  * Responsibilities:
  * - Advance packet accumulation and travel for active TW channels.
- * - Route delivered payload through the current shared delivery helpers.
- * - Keep the migration debt around target-side writes explicit and bounded.
+ * - Route sustained delivered payload through TW-native Layer 1 delivery primitives.
+ * - Keep cut/burst payload delivery on the shared path until the dedicated follow-up wave.
  *
  * Runtime role:
  * Called from TwChannel during TW ACTIVE flow; operates on Tent instances during migration.
@@ -16,17 +16,15 @@ import { computeTentacleSourceFeedRate } from '../systems/EnergyBudget.js';
 import { areAlliedOwners } from '../systems/OwnerTeams.js';
 import { advanceTentacleWarsLaneRuntime } from './TwPacketFlow.js';
 import { drainSourceEnergy } from './TwChannel.js';
-/*
- * Migration bridge:
- * These shared helpers still mutate target-side node state directly. Wave 3
- * replaces them with cleaner Layer 1/2 boundaries.
- */
 import {
-  applyTentacleEnemyAttackFlow,
-  applyTentacleFriendlyFlow,
-  applyTentacleNeutralCaptureFlow,
   applyTentaclePayloadToTarget,
 } from '../entities/TentCombat.js';
+import {
+  applyTwEnemyAttack,
+  applyTwFriendlyDelivery,
+  applyTwNeutralCapture,
+  markNodeUnderAttack,
+} from './TwDelivery.js';
 
 export function getRelayFlowMultiplier(sourceNode) {
   return (sourceNode.isRelay && sourceNode.owner !== 0 && !sourceNode.inFog)
@@ -35,8 +33,8 @@ export function getRelayFlowMultiplier(sourceNode) {
 }
 
 /*
- * Applies already-computed payload to a target node through the existing shared
- * Tent/TentCombat delivery resolution path.
+ * Applies already-computed burst/cut payload through the shared Tent/TentCombat path.
+ * Option X for Wave 3: keep this TW branch stable until cut/burst delivery moves into TwDelivery.
  */
 export function applyTwPayloadToTarget(channel, targetNode, sourceNode, payloadAmount, opts = {}) {
   applyTentaclePayloadToTarget({
@@ -94,31 +92,26 @@ export function advanceTwFlow(channel, dt) {
 
   let deliveredAmount = 0;
   if (!areAlliedOwners(targetNode.owner, sourceNode.owner) && targetNode.owner !== 0) {
-    // Migration debt: visual pressure hint still writes directly to the node.
-    targetNode.underAttack = Math.max(targetNode.underAttack || 0, 1);
+    markNodeUnderAttack(targetNode);
   }
 
   if (laneStep.deliveredPacketCount > 0) {
-    const deliveredFeedRate = laneStep.deliveredPacketCount / Math.max(dt, 0.001);
+    const deliveredAmountUnits = laneStep.deliveredPacketCount * relayFlowMultiplier;
     if (areAlliedOwners(targetNode.owner, sourceNode.owner)) {
-      deliveredAmount = applyTentacleFriendlyFlow(targetNode, deliveredFeedRate, relayFlowMultiplier, dt);
+      deliveredAmount = applyTwFriendlyDelivery(targetNode, deliveredAmountUnits);
     } else if (targetNode.owner === 0) {
-      deliveredAmount = applyTentacleNeutralCaptureFlow(
+      deliveredAmount = applyTwNeutralCapture(
         channel,
         targetNode,
         sourceNode,
-        deliveredFeedRate,
-        relayFlowMultiplier,
-        dt,
+        deliveredAmountUnits,
       );
     } else {
-      deliveredAmount = applyTentacleEnemyAttackFlow(
+      deliveredAmount = applyTwEnemyAttack(
         channel,
         targetNode,
         sourceNode,
-        deliveredFeedRate,
-        relayFlowMultiplier,
-        dt,
+        deliveredAmountUnits,
       );
     }
   }
