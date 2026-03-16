@@ -81,10 +81,19 @@ that commit that state atomically.
 - `src/entities/GameNode.js` — node state (energy, owner field, level, geometry)
 
 **Ownership split (critical):**
-The `owner` field lives here as a substrate primitive (`node.owner = newOwner`), but
-ownership-transition *policy* (when capture is valid, what cleanup follows, what starting
-energy the new owner receives) lives in Layer 2. Layer 0 commits the state; Layer 2
-decides when and how.
+The `owner` field lives here as raw substrate state. However, the adjacent-write rule
+means Layer 2 cannot write `node.owner` directly — that would skip Layer 1.
+
+The clean model:
+- **Layer 0:** owns the `owner` field (pure substrate state)
+- **Layer 1:** exposes `commitOwnershipTransfer(node, newOwner, startingEnergy)` — the
+  narrow primitive that performs the ownership-state mutation safely, including any
+  invariant-preserving bookkeeping (e.g. energy reset)
+- **Layer 2:** `Ownership.js` decides *when* and *how* to invoke it — policy only
+
+This means Layer 1 is not just lane primitives (`TwChannel`). It also includes
+node-state commit primitives like `commitOwnershipTransfer`. Both belong to Layer 1
+because both are the lowest-level invariant-preserving state mutations in the game.
 
 **Does NOT know:** lanes, packets, rules, frame order, rendering, AI.
 
@@ -99,11 +108,17 @@ energy accounting and lane lifecycle. The only layer that writes `node.energy` d
 invariant-preserving energy primitives. Higher layers never write `node.energy` — they
 call Layer 1 primitives.
 
-**Target files (from TW tent-layer spec):**
+**Target files:**
 - `src/tentaclewars/TwChannel.js` — lane lifecycle, grow/retract/burst/collapse/transfer
+- `src/tentaclewars/TwNodeOps.js` — node-state commit primitives:
+  `commitOwnershipTransfer(node, newOwner, startingEnergy)` and future node-level ops
 
-**Current state:** this layer's logic is still inside `src/entities/Tent.js`.
+Layer 1 is the **only** layer whose modules write `node.energy` or `node.owner`.
+All other layers go through these primitives.
+
+**Current state:** lane logic is still inside `src/entities/Tent.js`.
 The TwChannel extraction is the first implementation wave.
+`TwNodeOps` is a new thin module to be created alongside it.
 
 **Key invariants Layer 1 enforces for free:**
 - `retract()` always refunds → Layer 2 never reasons about refund correctness
@@ -125,24 +140,34 @@ any code in this layer: "is this a decision, or is it an implementation?"
 If it's an implementation, it belongs in Layer 1.
 
 **Responsibility:** express game rules — flow, clash, capture, ownership-transition
-policy, relay behavior, alliance/hostility interpretation.
+policy, relay behavior, alliance/hostility interpretation. Layer 2 is **policy plus
+thin runtime operators built on Layer 1 primitives**. It decides *when* and *why*
+to invoke Layer 1; Layer 1 handles *how*.
+
+The distinction: if a module is deciding (threshold, condition, classification) it is
+policy. If it is computing an energy delta or mutating lifecycle state, that belongs
+in Layer 1. Layer 2 modules that contain both are incomplete extractions.
 
 **Target files:**
-- `src/tentaclewars/TwFlow.js` — packet advance, energy delivery per frame
-- `src/tentaclewars/TwCombat.js` — clash outcome decisions, slice resolution
-- `src/tentaclewars/TwCaptureRules.js` — capture pressure, threshold decisions
-- `src/systems/Ownership.js` — ownership-transition policy (calls Layer 0 primitive)
+- `src/tentaclewars/TwFlow.js` — packet advance orchestration and delivery decisions;
+  thin runtime operators that schedule `channel.transfer()` calls per frame
+- `src/tentaclewars/TwCombat.js` — clash outcome decisions, slice classification,
+  thin operators that invoke `channel.retract()` / `channel.beginBurst()`
+- `src/tentaclewars/TwCaptureRules.js` — capture pressure thresholds, timing decisions,
+  calls Layer 1 ownership commit when threshold is reached
+- `src/systems/Ownership.js` — ownership-transition policy (calls Layer 1
+  `commitOwnershipTransfer` primitive, not `node.owner` directly)
 
 **Expected behavior:** once Layer 1 primitives are complete, these modules become thin.
-- TwFlow: "advance packets, call transfer()" — a few lines
-- TwCombat: "drain weaker lane, call retract() on loser" — policy, not mechanics
-- TwCaptureRules: "threshold reached, call ownership transition" — decision only
+The runtime-mechanics parts of TwFlow (packet queue math, accumulator) may shift toward
+Layer 1 over time as the boundary clarifies. Right now they sit in Layer 2 as thin
+operators; if they grow, that signals Layer 1 is still leaking.
 
-Some essential policy complexity remains regardless of how clean Layer 1 gets:
+Essential policy complexity that remains in Layer 2 regardless:
 - capture thresholds and timing
 - alliance/hostility interpretation
-- clash outcome tie-breaking
-- relay policy
+- clash outcome tie-breaking and force computation
+- relay policy decisions
 
 **Does NOT know:** frame ordering, AI intent, rendering, direct `node.energy` writes.
 
@@ -259,9 +284,29 @@ blockers. NodeWARS code violations stay until NW is retired.
 | `Game.js` | Writes `node.energy` directly in several places | Route through Layer 1 primitive |
 | `Tent.js` | Mixes Layer 1 (lifecycle) + Layer 2 (flow, combat) in one file | Extract TwChannel (Layer 1) |
 | `TentCombat.js` | Has Layer 1 flow helpers and Layer 2 combat helpers mixed | Split into TwFlow + TwCombat |
-| `Physics.js` | Writes `node.energy` via regen (Layer 3 → Layer 0) | Acceptable via regen primitive in GameNode, or explicit Layer 2 regen module |
+| `Physics.js` calls `node.update(dt)` for regen | L3 invokes L0 self-update | ✅ permitted — see regen model below |
+| `Game.js` writes `node.energy +=` directly | L3 → L0 direct field write | ❌ violation — must route through Layer 1 primitive |
 | `EnergyBudget.js` | Straddles Layer 2 and Layer 3 | Clarify over time as Layer 2 matures |
 | AI in `Game.js` | Layer 4 behavior fused with Layer 3 orchestration | Extract AI to Layer 4 module over time |
+
+---
+
+## Regen Model (explicit resolution)
+
+Regen is the only `node.energy` write that does not come from a lane operation.
+The rule for regen is:
+
+> `GameNode.update(dt)` is a **Layer 0 self-update** — the node manages its own
+> passive regen internally. Layer 3 (`Physics.js`) invokes it as an orchestration
+> call, not as a direct field write.
+
+This is not a Layer 3 → Layer 0 write violation. It is Layer 3 *triggering* a Layer 0
+self-update method. The distinction: Layer 3 does not compute or assign the energy
+delta — GameNode does that internally using its own rate and cap.
+
+**Rule:** any code that computes an energy delta and assigns it to `node.energy` from
+outside `GameNode.update()` or a Layer 1 primitive is a violation. Regen stays
+self-contained inside `GameNode.update()`.
 
 ---
 
