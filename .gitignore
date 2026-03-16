@@ -5,3 +5,4 @@ tmp/imagegen/
 .playwright-cli/
 output/playwright/
 tmp/
+.worktrees/
