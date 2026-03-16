@@ -19,11 +19,26 @@ NodeWARS code is untouched. TW layers become the canonical runtime as NW is reti
 
 ## Architecture
 
+### Scope of this spec
+
+This spec covers the **lane-runtime portion** of Layer 1 and Layer 2 in the global
+architecture. It does not cover the full Layer 1 surface.
+
+Global Layer 1 has two modules:
+- **`TwChannel.js`** — lane lifecycle, economic primitives, energy accounting
+- **`TwNodeOps.js`** — node-state commit primitives (`commitOwnershipTransfer` and future ops)
+
+This spec defines TwChannel and its callers (TwFlow, TwCombat). TwNodeOps is defined in
+`docs/superpowers/specs/2026-03-15-game-architecture-layers.md`.
+
 ### Substrate: GameNode (global Layer 0)
 
 GameNode exists below all layers. It owns `energy`, `owner`, `level`, and related state.
-**Only `TwChannel` may directly read or write `node.energy`.**
-All higher layers interact with nodes exclusively through TwChannel primitives.
+**Only Layer 1 primitives may write `node.energy` or `node.owner`:**
+- `node.energy` — through TwChannel economic primitives only
+- `node.owner` — through `TwNodeOps.commitOwnershipTransfer()` only
+
+All higher layers interact with nodes exclusively through Layer 1 primitives.
 
 ### Layer 1 (global) — TwChannel.js (Network Primitives)
 
@@ -57,7 +72,7 @@ exclusively — it is accessible to TwChannel for lifecycle-critical operations.
 | `retract()` | Returns `paidCost + energyInPipe` to source, begins RETRACTING | Source always gets full refund |
 | `partialRefund(amount)` | Credits `amount` to source immediately, no state change | Used by animated cut payouts; still routes through TwChannel |
 | `drainSourceEnergy(amount)` | Debits `amount` from source, no payload accounting | Used by TwCombat for clash damage only |
-| `collapseCommittedPayload()` | Clears clash partner, destroys payload without refund, sets state=RETRACTING (preserves visible reachT for retract animation) | Used only by Ownership.js for ownership loss — matches current `collapseForOwnershipLoss()` behavior: lane collapses out visually, does not vanish instantly |
+| `collapseCommittedPayload()` | Clears clash partner, destroys payload without refund, sets state=RETRACTING (preserves visible reachT for retract animation) | Used by Ownership.js to collapse outgoing lanes when a node changes owner — ownership-state mutation itself goes through `TwNodeOps.commitOwnershipTransfer()` (see game-architecture-layers spec) |
 | `beginBurst(payload, startT)` | Sets state=BURSTING, stores payload | Combat decision, channel execution |
 | `transfer(energy)` | Moves energy directly from source to target, no ownership logic | source -= energy, target += energy — use only for uncontested delivery |
 | `advanceLifecycle(dt)` | Runs the full state machine for this frame | Single update entry point |
@@ -162,7 +177,7 @@ ownership rules, who is ally or enemy.
 
 | File | Role | Change |
 |---|---|---|
-| `Ownership.js` | Decides ownership transitions | Calls `channel.collapseCommittedPayload()` |
+| `Ownership.js` | Decides ownership transitions | Calls `channel.collapseCommittedPayload()` to collapse outgoing lanes; calls `TwNodeOps.commitOwnershipTransfer()` to commit node ownership change |
 | `TwCaptureRules.js` | Neutral capture math | Receives neutral capture hooks from TwFlow |
 | `NeutralContest.js` | Contest state | Unchanged |
 | `TwBalance.js` | Tuning constants | Unchanged |

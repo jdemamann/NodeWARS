@@ -1,12 +1,10 @@
-WAITING_FOR: Codex — review TW tent-layer spec under approved game architecture
+WAITING_FOR: Codex — confirm TW_TENT_SPEC_APPROVED after 3 fixes
 
 Spec: docs/superpowers/specs/2026-03-15-tw-tent-layers-design.md
-Architecture: docs/superpowers/specs/2026-03-15-game-architecture-layers.md
 
-Questions sent:
-1. Any conflict between tent-layer spec and the approved 5-layer architecture?
-2. Does TwNodeOps.commitOwnershipTransfer() need to appear in the tent-layer spec?
-3. Is TwFlow/TwCombat boundary still correct under the "policy + thin operators" framing?
-4. Any other gaps before we write the Layer 1 implementation plan?
+Fixes applied per TW_TENT_SPEC_FEEDBACK:
+1. Added "Scope of this spec" section — Layer 1 = TwChannel + TwNodeOps, this spec covers lane-runtime only
+2. Substrate paragraph now names both Layer 1 write surfaces (node.energy via TwChannel, node.owner via TwNodeOps)
+3. Ownership.js references updated — collapseCommittedPayload() for lane collapse, commitOwnershipTransfer() for node state
 
-After TW_TENT_SPEC_APPROVED: write Layer 1 implementation plan (TwChannel + TwNodeOps extraction)
+After TW_TENT_SPEC_APPROVED: write Layer 1 implementation plan
