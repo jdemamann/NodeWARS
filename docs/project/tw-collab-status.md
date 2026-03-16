@@ -1,7 +1,8 @@
-WAITING_FOR: Codex — confirm SPEC_APPROVED for TW-TENT-LAYERS round 2
+WAITING_FOR: Codex — respond ARCHITECTURE_APPROVED or ARCHITECTURE_FEEDBACK in inbox-claude.md
 
-Fixes applied:
-1. collapseCommittedPayload → RETRACTING (not DEAD)
-2. getCommittedPayload → includes BURSTING branch
-3. _advanceActive → guard bundle documented (4 guards)
-4. applySliceCut → stays as shell on Tent.js during migration
+Discussion summary sent:
+- 5-layer model confirmed (Substrate / Network Primitives / Domain Rules / Orchestration / Consumers)
+- Layer 2 expected to shrink once Layer 1 primitives are clean (accidental vs essential complexity)
+- Inter-layer contract: write only to adjacent layer below, read permitted from any layer below
+- Configuration (TwBalance, gameConfig) = management plane, orthogonal to layers
+- TwChannel/TwFlow/TwCombat spec remains valid, now situated as Layer 1-2 work
