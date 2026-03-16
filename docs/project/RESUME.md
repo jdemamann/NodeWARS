@@ -1,10 +1,10 @@
 # Project Resume
 
-**Last updated:** 2026-03-15
+**Last updated:** 2026-03-16
 
 ## Project phase
 
-Stabilized foundation — active TentacleWars balance and polish.
+Stabilized foundation — active TentacleWars layer extraction and campaign work.
 Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrated in main.
 
 ## Current branch
@@ -13,15 +13,29 @@ Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrat
 
 ## Latest validated baseline
 
-- smoke-checks.mjs: 96/96 (post TW-AI-001, commits 475e241 + bb91479)
+- smoke-checks.mjs: 102/102 (post TW-WAVE2-001, commit after merge)
 - tw-campaign-sanity.mjs: 15/15
+- tw-channel-sanity.mjs: 16/16
+- tw-flow-sanity.mjs: 7/7
+- tw-combat-sanity.mjs: 6/6
+- tw-energy-sanity.mjs: 6/6
+
+## Completed waves (this cycle)
+
+- **TW-WAVE1**: TwChannel + TwNodeOps Layer 1 extraction — merged
+- **TW-WAVE2**: TwFlow + TwCombat Layer 2 extraction — merged
+  - Bounded migration debt: TentCombat.js delivery helpers (target-side), `targetNode.underAttack`
+  - Wave 3 scope: TW-specific Layer 1 delivery primitives, pairChannels API, legacy code removal
 
 ## Open tracks
 
 - Tutorial playtest feedback — awaiting sessions
 - W24 RELAY RACE structural support — awaiting playtest evidence
 - TASK-TWL-BALANCE-CROSS cross-world balance — awaiting timed playtests
-- (no implementation tracks open — between waves)
+- TASK-TWL-009 World 1 Playtest Review — `needs validation`
+- TASK-TWL-003 Progression and Score Spec — `planned`, depends on TWL-001 ✓
+- TASK-TWL-004 Obstacle Spec — `planned`, depends on TWL-001 ✓
+- TW Wave 3 (Packet-Native Lane Runtime) — ready to start, resolves TentCombat.js bridge
 
 ## Cold-start order
 
@@ -44,9 +58,12 @@ Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrat
 
 ## Next recommended action
 
-No active wave. Review open tracks above and await playtest data.
-If a new implementation track is needed, start with the brainstorming skill.
-For bounded boot-chain integrity checks, run `node scripts/doc-audit.mjs`.
+TWL-002 closed. Immediate candidates:
+1. **TW Wave 3** — resolve TentCombat.js migration debt (Layer 1 delivery primitives)
+2. **TASK-TWL-009** — validate World 1 levels against current runtime
+3. **TASK-TWL-003** — Progression and Score Spec (unblocks TWL-005/006)
+
+Start with the brainstorming skill for any new wave.
 
 ## Tiebreaker
 

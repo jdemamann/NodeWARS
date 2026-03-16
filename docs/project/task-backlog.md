@@ -2345,7 +2345,7 @@ Sequence and current status: `docs/project/operational-kanban.md`
 
 - Owner: `campaign-level-owner`
 - Workstream: `WS-TW TentacleWars Campaign`
-- Status: `active`
+- Status: `completed`
 - Depends on: TWL-001 ✓
 
 Checks:
