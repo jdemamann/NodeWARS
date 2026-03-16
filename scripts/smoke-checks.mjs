@@ -1177,13 +1177,14 @@ async function testTentacleWarsOverflowBudgetAccumulatesAtCap() {
     energy: 50,
     maxE: 50,
     inFlow: 0,
-    twOverflowBudget: 0,
+    excessFeed: 0,
+    pendingExcessFeed: 0,
   };
 
   applyTentacleFriendlyFlow(targetNode, 10, 1, 0.5);
 
   assert.equal(targetNode.energy, targetNode.maxE, 'TentacleWars friendly overflow should not push energy beyond maxE');
-  assert.ok(targetNode.twOverflowBudget > 0, 'TentacleWars full-cap friendly flow should accumulate overflow budget');
+  assert.ok(targetNode.pendingExcessFeed > 0, 'TentacleWars full-cap friendly flow should accumulate pendingExcessFeed');
 }
 
 async function testTentacleWarsGameNodeHasExcessFeedProperties() {

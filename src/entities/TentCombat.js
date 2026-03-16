@@ -124,7 +124,7 @@ export function applyTentacleFriendlyFlow(targetNode, feedRate, relayFlowMultipl
       targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + absorbedEnergy);
     }
     if (overflowEnergy > 0) {
-      targetNode.twOverflowBudget = (targetNode.twOverflowBudget || 0) + overflowEnergy;
+      targetNode.pendingExcessFeed = (targetNode.pendingExcessFeed || 0) + overflowEnergy;
     }
   } else if (targetNode.energy < targetNode.maxE) {
     targetNode.energy = Math.min(targetNode.maxE, targetNode.energy + incomingEnergy);
