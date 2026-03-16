@@ -11,7 +11,6 @@ import {
   captureRelayFeedBudget,
   computeNodeTentacleFeedRate,
 } from './EnergyBudget.js';
-import { distributeTentacleWarsOverflow } from '../tentaclewars/TwEnergyModel.js';
 
 export class Physics {
   /* ── outCount + tentFeedPerSec: computed once per frame ── */
@@ -24,12 +23,6 @@ export class Physics {
       /* Relay rule: only last frame's received flow can be forwarded this frame.
          Relays are infrastructure, not generators. */
       n.relayFeedBudget = captureRelayFeedBudget(n);
-      /* twOverflowBudget: retain last frame's value as-is — it was accumulated by
-         applyTentacleFriendlyFlow during the previous frame and already contains only
-         the true excess (energy that arrived when the node was at max).
-         captureTentacleWarsOverflowBudget is NOT called here because it returned
-         inFlow (total incoming including absorbed energy), inflating outgoing boost
-         and causing the node to drain faster than incoming support could heal it. */
       n.outCount = 0;
       n.inFlow   = 0;
     }
@@ -48,52 +41,15 @@ export class Physics {
       nodes[i].tentFeedPerSec = computeNodeTentacleFeedRate(nodes[i]);
     }
 
-    /* Pass 4: TentacleWars overflow pre-assignment.
-       Distributes each node's twOverflowBudget to eligible outgoing tentacles
-       so both ACTIVE and CLASH paths read a ready-to-consume per-tentacle share. */
-
-    // Step 4a: zero every tentacle's share (covers non-TW tentacles too)
-    for (let i = 0; i < tents.length; i++) {
-      tents[i].twOverflowShare = 0;
-    }
-
-    // Step 4b: collect eligible tentacle counts per TW node with overflow
-    const overflowEligibleCounts = new Map(); // nodeId → eligible count
-    for (let i = 0; i < tents.length; i++) {
-      const t = tents[i];
-      if (!t.alive || t.state === TentState.DEAD || t.state === TentState.RETRACTING) continue;
-      const src = t.reversed ? t.target : t.source;
-      if (src.simulationMode !== 'tentaclewars' || !(src.twOverflowBudget > 0)) continue;
-      overflowEligibleCounts.set(src.id, (overflowEligibleCounts.get(src.id) ?? 0) + 1);
-    }
-
-    // Step 4c: assign shares using per-node counters (Map<nodeId, counter>)
-    // Counters are incremented each time an eligible tentacle for that node is seen.
-    // Do NOT reset when source node changes — tentacles may be non-contiguous in game.tents.
-    const perNodeCounter = new Map(); // nodeId → assignment index so far
-    for (let i = 0; i < tents.length; i++) {
-      const t = tents[i];
-      if (!t.alive || t.state === TentState.DEAD || t.state === TentState.RETRACTING) continue;
-      const src = t.reversed ? t.target : t.source;
-      if (src.simulationMode !== 'tentaclewars' || !(src.twOverflowBudget > 0)) continue;
-      const eligibleCount = overflowEligibleCounts.get(src.id) ?? 0;
-      if (eligibleCount === 0) continue;
-      const { laneOverflowShares } = distributeTentacleWarsOverflow(src.twOverflowBudget, eligibleCount);
-      const idx = perNodeCounter.get(src.id) ?? 0;
-      t.twOverflowShare = laneOverflowShares[idx] ?? 0;
-      perNodeCounter.set(src.id, idx + 1);
-    }
-
-    /* Step 4d: double-buffer swap — promote pending excess to readable buffer.
-       excessFeed = last-frame accumulated excess; available for tentacle reads this frame.
-       pendingExcessFeed = reset to 0; will accumulate this frame via applyTentacleFriendlyFlow.
-       Also zero twOverflowBudget (legacy — removed with Step 4 in Task 6). */
+    /* Double-buffer swap: promote this-frame accumulated excess to readable buffer.
+       applyTentacleFriendlyFlow writes to pendingExcessFeed during tent updates (step 5).
+       This swap runs at step 1 of the next frame so tentacles read excessFeed safely
+       without any ordering dependency. */
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
       if (n.simulationMode === 'tentaclewars' && !n.isRelay) {
         n.excessFeed = n.pendingExcessFeed;
         n.pendingExcessFeed = 0;
-        n.twOverflowBudget = 0;   // superseded by excessFeed — removed in Task 9
       }
     }
   }
