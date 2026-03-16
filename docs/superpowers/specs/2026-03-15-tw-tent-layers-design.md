@@ -1,6 +1,6 @@
 # TW Tentacle Layer Architecture — Design Spec
 
-**Status:** DRAFT — PENDING SPEC REVIEW
+**Status:** DRAFT — PENDING SPEC REVIEW (round 2)
 
 ---
 
@@ -32,9 +32,15 @@ economic operations. This is the only layer that knows nodes exist.
 **Owns:**
 - State machine: `GROWING → ACTIVE → RETRACTING → BURSTING → DEAD`
   (plus `ADVANCING` as a transient recovery state after clash win)
-- Fields: `source`, `target`, `reachT`, `startT`, `paidCost`, `energyInPipe`, `_burstPayload`
+- Fields: `source`, `target`, `reversed`, `reachT`, `startT`, `paidCost`, `energyInPipe`,
+  `_burstPayload`, `twCutRetraction`
 - Packet queue storage (`packetTravelQueue`, `packetAccumulatorUnits`)
 - Geometry: `distance`, `travelDuration`, `pipeCapacity`, `buildCost`
+
+Note on `reversed`: this field flips `effectiveSourceNode` / `effectiveTargetNode`. It lives
+in TwChannel. All TwChannel primitives that reference source/target use `effectiveSourceNode`
+and `effectiveTargetNode` — never `source`/`target` directly — so `reversed` is always
+respected without callers needing to know about it.
 
 **Public primitives (the only way higher layers interact with the channel):**
 
@@ -42,14 +48,18 @@ economic operations. This is the only layer that knows nodes exist.
 |---|---|---|
 | `grow(dt)` | Advances `reachT`, debits `source.energy` | Energy leaves source proportionally |
 | `retract()` | Returns `paidCost + energyInPipe` to source, begins RETRACTING | Source always gets full refund |
-| `collapseCommittedPayload()` | Destroys payload without refund, goes DEAD | Used only by Ownership.js for ownership loss |
+| `partialRefund(amount)` | Credits `amount` to source immediately, no state change | Used by animated cut payouts; still routes through TwChannel |
+| `drainSourceEnergy(amount)` | Debits `amount` from source, no payload accounting | Used by TwCombat for clash damage only |
+| `collapseCommittedPayload()` | Clears clash partner, destroys payload without refund, goes DEAD | Used only by Ownership.js for ownership loss |
 | `beginBurst(payload, startT)` | Sets state=BURSTING, stores payload | Combat decision, channel execution |
 | `transfer(energy)` | Moves energy from source to target | source -= energy, target += energy |
-| `advanceLifecycle(dt)` | Runs the state machine for this frame | Single update entry point |
+| `advanceLifecycle(dt)` | Runs the full state machine for this frame | Single update entry point |
+| `getCommittedPayload()` | Returns `paidCost + energyInPipe` | Read-only query for ownership cleanup |
 
 **Invariant:** `retract()` ALWAYS refunds. No flags, no exceptions.
-If a caller needs to destroy payload, it calls `collapseCommittedPayload()` — a different
-operation with a different name and explicit semantics.
+`partialRefund(amount)` and `drainSourceEnergy(amount)` are the only other energy ops
+in TwChannel; both have distinct names and explicit, bounded semantics.
+If a caller needs to destroy payload, it calls `collapseCommittedPayload()`.
 
 **Does NOT know:** clash partners, packet emission logic, cut classification,
 ownership rules, who is enemy or ally.
@@ -58,23 +68,32 @@ ownership rules, who is enemy or ally.
 
 ### Layer 1 — TwFlow.js
 
-How energy travels through an active, uncontested channel. Stateless helpers that
-operate on a channel instance. Does not own any state of its own.
+How energy travels through an active, uncontested channel. A collection of pure functions
+that operate on a channel instance. TwFlow holds no fields of its own; all state it
+reads or writes lives in the channel instance passed to it (a TwChannel).
 
-**Owns (functions, not state):**
-- Packet emission — advance accumulator, emit whole packets, drain `source.energy`
+**Clarification on "stateless":** TwFlow is stateless in that it allocates no objects
+and holds no mutable fields between calls. However, functions like `clearFlowState(channel)`
+do mutate channel fields — that is by design, since TwChannel owns those fields and TwFlow
+is an authorized mutator of them.
+
+**Owns (functions, not fields):**
+- Packet emission — advance accumulator, emit whole packets, drain via `channel.drainSourceEnergy()`
 - Packet delivery — advance travel times, deliver packets that arrive, call `channel.transfer()`
 - Flow application hooks:
   - `applyTwFriendlyFlow(channel, dt)` — feed ally node
   - `applyTwNeutralCaptureFlow(channel, dt)` — contribute to neutral capture
   - `applyTwEnemyAttackFlow(channel, dt)` — damage enemy node
+- `applyTwPayloadToTarget(channel, payload, opts)` — route payload to target based on ownership
+- `advanceTwFlow(channel, dt)` — main entry: emit packets, deliver, apply effect
+- `clearFlowState(channel)` — resets pipe/queue fields on the channel
+- `getRelayFlowMultiplier(channel)` — relay output modifier
 - Excess feed consumption — reads `sourceNode.excessFeed` per frame (double-buffer)
-- Relay flow multiplier calculation
 
 **Source of truth for migrations:**
-Current `_updateTentacleWarsActiveFlowState()` in `Tent.js` and the three flow functions
-in `TentCombat.js` (`applyTentacleFriendlyFlow`, `applyTentacleNeutralCaptureFlow`,
-`applyTentacleEnemyAttackFlow`) all move here.
+Current `_updateTentacleWarsActiveFlowState()` in `Tent.js` and the four exports from
+`TentCombat.js` (`applyTentacleFriendlyFlow`, `applyTentacleNeutralCaptureFlow`,
+`applyTentacleEnemyAttackFlow`, `applyTentaclePayloadToTarget`) all move here.
 
 **Does NOT know:** clash state, cut resolution, ownership rules.
 Knows only: "this channel is ACTIVE and uncontested — move energy through it."
@@ -83,34 +102,49 @@ Knows only: "this channel is ACTIVE and uncontested — move energy through it."
 
 ### Layer 2 — TwCombat.js
 
-How conflicts and cuts redirect a lane. Policy and orchestration only — no direct
-mutation of `node.energy` or lifecycle fields.
+How conflicts and cuts redirect a lane. Policy and orchestration only. TwCombat does
+not directly write `node.energy` — all energy operations go through TwChannel primitives.
 
 **Owns:**
 - Clash pair management: establish pair, clear pair, symmetric update guard
-- `clashT`, `clashVisualT`, `clashApproachActive` (visual clash front)
+- `clashT`, `clashVisualT`, `clashApproachActive` (visual clash front) — owned by TwCombat
+  as combat-session state on the channel instance
 - Clash approach animation
 - Clash front update (TW: fixed at 0.5)
-- Clash damage: drain losing source energy each frame
-- Clash resolution: when losing source falls below `TW_RETRACT_CRITICAL_ENERGY`
+- Clash damage: calls `channel.drainSourceEnergy(netDamage * dt)` on the losing source
+- Clash resolution: when losing source energy falls below `TW_RETRACT_CRITICAL_ENERGY`
   → calls `channel.retract()` on all losing outgoing channels (refund is automatic)
-  → calls `channel.state = ADVANCING` on winner (via a channel primitive)
+  → calls a TwChannel advance primitive to put winner in ADVANCING state
 - Cut classification: kamikaze / defensive / split
 - Burst decision: classifies a cut as burst → calls `channel.beginBurst(payload, startT)`
-- Slice payout animation (TW cut retraction: animated energy release to both sides)
+- Animated slice payout: calls `channel.partialRefund(sourceDelta)` and
+  `channel.transfer(targetDelta)` per frame as the animation progresses
+
+**`this.game` back-reference:** `_applyTwClashDamage` (→ `_applyClashDamage`) currently
+reads `this.game?.tents` to enumerate all outgoing tentacles from the losing source.
+In TwCombat this function receives the tent registry as a parameter:
+`_applyClashDamage(channel, opposingChannel, tentRegistry, dt)`.
+The caller (Tent.js delegation shell) passes `this.game.tents`.
 
 **Explicit contract — clash pair lifecycle:**
 ```
 TwCombat.pairChannels(channelA, channelB)
   → sets clashPartner on both symmetrically
+  → initializes clashT / clashVisualT / clashApproachActive
 
 TwCombat.unpairChannels(channelA, channelB)
-  → clears clashPartner + visual state on both BEFORE any kill/retract call
+  → clears clashPartner + all visual state on both BEFORE any retract/collapse call
   → prevents re-entry into clash update on the same frame
 ```
-This is the explicit contract that replaces the current fragile symmetric-cleanup pattern.
+All clash resolution paths call `unpairChannels` before calling any TwChannel unwind
+primitive. This is the explicit contract replacing the current fragile symmetric-cleanup.
 
-**Does NOT know:** node.energy directly, packet queues, relay multipliers,
+**TW cut classification:** The existing `isTentacleWarsSlice` inline branch in `kill()`
+(Tent.js line 436) becomes `TwCombat.classifyTwCut(cutRatio)`. It does not use the
+NodeWARS `classifyTentacleCut` / `CUT_RULES` path. During migration, the NW path
+stays in `Tent.js` untouched (D5).
+
+**Does NOT know:** `node.energy` directly, packet queues, relay multipliers,
 ownership rules, who is ally or enemy.
 
 ---
@@ -120,7 +154,7 @@ ownership rules, who is ally or enemy.
 | File | Role | Change |
 |---|---|---|
 | `Ownership.js` | Decides ownership transitions | Calls `channel.collapseCommittedPayload()` |
-| `TwCaptureRules.js` | Neutral capture math | Receives capture flow hooks from TwFlow |
+| `TwCaptureRules.js` | Neutral capture math | Receives neutral capture hooks from TwFlow |
 | `NeutralContest.js` | Contest state | Unchanged |
 | `TwBalance.js` | Tuning constants | Unchanged |
 | `TwGradeTable.js` | Grade/level table | Unchanged |
@@ -137,16 +171,27 @@ No caller can make `retract()` skip the refund. There are exactly two unwind ope
 - `retract()` = energy-preserving unwind (every voluntary and combat-triggered retract)
 - `collapseCommittedPayload()` = energy-destructive unwind (ownership loss only)
 
+`partialRefund(amount)` is a third primitive for animated partial payouts; it is
+energy-preserving but not a full unwind. It is only called from TwCombat's cut-retraction
+animation, never from flow or game rules.
+
 Rationale: the single biggest source of bugs in the current code is uncertainty about
 whether a given kill path refunds or not. This eliminates that class of bug entirely.
 
-### D2 — TwChannel is sole lifecycle owner
+### D2 — TwChannel is sole lifecycle owner; energy ops go through primitives
 
 `TwFlow` and `TwCombat` are **policy modules** — they call TwChannel primitives but do
-not own or directly mutate lifecycle fields (`state`, `reachT`, `paidCost`, etc.).
+not own lifecycle fields (`state`, `reachT`, `paidCost`, etc.).
 
-Rationale (Codex): if TwCombat directly owns lifecycle state, the coupling just moves
-to a second file. The clean split is primitives in TwChannel, policy in the others.
+Energy writes from higher layers are permitted only through named TwChannel primitives:
+- `TwFlow` uses `channel.drainSourceEnergy()` (via packet emission) and `channel.transfer()`
+- `TwCombat` uses `channel.drainSourceEnergy()` (clash damage), `channel.partialRefund()`
+  (cut payout), `channel.retract()` (clash resolution), `channel.beginBurst()`
+
+Direct `node.energy +=/-=` outside of TwChannel is a violation of this design.
+
+Rationale (Codex): if TwCombat directly mutates node state, the coupling just moves
+to a second file. Named primitives with explicit semantics are the clean split.
 
 ### D3 — Clash is a submode of ACTIVE
 
@@ -160,7 +205,7 @@ design covers. Keep it as a submode for now; elevate to a state in a future wave
 ### D4 — Kamikaze burst: decision in TwCombat, execution in TwChannel
 
 TwCombat classifies a cut as kamikaze and calls `channel.beginBurst(payload, startT)`.
-TwChannel owns the BURSTING state and its update loop (`_updateBurstingState`).
+TwChannel owns the BURSTING state and its update loop (`_advanceBursting`).
 The visual state (`startT`, `_burstPayload`) is channel state, not combat policy.
 
 ### D5 — NodeWARS code stays in Tent.js until retired
@@ -174,33 +219,50 @@ Migration is additive first, destructive only when NW is confirmed retired.
 
 ## Method Migration Map
 
-All ~55 methods in `Tent.js` + 5 exports from `TentCombat.js` map to exactly one destination.
+All 55 methods in `Tent.js` + 5 exports from `TentCombat.js` map to exactly one destination.
+Methods that stay in `Tent.js` as NodeWARS-only are noted explicitly.
 
 ### → TwChannel.js
 
 | Current | New name | Notes |
 |---|---|---|
-| `constructor` (TW fields) | `constructor` | Keep NW fields in Tent.js for now |
-| `_refundToSourceNode()` | private, called by `retract()` | |
+| `constructor` (TW fields) | `constructor` | NW fields stay in Tent.js |
+| `alive`, `removed` getters | unchanged | Lifecycle queries |
+| `effectiveSourceNode`, `effectiveTargetNode` | unchanged | Respect `reversed` |
+| `travelDuration`, `distance`, `pipeCapacity` getters | unchanged | Geometry |
+| `_refundToSourceNode()` | private — called only by `retract()` | |
 | `_clearEconomicPayload()` | private | |
-| `collapseForOwnershipLoss()` | `collapseCommittedPayload()` | Rename for clarity |
+| `_clearTentacleWarsCutRetraction()` | private | Clears `twCutRetraction` after animation |
+| `collapseForOwnershipLoss()` | `collapseCommittedPayload()` | Includes clash-partner teardown (see below) |
 | `getCommittedPayloadForOwnershipCleanup()` | `getCommittedPayload()` | |
 | `kill()` kamikaze branch | `beginBurst(payload, startT)` | |
 | `kill()` programmatic branch | `retract()` | |
+| `killBoth()` | `retractBoth()` | Calls `retract()` on both sides |
 | `activateImmediate()` | `activateImmediate()` | |
+| `update(dt)` TW dispatcher | `advanceLifecycle(dt)` | Dispatches to state-specific advances below |
+| `_updateActiveState(dt)` TW branch | `_advanceActive(dt)` | Gates flow vs clash |
 | `_updateGrowingState()` | `_advanceGrowing(dt)` | |
 | `_updateRetractingState()` | `_advanceRetracting(dt)` | |
 | `_updateAdvancingState()` | `_advanceAdvancing(dt)` | |
 | `_updateBurstingState()` | `_advanceBursting(dt)` | |
-| `getControlPoint()`, `getCP()` | unchanged | |
+| `getControlPoint()` | unchanged | |
+| `getCP()` | unchanged | Alias for getControlPoint |
+
+**Note on `collapseCommittedPayload()`:** absorbs the `_resolveClashPartnerOnCut(false)`
+call that currently lives inside `collapseForOwnershipLoss()`. Ownership.js calls a single
+primitive; the clash teardown is guaranteed before payload destruction.
 
 ### → TwFlow.js
 
 | Current | New name | Notes |
 |---|---|---|
 | `_updateTentacleWarsActiveFlowState()` | `advanceTwFlow(channel, dt)` | Main flow entry |
-| `_clearPipeState()` | `clearFlowState(channel)` | |
+| `_clearPipeState()` | `clearFlowState(channel)` | Mutates channel fields |
 | `_getRelayFlowMultiplier()` | `getRelayFlowMultiplier(channel)` | |
+| `_applyFriendlyFlow()` thin shim | merged into `applyTwFriendlyFlow` | |
+| `_applyNeutralCaptureFlow()` thin shim | merged into `applyTwNeutralCaptureFlow` | |
+| `_applyEnemyAttackFlow()` thin shim | merged into `applyTwEnemyAttackFlow` | |
+| `_applyPayloadToTarget()` | `applyTwPayloadToTarget` | |
 | `TentCombat: applyTentacleFriendlyFlow` | `applyTwFriendlyFlow` | |
 | `TentCombat: applyTentacleNeutralCaptureFlow` | `applyTwNeutralCaptureFlow` | |
 | `TentCombat: applyTentacleEnemyAttackFlow` | `applyTwEnemyAttackFlow` | |
@@ -210,52 +272,73 @@ All ~55 methods in `Tent.js` + 5 exports from `TentCombat.js` map to exactly one
 
 | Current | New name | Notes |
 |---|---|---|
-| `applySliceCut()` | `applySliceCut(channel, cutRatio)` | Entry point |
-| `_applyTentacleWarsSliceCut()` | `_resolveTwSliceCut()` | |
+| `applySliceCut()` | `applyTwSliceCut(channel, cutRatio)` | TW entry point |
+| `_applyTentacleWarsSliceCut()` | `_resolveTwSliceCut()` | Calls classifyTwCut |
 | `_resolveClashPartnerOnCut()` | `unpairChannels(a, b)` | Explicit contract |
 | `initializeFreshClashVisual()` | `pairChannels(a, b)` | Explicit contract |
 | `_updateClashApproach()` | `_advanceClashApproach()` | |
 | `_updateClashVisualFront()` | `_syncClashVisualFront()` | |
-| `_drainClashSourceBudget()` | `_drainClashSource()` | |
+| `_drainClashSourceBudget()` | `_drainClashSource()` | Calls `channel.drainSourceEnergy()` |
 | `_isCanonicalClashDriver()` | `_isCanonicalDriver()` | |
 | `TentCombat: computeTentacleClashForces` | `computeClashForces()` | |
 | `_updateClashFront()` TW branch | `_updateClashFront()` | |
-| `_resolveClashOutcome()` | `_resolveClashOutcome()` | Calls channel.retract() |
+| `_resolveClashOutcome()` | `_resolveClashOutcome()` | Calls unpairChannels, then channel.retract() |
 | `_updateClashState()` | `advanceTwClash(channel, dt)` | Main clash entry |
-| `_applyTwClashDamage()` | `_applyClashDamage()` | |
+| `_applyTwClashDamage()` | `_applyClashDamage(channel, opposing, tentRegistry, dt)` | Calls drainSourceEnergy; tentRegistry passed by Tent.js shell |
 | `_prepareClashState()` | `_prepareClash()` | |
 | `_applyTentacleWarsCutRetractionTargetEffect()` | `_applyCutRetractionEffect()` | |
-| `_releaseTentacleWarsCutPayout()` | `_releaseCutPayout()` | |
+| `_releaseTentacleWarsCutPayout()` | `_releaseCutPayout()` | Calls channel.partialRefund() + channel.transfer() |
+| *(new)* | `classifyTwCut(cutRatio)` | TW-specific cut classifier (kamikaze/defensive/split) |
+| `_applyImmediateTargetEffect()` TW branch | `_applyImmediateCutEffect()` | Cut context only |
 
-### → Ownership.js / TwCaptureRules.js (already there or migrate)
+### → Ownership.js / TwCaptureRules.js
 
-| Current | Destination |
+| Current | Destination | Notes |
+|---|---|---|
+| `_applyNeutralContestContribution()` | TwCaptureRules.js | |
+| `_setNeutralContestContribution()` | TwCaptureRules.js | |
+| `_cancelRivalContestProgress()` | TwCaptureRules.js | |
+| `_captureNeutralTarget()` | TwCaptureRules.js | |
+| `_defeatEnemyTarget()` | TwCaptureRules.js / Ownership.js | |
+
+### Stays in Tent.js (NodeWARS only, untouched until NW retired)
+
+| Method | Reason |
 |---|---|
-| `_applyNeutralContestContribution()` | TwCaptureRules.js |
-| `_setNeutralContestContribution()` | TwCaptureRules.js |
-| `_cancelRivalContestProgress()` | TwCaptureRules.js |
-| `_captureNeutralTarget()` | TwCaptureRules.js |
-| `_defeatEnemyTarget()` | TwCaptureRules.js / Ownership.js |
-| `_applyPayloadToTarget()` | TwFlow.js (via applyTwPayloadToTarget) |
-| `_applyImmediateTargetEffect()` | TwCombat.js (cut context) |
+| `_updateActiveFlowState(dt)` | NW continuous flow — not TW |
+| `_updateClashFront()` NW branch | NW force-based tug-of-war — not TW |
+| `_computeClashForces()` NW wrapper | NW only |
+| All NW-specific update paths | D5 — NW untouched |
 
 ---
 
-## What Stays in Tent.js
+## What Stays in Tent.js (delegation shell)
 
-During the migration period, `Tent.js` is the thin delegation shell:
+During the migration period, `Tent.js` dispatches TW calls to the new layers.
+The delegation shell covers all lifecycle states:
 
 ```js
 update(dt) {
-  if (this.simulationMode === 'tentaclewars') {
-    TwChannel.advanceLifecycle(this, dt);
-    if (this.clashPartner) TwCombat.advanceTwClash(this, dt);
-    else TwFlow.advanceTwFlow(this, dt);
-  } else {
+  if (this.simulationMode !== 'tentaclewars') {
     this._updateNodeWarsState(dt); // unchanged NW path
+    return;
   }
+
+  // TW: all lifecycle advances go through TwChannel
+  TwChannel.advanceLifecycle(this, dt);
+
+  // TW active state: flow or clash (advanceLifecycle gates GROWING/RETRACTING/etc.)
+  // _advanceActive is called from within advanceLifecycle when state === ACTIVE
+  // It delegates to TwCombat or TwFlow based on clashPartner:
+  //   if (this.clashPartner) TwCombat.advanceTwClash(this, dt)
+  //   else TwFlow.advanceTwFlow(this, dt)
 }
 ```
+
+`TwChannel.advanceLifecycle` is the single entry point. It calls the correct
+state-specific advance (_advanceGrowing, _advanceActive, _advanceRetracting,
+_advanceAdvancing, _advanceBursting). `_advanceActive` is the only state that
+dispatches to TwCombat or TwFlow.
 
 All NW-specific methods stay in `Tent.js` until NW is retired.
 
@@ -263,12 +346,19 @@ All NW-specific methods stay in `Tent.js` until NW is retired.
 
 ## Testing Strategy
 
-Each layer is testable independently:
+Each layer is independently testable with lightweight fixtures:
 
-- **TwChannel**: unit tests — grow debits, retract refunds, collapse destroys, beginBurst stores payload. No game loop needed.
-- **TwFlow**: unit tests with mock channels — packet emission count, delivery timing, energy accounting. `advanceTentacleWarsLaneRuntime()` already exists and can be reused.
-- **TwCombat**: unit tests with mock channel pairs — clash damage drains correct source, resolution calls retract on loser, pairChannels/unpairChannels are symmetric.
-- **Integration**: existing `smoke-checks.mjs` covers the full stack; all 102 checks must continue passing after each migration step.
+- **TwChannel**: unit tests — `grow` debits, `retract` refunds, `collapseCommittedPayload`
+  destroys, `beginBurst` stores payload, `drainSourceEnergy` debits without payload
+  accounting. No game loop needed. Fixtures are plain objects `{ energy, owner }`.
+- **TwFlow**: unit tests with mock TwChannel instances — packet emission count, delivery
+  timing, energy accounting via `transfer` calls. `advanceTentacleWarsLaneRuntime()`
+  in `TwPacketFlow.js` (renamed `advanceTwLaneRuntime` or kept) is reusable here.
+- **TwCombat**: unit tests with mock channel pairs — `pairChannels`/`unpairChannels` are
+  symmetric, clash damage calls `drainSourceEnergy` on correct source, clash resolution
+  calls `retract` on all losing channels, `classifyTwCut` returns correct branch.
+- **Integration**: existing `smoke-checks.mjs` (102 checks) must pass after every
+  migration commit. The `tw-energy-sanity.mjs` suite (6 checks) covers the energy model.
 
 ---
 
@@ -281,10 +371,17 @@ Each layer is testable independently:
 
 ---
 
-## Open Questions for Implementation
-
-None. The three questions from the initial brainstorm are resolved:
+## Resolved Design Questions
 
 1. **Layer count:** 3 (TwChannel + TwFlow + TwCombat) ✅
-2. **collapseForOwnershipLoss:** channel primitive `collapseCommittedPayload()` called by Ownership.js ✅
-3. **Kamikaze burst:** TwCombat decides → calls `channel.beginBurst()` ✅
+2. **`collapseForOwnershipLoss`:** becomes `collapseCommittedPayload()` in TwChannel,
+   includes clash-partner teardown internally, called by Ownership.js ✅
+3. **Kamikaze burst:** TwCombat decides (`classifyTwCut`) → calls `channel.beginBurst()` ✅
+4. **`node.energy` writes from TwCombat:** routed through `drainSourceEnergy()` and
+   `partialRefund()` primitives — TwCombat never writes `node.energy` directly ✅
+5. **`reversed` field:** lives in TwChannel; all TwChannel ops use `effectiveSourceNode`
+   / `effectiveTargetNode` so `reversed` is transparent to callers ✅
+6. **`_releaseTentacleWarsCutPayout` energy writes:** routed through `channel.partialRefund()`
+   and `channel.transfer()` — no direct `node.energy` mutation from TwCombat ✅
+7. **`this.game` back-reference in clash damage:** resolved by passing `tentRegistry`
+   as a parameter to `_applyClashDamage` ✅
