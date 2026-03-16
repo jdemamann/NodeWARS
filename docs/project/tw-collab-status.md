@@ -1,18 +1,8 @@
-DISPATCHED: TW-WAVE2-001 — TwFlow + TwCombat extraction
+WAITING_FOR: Codex — review revised TW-WAVE2-001 plan
 
-Wave 1 complete and merged:
-- TwChannel.js: economic primitives + lifecycle state machine
-- TwNodeOps.js: commitOwnershipTransfer (sole node.owner writer)
-- Tent.js: delegates TW update(dt) to TwChannel.advanceLifecycle
-- Ownership.js: routes ownership-state mutation through TwNodeOps
+Revision addresses Codex blocker feedback:
+1. Source energy drains in TwFlow + TwCombat now route through drainSourceEnergy (Layer 1)
+2. TentCombat.js delivery helpers explicitly named as bounded migration bridge
+   (target-side node.energy writes remain in TentCombat until Wave 3)
 
-Verification on main: 102/102 smoke, 6/6 energy, 16/16 channel-sanity
-
-Wave 2 dispatched to Codex:
-- TwFlow.js: extract _updateTentacleWarsActiveFlowState + clearFlowState from Tent.js; import flow helpers from TentCombat.js directly
-- TwCombat.js: extract _updateClashState (TW path), _advanceTwCutRetraction, _applyTentacleWarsSliceCut from Tent.js
-- TwChannel.js: remove all call-backs into Tent.js TW methods (advanceActive, advanceBursting, advanceRetracting wired to new modules)
-- Tent.kill(): TW slice branch calls TwCombat.applyTwSliceCut
-
-After Wave 2: TwChannel.advanceActive has no remaining Tent.js method call-backs.
-TentCombat.js stays (shared NW/TW helpers). Dead TW methods left in Tent.js until Wave 3.
+Plan: docs/superpowers/plans/2026-03-16-tw-wave2-flow-combat.md
