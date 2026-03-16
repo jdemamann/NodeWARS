@@ -27,6 +27,7 @@ import {
 } from '../tentaclewars/TwCaptureRules.js';
 import { resolveTentacleWarsCutDistribution } from '../tentaclewars/TwCutRules.js';
 import { advanceLifecycle } from '../tentaclewars/TwChannel.js';
+import { applyTwSliceCut } from '../tentaclewars/TwCombat.js';
 import {
   applyTentaclePayloadToTarget,
   applyTentacleFriendlyFlow,
@@ -437,7 +438,7 @@ export class Tent {
     const isTentacleWarsSlice = this.effectiveSourceNode?.simulationMode === 'tentaclewars' && cutRatio !== undefined;
 
     if (isTentacleWarsSlice) {
-      this._applyTentacleWarsSliceCut(cutRatio, payload);
+      applyTwSliceCut(this, cutRatio, payload);
       return;
     }
 

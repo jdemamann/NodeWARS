@@ -17,8 +17,13 @@ import { bus } from '../core/EventBus.js';
 import { areHostileOwners } from '../systems/OwnerTeams.js';
 import { resolveGrowingTentacleCollision } from '../entities/TentRules.js';
 import { advanceTwFlow, applyTwPayloadToTarget } from './TwFlow.js';
+import { advanceTwClash, advanceTwCutRetraction } from './TwCombat.js';
 
-function clearEconomicPayload(channel) {
+/*
+ * Clears the economically committed payload fields on a channel.
+ * Used when a lane is refunded, collapsed, or converted into a cut runtime.
+ */
+export function clearEconomicPayload(channel) {
   channel.paidCost = 0;
   channel.energyInPipe = 0;
   channel._burstPayload = 0;
@@ -30,7 +35,11 @@ function clearClashVisualState(channel) {
   channel.clashApproachActive = false;
 }
 
-function resolveClashPartnerOnCut(channel, preserveClashT) {
+/*
+ * Releases an active clash pair when one lane is cut or collapsed.
+ * The partner either advances from the shared clash front or fully retracts.
+ */
+export function resolveClashPartnerOnCut(channel, preserveClashT) {
   if (!channel.clashPartner) return;
 
   const partner = channel.clashPartner;
@@ -82,20 +91,36 @@ export function getCommittedPayload(channel) {
     : ((channel.paidCost || 0) + (channel.energyInPipe || 0));
 }
 
+/*
+ * Applies a canonical source-side energy drain for a TW channel.
+ * Layer 2 flow/combat logic must route source spending through this helper.
+ */
 export function drainSourceEnergy(channel, amount) {
   channel.effectiveSourceNode.energy = Math.max(0, channel.effectiveSourceNode.energy - amount);
 }
 
+/*
+ * Returns energy to the effective source without clamping to node cap.
+ * Used by retracts and progressive TW cut refunds.
+ */
 export function partialRefund(channel, amount) {
   channel.effectiveSourceNode.energy += amount;
 }
 
+/*
+ * Arms a committed payload burst that will deliver when the burst tail reaches the target.
+ * Used by the shared cut/burst mechanics during the Layer 1 migration.
+ */
 export function beginBurst(channel, payload, startT) {
   channel.state = TentState.BURSTING;
   channel._burstPayload = payload;
   channel.startT = startT;
 }
 
+/*
+ * Performs a direct source->target transfer through the channel surface.
+ * Retained as a narrow primitive for future Layer 2 callers.
+ */
 export function transfer(channel, energy) {
   channel.effectiveSourceNode.energy -= energy;
   channel.effectiveTargetNode.energy += energy;
@@ -160,7 +185,7 @@ function advanceGrowing(channel, dt) {
 
 function advanceRetracting(channel, dt) {
   if (channel.twCutRetraction) {
-    channel._advanceTwCutRetraction(dt);
+    advanceTwCutRetraction(channel, dt);
     return;
   }
 
@@ -214,7 +239,7 @@ function advanceActive(channel, dt) {
   channel._previousTargetOwner = effectiveTarget.owner;
 
   if (channel.clashPartner?.alive && channel.clashPartner.state !== TentState.RETRACTING) {
-    channel._updateClashState(dt);
+    advanceTwClash(channel, dt);
   } else if (channel.clashT !== null) {
     channel.clashT = null;
     channel.clashVisualT = null;
