@@ -6,7 +6,10 @@
 
 **Architecture:** `TwFlow.js` owns the packet-accumulator flow tick and per-delivery routing. `TwCombat.js` owns the clash front, cut retraction animation, and slice-cut resolution. Both import Layer 1 primitives from `TwChannel.js`; neither touches `node.owner`. Source energy drains (emitted packets, clash drain, clash damage) all route through `TwChannel.drainSourceEnergy`. After this wave, `TwChannel.advanceActive` has no remaining call-backs into `Tent.js` TW methods. `Tent.kill()` routes TW slices through `TwCombat.applyTwSliceCut`.
 
-**Migration debt:** `TentCombat.js` delivery helpers (`applyTentacleFriendlyFlow`, `applyTentacleNeutralCaptureFlow`, `applyTentacleEnemyAttackFlow`, `applyTentaclePayloadToTarget`) still write `node.energy` directly — they are shared NW/TW code and cleaning them up requires either TW-specific Layer 1 delivery primitives or restructuring the NW path too. This wave treats them as a **bounded migration bridge** (not a clean final boundary). Wave 3 / TASK-TW-007 will either create TW-specific Layer 1 delivery primitives or migrate TentCombat.js into the layer model. The remaining source-side drains, however, are fixed in this wave via `drainSourceEnergy`.
+**Migration debt (bounded, explicit):** Three categories of direct Layer 0 writes remain in this wave and are explicitly accepted as temporary:
+1. `TentCombat.js` delivery helpers (`applyTentacleFriendlyFlow`, `applyTentacleNeutralCaptureFlow`, `applyTentacleEnemyAttackFlow`, `applyTentaclePayloadToTarget`) — still write `node.energy` directly on the target side; shared NW/TW code, requires dedicated Layer 1 delivery primitives or NW path restructure.
+2. `targetNode.underAttack = ...` in `advanceTwFlow` — visual/rendering hint only, no economic effect; will move behind a `markNodeUnderAttack` Layer 1 primitive in Wave 3.
+All source-side energy drains are fixed in this wave via `drainSourceEnergy`. Wave 3 / TASK-TW-007 resolves the remaining debt.
 
 **Tech Stack:** Vanilla JS ES modules. Node.js test scripts (`scripts/*.mjs`). No build step.
 
@@ -269,6 +272,10 @@ export function advanceTwFlow(channel, dt) {
 
   let deliveredAmount = 0;
   if (!areAlliedOwners(targetNode.owner, sourceNode.owner) && targetNode.owner !== 0) {
+    /* MIGRATION BRIDGE: direct write to targetNode.underAttack (Layer 0 field).
+       underAttack is a visual/rendering hint only — no economic effect.
+       Classified as bounded debt alongside TentCombat delivery helpers;
+       a Layer 1 primitive (e.g. markNodeUnderAttack) can wrap it in Wave 3. */
     targetNode.underAttack = Math.max(targetNode.underAttack || 0, 1);
   }
 
