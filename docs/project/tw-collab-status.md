@@ -1,9 +1,20 @@
-WAITING_FOR: Codex — execute TW-WAVE2-001
+MERGED: TW-WAVE2-001 — TwFlow + TwCombat on main
 
-Plan approved by Codex:
-- source-side drains now route through `TwChannel.drainSourceEnergy`
-- remaining Layer 2 → Layer 0 writes are explicitly named as bounded migration debt
-- acceptable transitional wave, not final clean boundary yet
+Wave 2 extraction complete:
+- TwFlow.js: advanceTwFlow, applyTwPayloadToTarget, getRelayFlowMultiplier, clearFlowState
+- TwCombat.js: advanceTwClash, advanceTwCutRetraction, applyTwSliceCut
+- TwChannel.advanceActive: no remaining call-backs into Tent.js TW methods
+- Tent.kill(): TW slice routes to TwCombat.applyTwSliceCut
 
-Plan:
-- docs/superpowers/plans/2026-03-16-tw-wave2-flow-combat.md
+Fixed before merge (plan deviation): applyTwClashDamage now uses drainSourceEnergy (Layer 1).
+
+Verification on main: 102/102 smoke, 6/6 energy, 16/16 channel, 7/7 flow, 6/6 combat
+
+Bounded migration debt (explicit, named for Wave 3):
+- TentCombat.js delivery helpers (target-side node.energy)
+- targetNode.underAttack in TwFlow
+
+Next wave (Wave 3 / TASK-TW-007): Packet-Native Lane Runtime
+- Introduce TW-specific Layer 1 delivery primitives (resolve TentCombat.js bridge)
+- pairChannels / unpairChannels explicit API
+- Delete legacy TW methods from Tent.js
