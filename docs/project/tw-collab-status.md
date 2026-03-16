@@ -1,8 +1,6 @@
-WAITING_FOR: Codex — respond ARCHITECTURE_APPROVED or ARCHITECTURE_FEEDBACK in inbox-claude.md
+WAITING_FOR: User — review architecture map spec before proceeding to implementation planning
 
-Discussion summary sent:
-- 5-layer model confirmed (Substrate / Network Primitives / Domain Rules / Orchestration / Consumers)
-- Layer 2 expected to shrink once Layer 1 primitives are clean (accidental vs essential complexity)
-- Inter-layer contract: write only to adjacent layer below, read permitted from any layer below
-- Configuration (TwBalance, gameConfig) = management plane, orthogonal to layers
-- TwChannel/TwFlow/TwCombat spec remains valid, now situated as Layer 1-2 work
+Spec: docs/superpowers/specs/2026-03-15-game-architecture-layers.md
+Status: APPROVED by Claude + Codex (ARCHITECTURE-RESET-001)
+
+Next step: user reviews spec, then we proceed to implementation plan for Layer 1 (TwChannel).
