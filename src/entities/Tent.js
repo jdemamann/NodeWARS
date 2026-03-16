@@ -19,7 +19,6 @@ import { classifyTentacleCut, resolveGrowingTentacleCollision } from './TentRule
 import { areAlliedOwners, areHostileOwners } from '../systems/OwnerTeams.js';
 import { computeTentacleWarsBuildCost } from '../tentaclewars/TwTentacleEconomy.js';
 import { getTentacleWarsPacketRateForGrade } from '../tentaclewars/TwGradeTable.js';
-import { distributeTentacleWarsOverflow } from '../tentaclewars/TwEnergyModel.js';
 import { TW_BALANCE } from '../tentaclewars/TwBalance.js';
 import { advanceTentacleWarsLaneRuntime } from '../tentaclewars/TwPacketFlow.js';
 import {
@@ -80,9 +79,6 @@ export class Tent {
 
     /* Visual */
     this.flowRate    = 0;
-    /* TentacleWars overflow share — pre-assigned by Physics.js each frame.
-       Zero by default; only meaningful in TW mode with a full support triangle. */
-    this.twOverflowShare = 0;
     this.cutPoint    = undefined;
     this.cutFlash    = 0;
     this.age         = 0;
@@ -740,8 +736,11 @@ export class Tent {
    */
   _updateTentacleWarsActiveFlowState(sourceNode, targetNode, dt) {
     const baseThroughputPerSecond = computeTentacleSourceFeedRate(sourceNode, this.maxBandwidth, dt);
-    /* Overflow share is pre-assigned by Physics.updateOutCounts each frame. */
-    const overflowShareUnits = this.twOverflowShare;
+    /* Excess share: on-demand split of sourceNode's prior-frame excess across outgoing lanes. */
+    const excessShare = sourceNode.outCount > 0
+      ? (sourceNode.excessFeed || 0) / sourceNode.outCount
+      : 0;
+    const overflowShareUnits = excessShare;
     const relayFlowMultiplier = this._getRelayFlowMultiplier(sourceNode);
     const laneStep = advanceTentacleWarsLaneRuntime({
       accumulatorUnits: this.packetAccumulatorUnits + overflowShareUnits,
@@ -925,8 +924,11 @@ export class Tent {
        instantFlowRate in _updateTentacleWarsActiveFlowState), so localPressure is
        directly compatible with the existing EMA formula — do NOT divide by dt. */
     if (sourceNode.simulationMode === 'tentaclewars') {
+      const excessShare = sourceNode.outCount > 0
+        ? (sourceNode.excessFeed || 0) / sourceNode.outCount
+        : 0;
       const localPressure = computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt)
-        + this.twOverflowShare;
+        + excessShare;
       this.flowRate = this.flowRate * 0.80 + localPressure * 0.20;
 
       /* Feed the packet queue toward the clash point so yellow orbs animate
@@ -934,7 +936,7 @@ export class Tent {
          so travelDuration is halved. deliveredPacketCount is ignored — packets
          cancel at the midpoint, they do not deliver energy to the target. */
       const clashStep = advanceTentacleWarsLaneRuntime({
-        accumulatorUnits: this.packetAccumulatorUnits + this.twOverflowShare,
+        accumulatorUnits: this.packetAccumulatorUnits + excessShare,
         throughputPerSecond: computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt),
         deltaSeconds: dt,
         sourceAvailableEnergy: sourceNode.energy,
@@ -994,15 +996,19 @@ export class Tent {
     const sourceNode = this.effectiveSourceNode;
     const opposingSource = opposingTentacle.effectiveSourceNode;
 
-    /* Pressure = base feed rate + overflow share for each side.
+    /* Pressure = base feed rate + on-demand excess share for each side.
        Both sourceNode.energy and opposingSource.energy are already post-drain
        when Block B runs (_drainClashSourceBudget fired earlier in _updateClashState
        for each tentacle). Do NOT cache pre-drain values for symmetry — the drain
        is intentional and both sides are correctly reduced before this point. */
+    const myExcessShare = sourceNode.outCount > 0
+      ? (sourceNode.excessFeed || 0) / sourceNode.outCount : 0;
+    const opposingExcessShare = opposingSource.outCount > 0
+      ? (opposingSource.excessFeed || 0) / opposingSource.outCount : 0;
     const myPressure = computeTentacleClashFeedRate(sourceNode, this.maxBandwidth, dt)
-      + this.twOverflowShare;
+      + myExcessShare;
     const opposingPressure = computeTentacleClashFeedRate(opposingSource, opposingTentacle.maxBandwidth, dt)
-      + opposingTentacle.twOverflowShare;
+      + opposingExcessShare;
     /* Bidirectional: damage flows to whoever has lower pressure, regardless
        of which tentacle is the canonical driver. */
     const netDamage = Math.abs(myPressure - opposingPressure);

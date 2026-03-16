@@ -50,9 +50,8 @@ async function makeTwFixtures({ energyA = 50, energyB = 50, maxE = 60 } = {}) {
 async function testTwClashDamageAppliesToLosingNode() {
   const { sourceA, sourceB, tentA, tentB } = await makeTwFixtures({ energyA: 50, energyB: 50 });
 
-  // Give tentA an overflow boost so it wins
-  tentA.twOverflowShare = 5;
-  tentB.twOverflowShare = 0;
+  // Give sourceA an overflow boost so tentA wins
+  sourceA.excessFeed = 5;
 
   const energyBefore = sourceB.energy;
 
@@ -75,8 +74,7 @@ async function testTwClashThresholdTriggersRetractAndAdvance() {
       maxE: 60,
     });
 
-    tentA.twOverflowShare = 10;
-    tentB.twOverflowShare = 0;
+    sourceA.excessFeed = 10;
 
     tentB._updateClashState(0.1);
     tentA._updateClashState(0.1);
@@ -98,8 +96,7 @@ async function testTwClashThresholdTriggersRetractAndAdvance() {
       maxE: 60,
     });
 
-    tentA.twOverflowShare = 50;
-    tentB.twOverflowShare = 0;
+    sourceA.excessFeed = 50;
 
     tentB._updateClashState(0.1);
     tentA._updateClashState(0.1);
@@ -117,8 +114,7 @@ async function testTwClashBidirectionalDamage() {
   // Canonical driver (tentA, source.id=0) is the WEAKER side.
   // tentB has large overflow → higher pressure → damage should flow to sourceA.
   const { tentA, tentB, sourceA, sourceB, TentState } = await makeTwFixtures({ energyA: 8, energyB: 50 });
-  tentA.twOverflowShare = 0;
-  tentB.twOverflowShare = 10; // opposing side has overflow advantage
+  sourceB.excessFeed = 10; // opposing side has overflow advantage
 
   tentB._updateClashState(0.1); // non-canonical: Block A only
   tentA._updateClashState(0.1); // canonical: Block A + Block B
