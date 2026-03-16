@@ -204,6 +204,37 @@ When rebuilding a soundtrack track from an authored audio file:
 - Late high-pressure levels `18`, `21`, `30`, and `32` now give the player structural opening support through authored player-owned flank starts.
 - Next useful balance work should be based on playtest evidence, not blind global tuning.
 
+## Agent Identity and Tool Availability
+
+This project is worked on by two agents: **Claude** (Claude Code CLI) and **Codex** (OpenAI Codex CLI).
+They share this file but have different tools installed.
+
+**claude-mem is only available on Claude.** Codex does not have it installed.
+Before attempting any claude-mem operation, check which agent you are:
+- If you are Claude Code → claude-mem is available. Use it.
+- If you are Codex → skip all claude-mem steps. Do not attempt them.
+
+### Claude: use claude-mem before reading large files
+
+Claude has the `claude-mem:mem-search` skill and the MCP tools (`search`, `get_observations`,
+`timeline`). Use them to avoid re-reading large files that have already been analyzed.
+
+**When to check claude-mem first:**
+- Before reading any source file larger than ~200 lines that has been worked on before
+  (e.g. `Tent.js`, `Game.js`, `TentCombat.js`, `Ownership.js`)
+- Before mapping methods or imports in a file — past sessions often have this already
+- Before exploring module structure for a subsystem already touched in prior waves
+- When writing a plan: check for prior method inventories, file analyses, and decision records
+  before opening source files
+
+**How:** use the `claude-mem:mem-search` skill or call `search(query, project="nodewars-v2-codex")`
+directly. If the result is current enough, skip the file read. If the result is stale or missing,
+read the file and the new analysis will be captured automatically.
+
+**This does not apply to Codex.** Codex reads files directly — that is its normal workflow.
+
+---
+
 ## Workflow Expectations
 
 - Prefer small, test-backed changes.
