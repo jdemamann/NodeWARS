@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Advance packet accumulation and travel for active TW channels.
  * - Route sustained delivered payload through TW-native Layer 1 delivery primitives.
- * - Keep cut/burst payload delivery on the shared path until the dedicated follow-up wave.
+ * - Route burst/cut payload through TwDelivery.applyTwBurstDelivery.
  *
  * Runtime role:
  * Called from TwChannel during TW ACTIVE flow; operates on Tent instances during migration.
@@ -17,9 +17,7 @@ import { areAlliedOwners } from '../systems/OwnerTeams.js';
 import { advanceTentacleWarsLaneRuntime } from './TwPacketFlow.js';
 import { drainSourceEnergy } from './TwChannel.js';
 import {
-  applyTentaclePayloadToTarget,
-} from '../entities/TentCombat.js';
-import {
+  applyTwBurstDelivery,
   applyTwEnemyAttack,
   applyTwFriendlyDelivery,
   applyTwNeutralCapture,
@@ -33,17 +31,11 @@ export function getRelayFlowMultiplier(sourceNode) {
 }
 
 /*
- * Applies already-computed burst/cut payload through the shared Tent/TentCombat path.
- * Option X for Wave 3: keep this TW branch stable until cut/burst delivery moves into TwDelivery.
+ * Applies already-computed burst/cut payload to a TW target.
+ * Routes through TwDelivery.applyTwBurstDelivery — TentCombat no longer involved.
  */
 export function applyTwPayloadToTarget(channel, targetNode, sourceNode, payloadAmount, opts = {}) {
-  applyTentaclePayloadToTarget({
-    tentacle: channel,
-    targetNode,
-    sourceNode,
-    payloadAmount,
-    ...opts,
-  });
+  applyTwBurstDelivery(channel, targetNode, sourceNode, payloadAmount, opts);
 }
 
 export function clearFlowState(channel) {
