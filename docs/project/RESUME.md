@@ -4,22 +4,32 @@
 
 ## Project phase
 
-Stabilized foundation — active TentacleWars layer extraction and campaign work.
-Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrated in main.
+TW extraction complete. Two-line development strategy active.
+- `main` (tag `v-nw-tw-complete`) — frozen NW+TW snapshot, all 4 extraction waves merged
+- `tw-pure` — NodeWARS legacy removal in progress, TW-only target
+
+**See `docs/project/FORK-STRATEGY.md` for the full two-line strategy, architecture
+overview, and recovery procedures.**
 
 ## Current branch
 
-`main` — all TW work merged. No active feature branch.
+`tw-pure` — NW legacy removal. Branched from `v-nw-tw-complete` (main @ `979548a`).
+`main` is frozen as the NW+TW reference. Do not push NW removal work to main.
 
 ## Latest validated baseline
 
-- smoke-checks.mjs: 102/102 (post TW-WAVE4, commit after merge)
+At tag `v-nw-tw-complete` (main, commit `979548a`):
+
+- smoke-checks.mjs: 102/102 (post TW-WAVE4)
 - tw-campaign-sanity.mjs: 15/15
 - tw-channel-sanity.mjs: 16/16
 - tw-flow-sanity.mjs: 7/7
 - tw-combat-sanity.mjs: 6/6
 - tw-energy-sanity.mjs: 6/6
 - tw-ownership-sanity.mjs: 5/5
+- tw-delivery-sanity.mjs: 6/6
+
+Any agent starting work on `tw-pure` must reproduce this baseline first.
 
 ## Completed waves (this cycle)
 
@@ -43,8 +53,9 @@ Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrat
 
 1. `AGENTS.md` — stable rules and structure
 2. `docs/project/RESUME.md` — this file (live state)
-3. `docs/project/inbox-codex.md` — current task
-4. `docs/project/tw-collab-status.md` — handoff state
+3. `docs/project/FORK-STRATEGY.md` — two-line strategy + recovery procedures (READ THIS)
+4. `docs/project/inbox-codex.md` — current task
+5. `docs/project/tw-collab-status.md` — handoff state
 
 ## Stale files — ignore during cold-start
 
@@ -60,10 +71,17 @@ Core gameplay is not in high-risk drift. TentacleWars 80-level campaign integrat
 
 ## Next recommended action
 
-TW layer extraction pipeline complete (Waves 1–4). Immediate candidates:
-1. **TASK-TWL-009** — validate World 1 levels against current runtime
-2. **TASK-TWL-003** — Progression and Score Spec (unblocks TWL-005/006)
-3. **TASK-TWL-004** — Obstacle Spec
+**Active work (tw-pure branch):** NW legacy removal — 8-step plan:
+1. Delete `TentCombat.js` (100% NW-only, 137 lines)
+2. Simplify `kill()` from 80 → ~12 lines (only TW paths remain)
+3. Delete NW state machine methods from `Tent.js` (~70 lines)
+4. Delete NW flow methods from `Tent.js` (~90 lines)
+5. Delete NW clash methods from `Tent.js` (~130 lines)
+6. Delete NW contest/ownership callbacks from `Tent.js` (~60 lines)
+7. Simplify `update()` and constructor (remove all simulationMode checks)
+8. Fix `TwCombat.advanceTwClash` to receive `tentRegistry` as parameter
+
+**After tw-pure is stable:** campaign and balance work (TASK-TWL-009, TWL-003, TWL-004)
 
 Start with the brainstorming skill for any new wave.
 
