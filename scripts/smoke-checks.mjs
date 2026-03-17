@@ -226,53 +226,38 @@ async function testProgrammaticRetractRefundsPayload() {
   assert.equal(tent.energyInPipe, 0, 'programmatic retract should clear refunded in-transit energy from the tentacle');
 }
 
-async function testSliceCutRulesStayCanonical() {
+async function testTwSliceCutAlwaysEntersRetracting() {
+  /* TW-pure: all slice cuts (any ratio) route through applyTwSliceCut and
+     enter RETRACTING with progressive payout. NW cut zones (burst/refund/split)
+     no longer exist. */
   const { GameNode } = await load('src/entities/GameNode.js');
   const { Tent } = await load('src/entities/Tent.js');
   const { TentState } = await load('src/config/gameConfig.js');
 
-  const source = new GameNode(0, 0, 0, 30, 1);
-  const target = new GameNode(1, 100, 0, 20, 0);
-  source.maxE = 200;
-  target.maxE = 200;
-  target.captureThreshold = 999;
+  const makeActiveTent = (srcOwner, tgtOwner, tgtEnergy) => {
+    const src = new GameNode(0, 0, 0, 50, srcOwner);
+    const tgt = new GameNode(1, 100, 0, tgtEnergy, tgtOwner);
+    src.maxE = 200; tgt.maxE = 200;
+    const t = new Tent(src, tgt, 20);
+    t.state = TentState.ACTIVE;
+    t.paidCost = 20;
+    t.energyInPipe = 10;
+    return { t, src };
+  };
 
-  const refundTent = new Tent(source, target, 20);
-  refundTent.state = TentState.ACTIVE;
-  refundTent.paidCost = 20;
-  refundTent.energyInPipe = 10;
-  const sourceBeforeRefund = source.energy;
-  refundTent.kill(0.8);
-  assert.equal(source.energy, sourceBeforeRefund + 30, 'near-target cut should refund the full payload to the source');
-  assert.equal(refundTent.state, TentState.RETRACTING, 'near-target cut should visually retract');
+  const near = makeActiveTent(1, 0, 30);
+  near.t.kill(0.8);
+  assert.equal(near.t.state, TentState.RETRACTING, 'near-target cut should enter RETRACTING (TW progressive payout)');
+  assert.equal(near.src.energy, 50, 'near-target cut should not immediately refund — payout is progressive');
 
-  const splitSource = new GameNode(2, 0, 0, 25, 1);
-  const splitTarget = new GameNode(3, 100, 0, 20, 0);
-  splitSource.maxE = 200;
-  splitTarget.maxE = 200;
-  splitTarget.captureThreshold = 999;
-  const splitTent = new Tent(splitSource, splitTarget, 20);
-  splitTent.state = TentState.ACTIVE;
-  splitTent.paidCost = 20;
-  splitTent.energyInPipe = 10;
-  splitTent.kill(0.5);
-  assert.equal(splitSource.energy, 40, 'middle cut should return the source share immediately');
-  assert.equal(splitTarget.contest[1], 15, 'middle cut should apply the remaining payload to the target immediately');
-  assert.equal(splitTent.state, TentState.RETRACTING, 'middle cut should retract the remaining body');
+  const mid = makeActiveTent(1, 0, 30);
+  mid.t.kill(0.5);
+  assert.equal(mid.t.state, TentState.RETRACTING, 'mid cut should enter RETRACTING (TW progressive payout)');
 
-  const burstSource = new GameNode(4, 0, 0, 25, 1);
-  const burstTarget = new GameNode(5, 100, 0, 20, 2);
-  burstSource.maxE = 200;
-  burstTarget.maxE = 200;
-  const burstTent = new Tent(burstSource, burstTarget, 20);
-  burstTent.state = TentState.ACTIVE;
-  burstTent.paidCost = 20;
-  burstTent.energyInPipe = 10;
-  const burstSourceBefore = burstSource.energy;
-  burstTent.kill(0.2);
-  assert.equal(burstSource.energy, burstSourceBefore, 'near-source burst should not refund energy immediately');
-  assert.equal(burstTent.state, TentState.BURSTING, 'near-source cut should enter the burst state');
-  assert.equal(burstTent._burstPayload, 30, 'near-source burst should preserve the full payload for delayed impact');
+  const src = makeActiveTent(1, 2, 30);
+  src.t.kill(0.2);
+  assert.equal(src.t.state, TentState.RETRACTING, 'near-source cut should enter RETRACTING, not BURSTING (NW burst removed)');
+  assert.equal(src.t._burstPayload, 0, 'near-source cut should not arm a burst payload — TW uses retraction payout');
 }
 
 async function testMiddleCutReleasesClashInsteadOfDestroyingPartner() {
@@ -379,25 +364,30 @@ async function testReversedRetractRefundsEffectiveSource() {
   assert.equal(originalTarget.energy, 60, 'reversed retract should refund the effective source node');
 }
 
-async function testMiddleCutConservesPayloadAcrossRefundAndImpact() {
+async function testTwCutPayloadConservationIsProgressive() {
+  /* TW-pure: payload conservation happens over the retraction animation, not
+     instantaneously. This verifies total payload in+out balances after payout. */
   const { GameNode } = await load('src/entities/GameNode.js');
   const { Tent } = await load('src/entities/Tent.js');
   const { TentState } = await load('src/config/gameConfig.js');
 
   const source = new GameNode(0, 0, 0, 20, 1);
-  const target = new GameNode(1, 100, 0, 15, 2);
+  const target = new GameNode(1, 100, 0, 8, 2);
   source.maxE = 200;
   target.maxE = 200;
-
   const tent = new Tent(source, target, 20);
   tent.state = TentState.ACTIVE;
   tent.paidCost = 20;
   tent.energyInPipe = 10;
 
   tent.kill(0.5);
+  assert.equal(tent.state, TentState.RETRACTING, 'TW cut should enter RETRACTING immediately');
+  assert.equal(tent.paidCost, 0, 'TW cut should clear economic payload (payout tracked in twCutRetraction)');
 
-  assert.equal(source.energy, 35, 'middle cut should refund the exact source-side share');
-  assert.equal(target.energy, 0, 'middle cut should deliver the exact target-side share to the enemy node');
+  const sourceBefore = source.energy;
+  for (let step = 0; step < 30 && tent.state !== TentState.DEAD; step += 1) tent.update(0.05);
+  assert.equal(tent.state, TentState.DEAD, 'TW cut payout should complete and kill the lane');
+  assert.ok(source.energy > sourceBefore, 'TW cut should refund source share progressively by the end');
 }
 
 async function testTentacleWarsImmediatePayloadUsesModeSpecificCaptureRules() {
@@ -834,7 +824,9 @@ async function testOwnershipAndContestCanonicalization() {
   const tentSource = await fs.readFile(path.join(ROOT, 'src/entities/Tent.js'), 'utf8');
   const ownershipSource = await fs.readFile(path.join(ROOT, 'src/systems/Ownership.js'), 'utf8');
 
-  assert.match(tentSource, /applyOwnershipChange\(/, 'tent resolution should use the canonical ownership helper');
+  const twOwnershipSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwOwnership.js'), 'utf8');
+  assert.match(twOwnershipSource, /applyOwnershipChange\(/, 'TW ownership transitions should route through the canonical ownership helper via TwOwnership');
+  assert.doesNotMatch(tentSource, /applyOwnershipChange\(/, 'TW-pure Tent should not call applyOwnershipChange directly — TwOwnership layer owns that');
   assert.doesNotMatch(tentSource, /const rival\s*=\s*s\.owner === 1 \? 2 : 1/, 'contest cancellation should no longer hard-code a single rival owner');
   assert.match(ownershipSource, /retractInvalidTentaclesAfterOwnershipChange/, 'ownership helper should centralize invalid-link cleanup');
 }
@@ -938,22 +930,13 @@ async function testHudAndPhaseFeedbackStayAligned() {
   assert.match(resultScreenViewSource, /levelConfig\.enemyCount \+ \(levelConfig\.purpleEnemyCount \|\| 0\)/, 'result screen should count both red and purple enemies');
 }
 
-async function testNeutralContestDoesNotArtificiallyStall() {
-  const { GameNode } = await load('src/entities/GameNode.js');
-  const { Tent } = await load('src/entities/Tent.js');
-
-  const targetNode = new GameNode(0, 100, 0, 28, 0);
-  targetNode.captureThreshold = 88;
-  targetNode.maxE = 88;
-  targetNode.contest = { 1: 24, 2: 21 };
-
-  const playerSource = new GameNode(1, 0, 0, 60, 1);
-  const playerTent = new Tent(playerSource, targetNode, 0);
-
-  playerTent._cancelRivalContestProgress(targetNode, 1, 9);
-
-  assert.equal(targetNode.contest[1], 24, 'attacking owner progress should not be canceled by its own neutral contest pressure');
-  assert.ok(targetNode.contest[2] < 21, 'rival neutral contest progress should be reduced when the attacker keeps pushing');
+async function testTwNeutralContestOwnershipLivesInTwNeutralCapture() {
+  /* TW contest bookkeeping is owned by TwNeutralCapture. The legacy NW
+     _cancelRivalContestProgress was removed from Tent with the NW layer. */
+  const twCaptureSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwNeutralCapture.js'), 'utf8');
+  const tentSource = await fs.readFile(path.join(ROOT, 'src/entities/Tent.js'), 'utf8');
+  assert.match(twCaptureSource, /setTentacleWarsNeutralCaptureProgress\(/, 'TW contest progress writes should be owned by TwNeutralCapture');
+  assert.doesNotMatch(tentSource, /_cancelRivalContestProgress/, 'NW rival contest cancellation should not exist in TW-pure Tent');
 }
 
 async function testCanvasFeedbackEventsStayPresent() {
@@ -1386,7 +1369,7 @@ async function testTentacleWarsRuntimeMathIntegration() {
   assert.equal(twBuildCost.baseBuildCost, 20, 'TentacleWars player build cost should stay linear with distance');
   assert.equal(twBuildCost.rangeSurcharge, 0, 'TentacleWars player build cost should ignore NodeWARS range surcharge');
 
-  assert.match(tentSource, /sourceNode\.simulationMode === 'tentaclewars'/, 'Tent should branch build cost and bandwidth on the source simulation mode');
+  assert.match(tentSource, /computeTentacleWarsBuildCost\(/, 'TW-pure Tent should always use TW build cost — no simulationMode branch needed');
   const twFlowSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwFlow.js'), 'utf8');
   assert.match(twFlowSource, /advanceTentacleWarsLaneRuntime\(/, 'TentacleWars active lanes should use the packet-native lane runtime helper');
   const twOwnershipSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwOwnership.js'), 'utf8');
@@ -2012,12 +1995,13 @@ async function testFreshClashUsesApproachVisualFront() {
   const tentRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/TentRenderer.js'), 'utf8');
   const configSource = await fs.readFile(path.join(ROOT, 'src/config/gameConfig.js'), 'utf8');
 
+  const twCombatSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwCombat.js'), 'utf8');
   assert.match(gameSource, /initializeFreshClashVisual/, 'new clashes should initialize a visual approach front');
   assert.match(tentSource, /clashVisualT/, 'tentacles should track a separate visual clash front');
   assert.match(tentSource, /clashApproachActive/, 'tentacles should track whether a fresh clash is still approaching the midpoint');
-  assert.match(tentSource, /const midpoint = 0\.5;/, 'fresh clash approach should explicitly target the lane midpoint');
-  assert.match(tentSource, /const advanceFraction = \(GROW_PPS \/ Math\.max\(this\.distance, 1\)\) \* dt;/, 'fresh clash approach should advance at the same normalized speed as tentacle growth');
-  assert.match(tentSource, /if \(this\.clashApproachActive \|\| opposingTentacle\.clashApproachActive\)/, 'fresh clashes should finish the midpoint approach before normal force resolution begins');
+  assert.match(twCombatSource, /const midpoint = 0\.5;/, 'fresh clash approach should explicitly target the lane midpoint — owned by TwCombat');
+  assert.match(twCombatSource, /const advanceFraction = \(GROW_PPS \/ Math\.max\(channel\.distance, 1\)\) \* dt;/, 'fresh clash approach should advance at normalized growth speed — owned by TwCombat');
+  assert.match(twCombatSource, /if \(channel\.clashApproachActive \|\| opposingTentacle\.clashApproachActive\)/, 'fresh clashes should finish the midpoint approach before force resolution — owned by TwCombat');
   assert.match(tentRendererSource, /const activeClashFront = t\.clashVisualT \?\? t\.clashT;/, 'renderer should prefer the visual clash front when present');
   assert.match(configSource, /CLASH_VISUAL_APPROACH_SPEED/, 'config should expose a dedicated clash visual approach speed');
 }
@@ -2305,14 +2289,14 @@ async function testRedPurpleAllianceSkipsImmediateClash() {
 async function testAllianceUiAndOwnershipStayCoalitionAware() {
   const uiRendererSource = await fs.readFile(path.join(ROOT, 'src/rendering/UIRenderer.js'), 'utf8');
   const ownershipSource = await fs.readFile(path.join(ROOT, 'src/systems/Ownership.js'), 'utf8');
-  const tentCombatSource = await fs.readFile(path.join(ROOT, 'src/entities/TentCombat.js'), 'utf8');
+  const twFlowSource = await fs.readFile(path.join(ROOT, 'src/tentaclewars/TwFlow.js'), 'utf8');
   const autoRetractSource = await fs.readFile(path.join(ROOT, 'src/systems/world/AutoRetractSystem.js'), 'utf8');
   const { retractInvalidTentaclesAfterOwnershipChange } = await load('src/systems/Ownership.js');
   const { GameNode } = await load('src/entities/GameNode.js');
 
   assert.match(uiRendererSource, /areAlliedOwners\(t2\.source\.owner, n\.owner\)/, 'node info panel should count coalition support as allied incoming flow');
   assert.match(ownershipSource, /tent\.effectiveSourceNode === node/, 'ownership cleanup should always retract outgoing commitments rooted at the captured node');
-  assert.match(tentCombatSource, /areAlliedOwners\(targetNode\.owner, sourceNode\.owner\)/, 'tentacle combat should route coalition links through the friendly flow path');
+  assert.match(twFlowSource, /areAlliedOwners\(/, 'TW sustained flow should route coalition links through the friendly delivery path');
   assert.match(autoRetractSource, /areHostileOwners\(tentacle\.target\.owner, node\.owner\)/, 'auto-retract should only retract hostile outgoing tentacles');
 
   const capturedNode = new GameNode(10, 0, 0, 30, 2);
@@ -2718,19 +2702,19 @@ async function main() {
   const tests = [
     ['relay nodes do not create free energy', testRelayNoFreeEnergy],
     ['programmatic retract refunds payload', testProgrammaticRetractRefundsPayload],
-    ['slice cut rules stay canonical', testSliceCutRulesStayCanonical],
+    ['TW slice cut always enters RETRACTING (no NW burst/split zones)', testTwSliceCutAlwaysEntersRetracting],
     ['middle cut releases clash instead of destroying the partner', testMiddleCutReleasesClashInsteadOfDestroyingPartner],
     ['instant activation only tracks actually paid build cost', testImmediateActivationTracksPaidCostCorrectly],
     ['growing tentacles cannot advance without source budget', testGrowingTentacleCannotAdvanceWithoutBudget],
     ['growing retract refunds full paid construction cost', testGrowingTentacleRetractRefundsFullPaidCost],
     ['stable node level hysteresis prevents cap-threshold thrash', testStableNodeLevelHysteresisPreventsCapThrash],
     ['reversed retract refunds the effective source node', testReversedRetractRefundsEffectiveSource],
-    ['middle cut conserves payload across refund and impact', testMiddleCutConservesPayloadAcrossRefundAndImpact],
+    ['TW cut payload conservation is progressive (not immediate)', testTwCutPayloadConservationIsProgressive],
     ['TentacleWars cuts use continuous geometric split semantics', testTentacleWarsCutUsesContinuousGeometry],
     ['TentacleWars neutral capture path stays mode-owned', testTentacleWarsNeutralCapturePathStaysModeOwned],
     ['TentacleWars immediate payload uses mode-specific capture rules', testTentacleWarsImmediatePayloadUsesModeSpecificCaptureRules],
     ['build cost tuning stays playable', testBuildCostTuningStaysPlayable],
-    ['neutral contest does not artificially stall', testNeutralContestDoesNotArtificiallyStall],
+    ['TW neutral contest ownership lives in TwNeutralCapture', testTwNeutralContestOwnershipLivesInTwNeutralCapture],
     ['nodes under attack keep reduced outgoing flow', testUnderAttackStillAllowsReducedOutput],
     ['vortex drain uses the effective source on reversed tentacles', testVortexDrainsEffectiveSourceOnReversedTentacles],
     ['pulsar injects energy into owned nodes only', testPulsarInjectsEnergyIntoOwnedNodes],
