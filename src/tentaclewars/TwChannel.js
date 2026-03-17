@@ -239,7 +239,7 @@ function advanceActive(channel, dt) {
   channel._previousTargetOwner = effectiveTarget.owner;
 
   if (channel.clashPartner?.alive && channel.clashPartner.state !== TentState.RETRACTING) {
-    advanceTwClash(channel, dt);
+    advanceTwClash(channel, dt, channel.game?.tents ?? []);
   } else if (channel.clashT !== null) {
     channel.clashT = null;
     channel.clashVisualT = null;

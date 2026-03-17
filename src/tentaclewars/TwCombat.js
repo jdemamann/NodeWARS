@@ -161,7 +161,7 @@ function updateTwClashApproach(channel, opposingTentacle, dt) {
  * The losing source takes direct damage and, below threshold, all its outgoing
  * tentacles retract while the winner advances.
  */
-function applyTwClashDamage(channel, opposingTentacle, dt) {
+function applyTwClashDamage(channel, opposingTentacle, dt, tentRegistry = []) {
   const sourceNode = channel.effectiveSourceNode;
   const opposingSource = opposingTentacle.effectiveSourceNode;
 
@@ -186,7 +186,7 @@ function applyTwClashDamage(channel, opposingTentacle, dt) {
   drainSourceEnergy(loserTentacle, netDamage * dt); // Layer 1 write surface
   if (losingSource.energy >= TW_BALANCE.TW_RETRACT_CRITICAL_ENERGY) return;
 
-  const losingTents = (channel.game?.tents ?? []).filter(t =>
+  const losingTents = tentRegistry.filter(t =>
     t.alive &&
     t.state !== TentState.DEAD &&
     t.state !== TentState.RETRACTING &&
@@ -215,7 +215,7 @@ function applyTwClashDamage(channel, opposingTentacle, dt) {
  * Output: flowRate/packet visuals maintained, clash midpoint handled, and the
  * canonical driver applies asymmetric damage + auto-retract resolution.
  */
-export function advanceTwClash(channel, dt) {
+export function advanceTwClash(channel, dt, tentRegistry = []) {
   const sourceNode = channel.effectiveSourceNode;
   const opposingTentacle = channel.clashPartner;
   if (!opposingTentacle?.alive) {
@@ -260,5 +260,5 @@ export function advanceTwClash(channel, dt) {
     opposingTentacle.clashVisualT = 0.5;
   }
   opposingTentacle.clashSpark = channel.clashSpark;
-  applyTwClashDamage(channel, opposingTentacle, dt);
+  applyTwClashDamage(channel, opposingTentacle, dt, tentRegistry);
 }
